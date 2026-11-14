@@ -3,14 +3,12 @@ import {AppShell} from '@astryxdesign/core/AppShell';
 import {SideNav, SideNavHeading, SideNavItem, SideNavSection} from '@astryxdesign/core/SideNav';
 import {NavIcon} from '@astryxdesign/core/NavIcon';
 import {Icon} from '@astryxdesign/core/Icon';
-import {VStack} from '@astryxdesign/core/Stack';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Badge} from '@astryxdesign/core/Badge';
 import {Button} from '@astryxdesign/core/Button';
 import {
-  BarChart3, Bot, Database, Home as HomeIcon, PlayCircle, Search, Tag, UserCircle, Workflow,
+  BarChart3, Database, Home as HomeIcon, PlayCircle, Search, Tag, UserCircle, Workflow,
 } from 'lucide-react';
 import {RECENT_RUNS, TASKS, type Task} from './data';
 import {HomePage} from './pages/HomePage';
@@ -30,7 +28,6 @@ function useHashRoute(): string {
 export default function App() {
   const route = useHashRoute();
   const [tasks, setTasks] = useState<Task[]>(TASKS);
-  const [mode, setMode] = useState('build');
   const [query, setQuery] = useState('');
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
@@ -55,8 +52,7 @@ export default function App() {
             />
           }
           topContent={
-            <VStack gap={2}>
-              <TextInput
+            <TextInput
                 type="search"
                 label="Search"
                 isLabelHidden
@@ -66,16 +62,9 @@ export default function App() {
                 value={query}
                 onChange={setQuery}
               />
-              <SegmentedControl label="Sidebar mode" value={mode} onChange={setMode} size="sm" layout="fill">
-                <SegmentedControlItem value="build" label="Build" />
-                <SegmentedControlItem value="monitor" label="Monitor" />
-                <SegmentedControlItem value="agent" label="Agent" />
-              </SegmentedControl>
-            </VStack>
           }
           footer={
             <SideNavSection title="Account" isHeaderHidden>
-              <SideNavItem label="Connect your AI" icon={Bot} href="#home" />
               <SideNavItem label="Daniel" icon={UserCircle} href="#home" />
             </SideNavSection>
           }>
