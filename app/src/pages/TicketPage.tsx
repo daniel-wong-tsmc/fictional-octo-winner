@@ -120,7 +120,7 @@ function SheetTable({sheet}: {sheet: Sheet}) {
     return (
       <VStack padding={8} hAlign="center" gap={1}>
         <Icon icon={FileSpreadsheet} color="secondary" />
-        <Text type="supporting">This sheet fills in when the step runs.</Text>
+        <Text type="supporting">{sheet.emptyNote ?? 'This sheet fills in when the step runs.'}</Text>
       </VStack>
     );
   }
@@ -160,13 +160,61 @@ function SheetTable({sheet}: {sheet: Sheet}) {
   return <Table data={data} columns={columns} idKey="_row" density="compact" dividers="grid" textOverflow="truncate" />;
 }
 
+function Workbook({
+  title, description, sheets, selected, onSelect, actions,
+}: {
+  title: string;
+  description: string;
+  sheets: [string, Sheet][];
+  selected: string;
+  onSelect: (name: string) => void;
+  actions: React.ReactNode;
+}) {
+  const current = sheets.find(([n]) => n === selected)?.[1] ?? sheets[0][1];
+  const currentName = sheets.find(([n]) => n === selected)?.[0] ?? sheets[0][0];
+  return (
+    <Card padding={0}>
+      <VStack>
+        <HStack gap={3} padding={3} vAlign="center" hAlign="between" wrap="wrap">
+          <HStack gap={2} vAlign="center">
+            <Icon icon={FileSpreadsheet} color="success" />
+            <VStack gap={0}>
+              <Text weight="medium">{`${title} · ${sheets.length}`}</Text>
+              <Text type="supporting">{description}</Text>
+            </VStack>
+          </HStack>
+          <HStack gap={2} wrap="wrap">{actions}</HStack>
+        </HStack>
+        <TabList value={currentName} onChange={onSelect} size="sm" hasDivider>
+          {sheets.map(([name, s]) => (
+            <Tab key={name} value={name} label={name} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
+          ))}
+        </TabList>
+        <SheetTable sheet={current} />
+        <HStack gap={4} padding={3} wrap="wrap">
+          <Text type="supporting">
+            {current.fromFile ? `From ${current.fromFile}` : current.rows ? `Showing ${current.rows.length} sample rows` : 'No rows yet'}
+          </Text>
+          {!!current.addedColumns?.length && (
+            <HStack gap={1.5} vAlign="center">
+              <StatusDot variant="info" label="Added by the agent" />
+              <Text type="supporting">Column added by the agent</Text>
+            </HStack>
+          )}
+        </HStack>
+      </VStack>
+    </Card>
+  );
+}
+
 /* ---------- Page ---------- */
 
 export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number) => void}) {
   const t = TICKETS[id];
   const toast = useToast();
-  const firstSheet = t.outputs[0].emptyNote ? t.inputs[0].sheet : t.outputs[0].sheet;
-  const [sheet, setSheet] = useState(firstSheet);
+  const [inputSheet, setInputSheet] = useState(t.inputs[0].sheet);
+  const [outputSheet, setOutputSheet] = useState(t.outputs[0].sheet);
+  const [uploadedSheets, setUploadedSheets] = useState<[string, Sheet][]>([]);
   const [engine, setEngine] = useState('python');
   const [instructions, setInstructions] = useState(t.instructions);
   const [connections, setConnections] = useState(t.connections);
@@ -175,7 +223,24 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
 
   const preview = (what: string) => toast({body: `Preview only. ${what} comes with the real build.`});
   const status = isApproved ? 'done' : t.status;
-  const fileName = `${t.step.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')}.xlsx`;
+  const inputSheets: [string, Sheet][] = [
+    ...Object.entries(t.sheets).filter(([, s]) => s.kind === 'Input'),
+    ...uploadedSheets,
+  ];
+  const outputSheets = Object.entries(t.sheets).filter(([, s]) => s.kind === 'Output');
+
+  // Prototype only: a real upload reads the workbook's sheet names. Here we stand in two.
+  const addUpload = (file: File) => {
+    const base = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
+    const names = file.name.toLowerCase().endsWith('.csv') ? [base] : [`${base}: Sheet1`, `${base}: Sheet2`];
+    const added: [string, Sheet][] = names.map(n => [n, {
+      kind: 'Input', isEmpty: true, fromFile: file.name,
+      emptyNote: 'Uploaded. The sheet preview appears once uploads are connected.',
+    }]);
+    setUploadedSheets(prev => [...prev.filter(([, s]) => s.fromFile !== file.name), ...added]);
+    setInputSheet(names[0]);
+    toast({body: `Added ${names.length} ${names.length === 1 ? 'sheet' : 'sheets'} from ${file.name} to Input sheets.`});
+  };
 
   return (
     <Layout
@@ -230,7 +295,7 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
             <Grid columns={{minWidth: 300, repeat: 'fit'}} gap={3} align="start">
               <Column title="Inputs" count={t.inputs.length}>
                 {t.inputs.map(d => (
-                  <DataCard key={d.name} data={d} isSelected={sheet === d.sheet} onSelect={() => setSheet(d.sheet)} />
+                  <DataCard key={d.name} data={d} isSelected={inputSheet === d.sheet} onSelect={() => setInputSheet(d.sheet)} />
                 ))}
               </Column>
 
@@ -292,60 +357,45 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
 
               <Column title="Output">
                 {t.outputs.map(d => (
-                  <DataCard key={d.name} data={d} isSelected={sheet === d.sheet} onSelect={() => setSheet(d.sheet)} />
+                  <DataCard key={d.name} data={d} isSelected={outputSheet === d.sheet} onSelect={() => setOutputSheet(d.sheet)} />
                 ))}
               </Column>
             </Grid>
 
-            {/* Workbook */}
-            <Card padding={0}>
-              <VStack>
-                <HStack gap={3} padding={3} vAlign="center" hAlign="between" wrap="wrap">
-                  <HStack gap={2} vAlign="center">
-                    <Icon icon={FileSpreadsheet} color="success" />
-                    <VStack gap={0}>
-                      <Text weight="medium">{fileName}</Text>
-                      <Text type="supporting">
-                        {upload ? `You uploaded ${upload.name} just now` : `${Object.keys(t.sheets).length} sheets: inputs and output in one workbook`}
-                      </Text>
-                    </VStack>
-                  </HStack>
-                  <HStack gap={2}>
-                    <FileInput
-                      label="Upload Excel"
-                      isLabelHidden
-                      placeholder="Upload Excel"
-                      accept=".xlsx,.xls,.csv"
-                      width={220}
-                      value={upload}
-                      onChange={files => {
-                        const f = Array.isArray(files) ? files[0] : files;
-                        setUpload(f ?? null);
-                        if (f) toast({body: `Received ${f.name}. In the real build this replaces the matching input sheet.`});
-                      }}
-                    />
-                    <Button label="Download" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
-                  </HStack>
-                </HStack>
-                <TabList value={sheet} onChange={setSheet} size="sm" hasDivider>
-                  {Object.entries(t.sheets).map(([name, s]) => (
-                    <Tab key={name} value={name} label={name} endContent={<Text type="supporting">{s.kind}</Text>} />
-                  ))}
-                </TabList>
-                <SheetTable sheet={t.sheets[sheet]} />
-                <HStack gap={4} padding={3} wrap="wrap">
-                  <Text type="supporting">
-                    {t.sheets[sheet].rows ? `Showing ${t.sheets[sheet].rows!.length} sample rows` : 'No rows yet'}
-                  </Text>
-                  {!!t.sheets[sheet].addedColumns?.length && (
-                    <HStack gap={1.5} vAlign="center">
-                      <StatusDot variant="info" label="Added by the agent" />
-                      <Text type="supporting">Column added by the agent</Text>
-                    </HStack>
-                  )}
-                </HStack>
-              </VStack>
-            </Card>
+            {/* Sheets: inputs and outputs kept apart */}
+            <Workbook
+              title="Input sheets"
+              description="What the agent reads. Upload an Excel to add its sheets here."
+              sheets={inputSheets}
+              selected={inputSheet}
+              onSelect={setInputSheet}
+              actions={
+                <>
+                  <FileInput
+                    label="Upload Excel"
+                    isLabelHidden
+                    placeholder="Upload Excel"
+                    accept=".xlsx,.xls,.csv"
+                    width={220}
+                    value={upload}
+                    onChange={files => {
+                      const f = Array.isArray(files) ? files[0] : files;
+                      setUpload(f ?? null);
+                      if (f) addUpload(f);
+                    }}
+                  />
+                  <Button label="Download inputs" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
+                </>
+              }
+            />
+            <Workbook
+              title="Output sheets"
+              description="What the agent writes. Read only; change the instructions to change these."
+              sheets={outputSheets}
+              selected={outputSheet}
+              onSelect={setOutputSheet}
+              actions={<Button label="Download output" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />}
+            />
             <Text type="supporting" justify="center">Design prototype. Example data. Runs, uploads and downloads are not connected yet.</Text>
           </VStack>
         </LayoutContent>

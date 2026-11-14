@@ -42,6 +42,9 @@ export type Sheet = {
   missingColumns?: number[];
   signedColumns?: number[];
   isEmpty?: boolean;
+  /** File the sheet came from, when the user uploaded it. */
+  fromFile?: string;
+  emptyNote?: string;
 };
 
 export type Ticket = {
