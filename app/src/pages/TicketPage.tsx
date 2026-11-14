@@ -5,18 +5,22 @@ import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Grid} from '@astryxdesign/core/Grid';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
+import {IconButton} from '@astryxdesign/core/IconButton';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
 import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {TextArea} from '@astryxdesign/core/TextArea';
+import {TextInput} from '@astryxdesign/core/TextInput';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {Token} from '@astryxdesign/core/Token';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
-import {TextInput} from '@astryxdesign/core/TextInput';
+import {Selector} from '@astryxdesign/core/Selector';
+import {RadioList, RadioListItem} from '@astryxdesign/core/RadioList';
+import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Divider} from '@astryxdesign/core/Divider';
@@ -24,18 +28,25 @@ import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Bot, Check, Download, FileSpreadsheet, Plug, Plus, RotateCcw, Sparkles} from 'lucide-react';
+import {
+  ArrowRightLeft, Bot, Check, Download, FileSpreadsheet, MousePointerClick, Plug, Plus, RotateCcw, Sparkles, Trash2,
+} from 'lucide-react';
 import {AVAILABLE_CONNECTIONS, TICKETS, type DataSet, type Sheet} from '../data';
+import {
+  CHECK_LABEL, checksFor, describeRule, previewValue, rulesForPick, shapeOf,
+  type CheckKind, type Handoff, type Pick,
+} from '../handoffs';
 import {REF_ICON, RefLabel, StatusLabel} from './shared';
 
 const isNumeric = (v: string) => /^[+-]?[\d,]+(\.\d+)?%?$/.test(v);
+const letter = (i: number) => String.fromCharCode(65 + i);
 
-/* ---------- Inputs and output ---------- */
+/* ---------- Inputs and result cards ---------- */
 
 function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: boolean; onSelect: () => void}) {
   return (
     <ClickableCard
-      label={`Show ${data.name} in the workbook`}
+      label={`Show ${data.name} in the sheets below`}
       onClick={onSelect}
       padding={3}
       variant={data.emptyNote ? 'muted' : 'default'}
@@ -58,7 +69,7 @@ function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: bool
         {data.feedsInto && (
           <VStack gap={0.5} hAlign="start">
             <Divider />
-            <Text type="supporting">Feeds into</Text>
+            <Text type="supporting">Next step in this workflow</Text>
             {data.feedsInto.map(([kind, label, href]) => (
               <Button key={label} label={label} href={href} variant="ghost" size="sm" icon={<Icon icon={REF_ICON[kind]} />} />
             ))}
@@ -69,14 +80,152 @@ function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: bool
   );
 }
 
-function Column({title, count, children}: {title: string; count?: number; children: React.ReactNode}) {
+/** An input that arrives from another workflow's handoff. Fills in on every run. */
+function HandoffInputCard({handoff, onRemove}: {handoff: Handoff; onRemove?: () => void}) {
+  const failed = !!handoff.checkFailure;
+  return (
+    <Card padding={3}>
+      <VStack gap={1.5}>
+        <HStack gap={2} vAlign="center" hAlign="between">
+          <HStack gap={2} vAlign="center">
+            <Icon icon={ArrowRightLeft} size="sm" color="secondary" />
+            <Text weight="medium">{handoff.name}</Text>
+          </HStack>
+          {onRemove && <IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
+        </HStack>
+        <RefLabel kind="workflow" label={`Handoff from ${handoff.workflow}`} />
+        <HStack gap={2} vAlign="center" wrap="wrap">
+          <Token size="sm" label={shapeOf(handoff.rule)} />
+          <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
+        </HStack>
+        <HStack gap={1.5} vAlign="center">
+          <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Waiting' : 'Ready'} />
+          <Text type="supporting" weight="medium">
+            {failed ? `Waiting: ${handoff.checkFailure} This step won't run until it passes.` : 'Fills in automatically on every run'}
+          </Text>
+        </HStack>
+      </VStack>
+    </Card>
+  );
+}
+
+function Column({title, count, endContent, children}: {title: string; count?: number; endContent?: React.ReactNode; children: React.ReactNode}) {
   return (
     <Card padding={3}>
       <VStack gap={3}>
-        <Text type="label" color="secondary">{count !== undefined ? `${title} · ${count}` : title}</Text>
+        <HStack hAlign="between" vAlign="center" gap={2}>
+          <Text type="label" color="secondary">{count !== undefined ? `${title} · ${count}` : title}</Text>
+          {endContent}
+        </HStack>
         {children}
       </VStack>
     </Card>
+  );
+}
+
+/* ---------- Handoffs (step 2) and checks (step 3) ---------- */
+
+function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void}) {
+  const failed = !!handoff.checkFailure;
+  return (
+    <Card padding={3} variant={failed ? 'red' : 'default'}>
+      <VStack gap={2}>
+        <HStack hAlign="between" vAlign="start" gap={2}>
+          <VStack gap={0.5}>
+            <Text weight="medium">{handoff.name}</Text>
+            <Text type="supporting">{describeRule(handoff.rule)}</Text>
+          </VStack>
+          <IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />
+        </HStack>
+        <HStack gap={2} vAlign="center" wrap="wrap">
+          <Token size="sm" label={shapeOf(handoff.rule)} />
+          <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
+        </HStack>
+        {handoff.check !== 'none' && (
+          <HStack gap={1.5} vAlign="center">
+            <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Check failed' : 'Check passed'} />
+            <Text type="supporting" weight="medium">
+              {failed
+                ? `Check failed: ${CHECK_LABEL[handoff.check].toLowerCase()}. ${handoff.checkFailure}`
+                : `Check passed: ${CHECK_LABEL[handoff.check].toLowerCase()}`}
+            </Text>
+          </HStack>
+        )}
+        <HStack gap={1.5} vAlign="center" wrap="wrap">
+          <Text type="supporting">Used by</Text>
+          {handoff.usedBy.length ? (
+            handoff.usedBy.map(w => <RefLabel key={w} kind="workflow" label={failed ? `${w} (waiting)` : w} />)
+          ) : (
+            <Text type="supporting">Not used yet</Text>
+          )}
+        </HStack>
+      </VStack>
+    </Card>
+  );
+}
+
+function AddHandoffDialog({
+  pick, sheet, onClose, onAdd,
+}: {
+  pick: Pick | null;
+  sheet: Sheet;
+  onClose: () => void;
+  onAdd: (h: Omit<Handoff, 'id' | 'ticketId' | 'workflow' | 'usedBy'>) => void;
+}) {
+  const options = pick ? rulesForPick(pick, sheet) : [];
+  const [choice, setChoice] = useState('0');
+  const [name, setName] = useState(options[0]?.suggestedName ?? '');
+  const chosen = options[Number(choice)] ?? options[0];
+  const checks = chosen ? checksFor(chosen.rule) : [];
+  const [check, setCheck] = useState<CheckKind>(checks[0] ?? 'none');
+  if (!pick || !chosen) return null;
+
+  const clicked =
+    pick.kind === 'column' ? `column ${letter(pick.col)}` : pick.kind === 'row' ? `row ${pick.row}` : `cell ${letter(pick.col)}${pick.row}`;
+
+  return (
+    <Dialog isOpen onOpenChange={open => !open && onClose()} width={520} purpose="form">
+      <DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose how to find it on every run.`} onOpenChange={open => !open && onClose()} />
+      <VStack gap={4} padding={4}>
+        <RadioList
+          label="Save it as"
+          description="Saved by meaning, so it stays right when rows move or the data grows."
+          value={choice}
+          onChange={v => {
+            setChoice(v);
+            const o = options[Number(v)];
+            setName(o.suggestedName);
+            setCheck(checksFor(o.rule)[0]);
+          }}>
+          {options.map((o, i) => (
+            <RadioListItem
+              key={i}
+              value={String(i)}
+              label={describeRule(o.rule)}
+              description={`${shapeOf(o.rule)} · now ${previewValue(o.rule, sheet)}${i === 0 ? ' · recommended' : ''}`}
+            />
+          ))}
+        </RadioList>
+        <Text type="supporting">{`Not offered: ${clicked.replace('column ', '').replace('row ', 'row ').replace('cell ', '')} as a fixed position. It points at different data after the next run.`}</Text>
+        <TextInput label="Name" description="How other workflows will see it." value={name} onChange={setName} />
+        <Selector
+          label="Check before passing it on"
+          description="If the check fails, workflows that use it wait and you get a task on Home."
+          value={check}
+          onChange={v => setCheck(v as CheckKind)}
+          options={checks.map(c => ({value: c, label: CHECK_LABEL[c]}))}
+        />
+        <HStack gap={2} hAlign="end">
+          <Button label="Cancel" variant="ghost" onClick={onClose} />
+          <Button
+            label="Add handoff"
+            variant="primary"
+            isDisabled={!name.trim()}
+            onClick={() => onAdd({name: name.trim(), rule: chosen.rule, value: `${previewValue(chosen.rule, sheet)} (sample)`, check})}
+          />
+        </HStack>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -92,12 +241,7 @@ function Connections({items, onAdd, onRemove}: {items: string[]; onAdd: (n: stri
       </HStack>
       <HStack gap={1.5} wrap="wrap" vAlign="center">
         {items.map(name => (
-          <Token
-            key={name}
-            label={name}
-            icon={<StatusDot variant="success" label="Connected" />}
-            onRemove={() => onRemove(name)}
-          />
+          <Token key={name} label={name} icon={<StatusDot variant="success" label="Connected" />} onRemove={() => onRemove(name)} />
         ))}
         <DropdownMenu
           button={{label: 'Add connection', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
@@ -113,44 +257,11 @@ function Connections({items, onAdd, onRemove}: {items: string[]; onAdd: (n: stri
   );
 }
 
-/* ---------- Workbook ---------- */
+/* ---------- Sheets ---------- */
 
 type Row = Record<string, unknown> & {_row: number};
 
-/** What the user chose to show from an output sheet after each run. */
-type SheetView = {mode: 'columns' | 'cells'; columns: string[]; range: string};
-type ResolvedView = {cols: number[]; rowFrom: number; rowTo: number; summary: string; isAll: boolean};
-
-const letter = (i: number) => String.fromCharCode(65 + i);
-
-/** Parses an Excel-style range like "F2:F9", "A1:C5" or "B:D". Row 1 is the header row. */
-function parseRange(range: string, colCount: number): {cols: number[]; rowFrom: number; rowTo: number} | null {
-  const m = range.trim().toUpperCase().match(/^([A-Z])(\d*)(?::([A-Z])(\d*))?$/);
-  if (!m) return null;
-  const c1 = m[1].charCodeAt(0) - 65;
-  const c2 = (m[3] ?? m[1]).charCodeAt(0) - 65;
-  if (c1 >= colCount || c2 >= colCount || c2 < c1) return null;
-  const r1 = m[2] ? Number(m[2]) : 1;
-  const r2 = m[4] ? Number(m[4]) : m[2] && !m[3] ? r1 : Infinity;
-  if (r2 < r1) return null;
-  return {cols: Array.from({length: c2 - c1 + 1}, (_, i) => c1 + i), rowFrom: Math.max(r1, 2), rowTo: r2};
-}
-
-function resolveView(sheet: Sheet, view?: SheetView): ResolvedView {
-  const n = sheet.columns?.length ?? 0;
-  const all: ResolvedView = {cols: Array.from({length: n}, (_, i) => i), rowFrom: 2, rowTo: Infinity, summary: 'Everything', isAll: true};
-  if (!view || !sheet.columns) return all;
-  if (view.mode === 'columns') {
-    const cols = sheet.columns.map((c, i) => (view.columns.includes(c) ? i : -1)).filter(i => i >= 0);
-    if (!cols.length || cols.length === n) return all;
-    return {...all, cols, isAll: false, summary: cols.map(i => sheet.columns![i]).join(', ')};
-  }
-  const r = parseRange(view.range, n);
-  if (!r) return all;
-  return {...r, isAll: false, summary: `Cells ${view.range.trim().toUpperCase()}`};
-}
-
-function SheetTable({sheet, view}: {sheet: Sheet; view?: ResolvedView}) {
+function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?: string[]; onPick?: (p: Pick) => void}) {
   if (sheet.isEmpty || !sheet.columns || !sheet.rows) {
     return (
       <VStack padding={8} hAlign="center" gap={1}>
@@ -161,58 +272,76 @@ function SheetTable({sheet, view}: {sheet: Sheet; view?: ResolvedView}) {
   }
   const added = sheet.addedColumns ?? [];
   const missing = sheet.missingColumns ?? [];
-  const v = view ?? resolveView(sheet);
-  const data: Row[] = sheet.rows
-    .map((r, i) => {
-      const row: Row = {_row: i + 2};
-      r.forEach((val, c) => (row[`c${c}`] = val));
-      return row;
-    })
-    .filter(row => row._row >= v.rowFrom && row._row <= v.rowTo);
+  const cols = sheet.columns
+    .map((name, c) => [name, c] as const)
+    .filter(([name]) => !shownColumns?.length || shownColumns.includes(name));
+  const data: Row[] = sheet.rows.map((r, i) => {
+    const row: Row = {_row: i + 2};
+    r.forEach((val, c) => (row[`c${c}`] = val));
+    return row;
+  });
   const columns: TableColumn<Row>[] = [
-    {key: '_row', header: <Text type="supporting">1</Text>, width: pixel(44), align: 'end',
-      renderCell: item => <Text type="supporting" hasTabularNumbers>{item._row}</Text>},
-    ...v.cols.map(c => [sheet.columns![c], c] as const).map(([name, c]): TableColumn<Row> => ({
+    {
+      key: '_row', header: <Text type="supporting">1</Text>, width: pixel(52), align: 'end',
+      renderCell: item =>
+        onPick ? (
+          <Button label={String(item._row)} variant="ghost" size="sm" tooltip={`Hand off row ${item._row}`} onClick={() => onPick({kind: 'row', row: item._row})} />
+        ) : (
+          <Text type="supporting" hasTabularNumbers>{item._row}</Text>
+        ),
+    },
+    ...cols.map(([name, c]): TableColumn<Row> => ({
       key: `c${c}`,
       align: isNumeric(sheet.rows![0][c]) ? 'end' : 'start',
       header: (
         <VStack gap={0}>
           <Text type="supporting">{letter(c)}</Text>
-          <HStack gap={1} vAlign="center">
-            <Text weight="semibold">{name}</Text>
-            {added.includes(c) && <StatusDot variant="info" label="Added by the agent" tooltip="Added by the agent" />}
-          </HStack>
+          {onPick ? (
+            <Button label={name} variant="ghost" size="sm" tooltip={`Hand off column ${letter(c)}`} onClick={() => onPick({kind: 'column', col: c})} />
+          ) : (
+            <HStack gap={1} vAlign="center">
+              <Text weight="semibold">{name}</Text>
+              {added.includes(c) && <StatusDot variant="info" label="Added by the agent" tooltip="Added by the agent" />}
+            </HStack>
+          )}
         </VStack>
       ),
-      renderCell: item =>
-        missing.includes(c) ? (
-          <HStack gap={1} vAlign="center">
-            <StatusDot variant="error" label="Missing" />
-            <Text type="supporting">Missing</Text>
-          </HStack>
-        ) : (
-          <Text hasTabularNumbers weight={added.includes(c) ? 'medium' : 'normal'}>{String(item[`c${c}`])}</Text>
-        ),
+      renderCell: item => {
+        const v = String(item[`c${c}`]);
+        if (missing.includes(c)) {
+          return (
+            <HStack gap={1} vAlign="center">
+              <StatusDot variant="error" label="Missing" />
+              <Text type="supporting">Missing</Text>
+            </HStack>
+          );
+        }
+        if (onPick) {
+          return <Button label={v} variant="ghost" size="sm" tooltip={`Hand off cell ${letter(c)}${item._row}`} onClick={() => onPick({kind: 'cell', col: c, row: item._row})} />;
+        }
+        return <Text hasTabularNumbers weight={added.includes(c) ? 'medium' : 'normal'}>{v}</Text>;
+      },
     })),
   ];
   return <Table data={data} columns={columns} idKey="_row" density="compact" dividers="grid" textOverflow="truncate" />;
 }
 
 function Workbook({
-  title, description, sheets, selected, onSelect, actions, views,
+  title, description, sheets, selected, onSelect, actions, banner, shownColumns, onPick,
 }: {
-  views?: Record<string, SheetView>;
   title: string;
   description: string;
   sheets: [string, Sheet][];
   selected: string;
   onSelect: (name: string) => void;
   actions: React.ReactNode;
+  banner?: React.ReactNode;
+  shownColumns?: string[];
+  onPick?: (p: Pick) => void;
 }) {
   const current = sheets.find(([n]) => n === selected)?.[1] ?? sheets[0][1];
   const currentName = sheets.find(([n]) => n === selected)?.[0] ?? sheets[0][0];
-  const view = resolveView(current, views?.[currentName]);
-  const shownRows = current.rows?.filter((_, i) => i + 2 >= view.rowFrom && i + 2 <= view.rowTo).length ?? 0;
+  const hidden = shownColumns?.length && current.columns ? current.columns.length - shownColumns.length : 0;
   return (
     <Card padding={0}>
       <VStack>
@@ -224,23 +353,18 @@ function Workbook({
               <Text type="supporting">{description}</Text>
             </VStack>
           </HStack>
-          <HStack gap={2} wrap="wrap">{actions}</HStack>
+          <HStack gap={2} wrap="wrap" vAlign="center">{actions}</HStack>
         </HStack>
+        {banner}
         <TabList value={currentName} onChange={onSelect} size="sm" hasDivider>
           {sheets.map(([name, s]) => (
             <Tab key={name} value={name} label={name} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
           ))}
         </TabList>
-        <SheetTable sheet={current} view={view} />
+        <SheetTable sheet={current} shownColumns={shownColumns} onPick={onPick} />
         <HStack gap={4} padding={3} wrap="wrap">
           <Text type="supporting">
-            {current.fromFile
-              ? `From ${current.fromFile}`
-              : !current.rows
-                ? 'No rows yet'
-                : view.isAll
-                  ? `Showing ${current.rows.length} sample rows`
-                  : `Showing your selection: ${view.cols.length} of ${current.columns!.length} columns, ${shownRows} rows`}
+            {current.fromFile ? `From ${current.fromFile}` : current.rows ? `Showing ${current.rows.length} sample rows${hidden ? `, ${hidden} columns hidden` : ''}` : 'No rows yet'}
           </Text>
           {!!current.addedColumns?.length && (
             <HStack gap={1.5} vAlign="center">
@@ -254,74 +378,26 @@ function Workbook({
   );
 }
 
-function ShowPicker({sheet, view, onChange}: {sheet: Sheet; view: SheetView; onChange: (v: SheetView) => void}) {
-  if (sheet.isEmpty || !sheet.columns) {
-    return (
-      <Card variant="muted" padding={3}>
-        <VStack gap={1}>
-          <Text type="label">Show after each run</Text>
-          <Text type="supporting">Available after the agent has run. Then pick the columns or cells you want to see here.</Text>
-        </VStack>
-      </Card>
-    );
-  }
-  const resolved = resolveView(sheet, view);
-  const rangeInvalid = view.mode === 'cells' && view.range.trim() !== '' && !parseRange(view.range, sheet.columns.length);
-  return (
-    <Card variant="muted" padding={3}>
-      <VStack gap={3}>
-        <VStack gap={0.5}>
-          <Text type="label">Show after each run</Text>
-          <Text type="supporting">Only changes what you see on this ticket. The full output still goes to the next step.</Text>
-        </VStack>
-        <SegmentedControl label="Pick by" value={view.mode} onChange={m => onChange({...view, mode: m as SheetView['mode']})} size="sm">
-          <SegmentedControlItem value="columns" label="Columns" />
-          <SegmentedControlItem value="cells" label="Cells" />
-        </SegmentedControl>
-        {view.mode === 'columns' ? (
-          <MultiSelector
-            label="Columns to show"
-            isLabelHidden
-            placeholder="All columns"
-            options={sheet.columns.map((c, i) => ({value: c, label: `${letter(i)}  ${c}`}))}
-            value={view.columns}
-            onChange={cols => onChange({...view, columns: cols})}
-            triggerDisplay="labels"
-            hasSelectAll
-            width="100%"
-          />
-        ) : (
-          <TextInput
-            label="Cell range"
-            isLabelHidden
-            placeholder={`For example F2:F9 or A1:${letter(sheet.columns.length - 1)}5`}
-            value={view.range}
-            onChange={r => onChange({...view, range: r})}
-            status={rangeInvalid ? {type: 'error', message: `Use a range like F2:F9, within columns A to ${letter(sheet.columns.length - 1)}.`} : undefined}
-            width="100%"
-          />
-        )}
-        <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
-          <Text type="supporting">{`Showing: ${resolved.summary}`}</Text>
-          {!resolved.isAll && (
-            <Button label="Show everything" variant="ghost" size="sm" onClick={() => onChange({mode: view.mode, columns: [], range: ''})} />
-          )}
-        </HStack>
-      </VStack>
-    </Card>
-  );
-}
-
 /* ---------- Page ---------- */
 
-export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number) => void}) {
+export function TicketPage({
+  id, handoffs, onApprove, onAddHandoff, onRemoveHandoff,
+}: {
+  id: number;
+  handoffs: Handoff[];
+  onApprove: (id: number) => void;
+  onAddHandoff: (h: Handoff) => void;
+  onRemoveHandoff: (handoffId: string) => void;
+}) {
   const t = TICKETS[id];
   const toast = useToast();
-  const [inputSheet, setInputSheet] = useState(t.inputs[0].sheet);
+  const [inputSheet, setInputSheet] = useState(t.inputs.find(d => d.sheet)?.sheet ?? '');
   const [outputSheet, setOutputSheet] = useState(t.outputs[0].sheet);
   const [uploadedSheets, setUploadedSheets] = useState<[string, Sheet][]>([]);
-  const [views, setViews] = useState<Record<string, SheetView>>({});
-  const viewFor = (name: string): SheetView => views[name] ?? {mode: 'columns', columns: [], range: ''};
+  const [linkedInputs, setLinkedInputs] = useState<string[]>(t.inputs.filter(d => d.handoffId).map(d => d.handoffId!));
+  const [shownColumns, setShownColumns] = useState<string[]>([]);
+  const [isPicking, setIsPicking] = useState(false);
+  const [pick, setPick] = useState<Pick | null>(null);
   const [engine, setEngine] = useState('python');
   const [instructions, setInstructions] = useState(t.instructions);
   const [connections, setConnections] = useState(t.connections);
@@ -330,6 +406,15 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
 
   const preview = (what: string) => toast({body: `Preview only. ${what} comes with the real build.`});
   const status = isApproved ? 'done' : t.status;
+  const myHandoffs = handoffs.filter(h => h.ticketId === id);
+  const otherHandoffs = handoffs.filter(h => h.ticketId !== id && !linkedInputs.includes(h.id));
+  const result = t.outputs[0];
+  const resultSheet = t.sheets[result.sheet];
+  const hasResult = !resultSheet.isEmpty;
+  const failedChecks = myHandoffs.filter(h => h.checkFailure);
+
+  const fileInputs = t.inputs.filter(d => !d.handoffId);
+  const inputCount = fileInputs.length + linkedInputs.length;
   const inputSheets: [string, Sheet][] = [
     ...Object.entries(t.sheets).filter(([, s]) => s.kind === 'Input'),
     ...uploadedSheets,
@@ -374,7 +459,7 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
                 </HStack>
                 <Heading level={1} textWrap="balance">{t.step}</Heading>
                 <Text type="supporting">
-                  {isApproved && t.status !== 'done' ? 'Approved just now. The next step will use this output.' : t.ran}
+                  {isApproved && t.status !== 'done' ? 'Approved just now. The next step and any handoffs use this output.' : t.ran}
                 </Text>
               </VStack>
               <HStack gap={2} wrap="wrap">
@@ -387,7 +472,8 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
                     onClick={() => {
                       setIsApproved(true);
                       onApprove(id);
-                      toast({body: `Approved. ${t.outputs[0].feedsInto?.map(f => f[1]).join(' and ') ?? 'The next step'} will use this output.`});
+                      const users = [...new Set(myHandoffs.flatMap(h => h.usedBy))];
+                      toast({body: `Approved. ${users.length ? `${users.join(' and ')} will get the new handoff values.` : 'The next step will use this output.'}`});
                     }}
                   />
                 )}
@@ -397,21 +483,89 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
             {t.banner && !isApproved && (
               <Banner status={t.banner.status} title={t.banner.title} description={t.banner.description} collapsible={false} />
             )}
+            {failedChecks.length > 0 && (
+              <Banner
+                status="error"
+                title={`${failedChecks.length === 1 ? 'A handoff check failed' : `${failedChecks.length} handoff checks failed`}.`}
+                description={`${failedChecks.map(h => `${h.name}: ${h.checkFailure}`).join(' ')} Workflows that use it are waiting.`}
+                collapsible={false}
+              />
+            )}
 
             {/* Inputs and output on the left, instructions on the right */}
             <Grid columns={{minWidth: 380, repeat: 'fit'}} gap={3} align="start">
               <VStack gap={3}>
-                <Column title="Inputs" count={t.inputs.length}>
-                  {t.inputs.map(d => (
+                <Column
+                  title="Inputs"
+                  count={inputCount}
+                  endContent={
+                    <DropdownMenu
+                      button={{label: 'Add input', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
+                      header={<Text type="supporting">From another workflow</Text>}
+                      alignment="end"
+                      items={
+                        otherHandoffs.length
+                          ? otherHandoffs.map(h => ({
+                              label: h.name,
+                              description: `${h.workflow} · ${shapeOf(h.rule)} · ${h.value ?? ''}`,
+                              icon: <Icon icon={ArrowRightLeft} />,
+                              onClick: () => {
+                                setLinkedInputs(prev => [...prev, h.id]);
+                                toast({body: `${h.name} from ${h.workflow} is now an input. It fills in on every run.`});
+                              },
+                            }))
+                          : [{label: 'No other handoffs yet', isDisabled: true}]
+                      }
+                    />
+                  }>
+                  {fileInputs.map(d => (
                     <DataCard key={d.name} data={d} isSelected={inputSheet === d.sheet} onSelect={() => setInputSheet(d.sheet)} />
                   ))}
+                  {linkedInputs.map(hid => {
+                    const h = handoffs.find(x => x.id === hid);
+                    return h ? <HandoffInputCard key={hid} handoff={h} onRemove={() => setLinkedInputs(prev => prev.filter(x => x !== hid))} /> : null;
+                  })}
                 </Column>
+
                 <Column title="Output">
-                  {t.outputs.map(d => (
-                    <DataCard key={d.name} data={d} isSelected={outputSheet === d.sheet} onSelect={() => setOutputSheet(d.sheet)} />
-                  ))}
-                  {t.outputs.map(d => (
-                    <ShowPicker key={`${d.sheet}-show`} sheet={t.sheets[d.sheet]} view={viewFor(d.sheet)} onChange={v => setViews(prev => ({...prev, [d.sheet]: v}))} />
+                  {/* Step 1: the result, always passed on */}
+                  <VStack gap={1.5}>
+                    <Text type="label">Result</Text>
+                    <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
+                  </VStack>
+                  <DataCard data={result} isSelected={outputSheet === result.sheet} onSelect={() => setOutputSheet(result.sheet)} />
+
+                  <Divider />
+
+                  {/* Step 2: handoffs, with step 3: checks */}
+                  <HStack hAlign="between" vAlign="start" gap={2} wrap="wrap">
+                    <VStack gap={0.5}>
+                      <Text type="label">{`Handoffs · ${myHandoffs.length}`}</Text>
+                      <Text type="supporting">Values from the result that other workflows can use as inputs.</Text>
+                    </VStack>
+                    <Button
+                      label={isPicking ? 'Picking…' : 'Add handoff'}
+                      size="sm"
+                      icon={<Icon icon={MousePointerClick} />}
+                      isDisabled={!hasResult}
+                      tooltip={hasResult ? 'Click a column, row or cell in the output sheet' : undefined}
+                      onClick={() => {
+                        setOutputSheet(result.sheet);
+                        setShownColumns([]);
+                        setIsPicking(true);
+                      }}
+                    />
+                  </HStack>
+                  {!hasResult && <Text type="supporting">Available after the agent has run.</Text>}
+                  {myHandoffs.map(h => (
+                    <HandoffRow
+                      key={h.id}
+                      handoff={h}
+                      onRemove={() => {
+                        onRemoveHandoff(h.id);
+                        toast({body: h.usedBy.length ? `Removed ${h.name}. ${h.usedBy.join(' and ')} lost this input.` : `Removed ${h.name}.`});
+                      }}
+                    />
                   ))}
                 </Column>
               </VStack>
@@ -449,13 +603,7 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
                     defaultIsOpen={false}
                     chevronPosition="start"
                     trigger={<Text type="supporting" weight="medium">{engine === 'python' ? 'Show the Python' : 'Show the Excel formulas'}</Text>}>
-                    <CodeBlock
-                      code={engine === 'python' ? t.python : t.excel}
-                      language={engine === 'python' ? 'python' : 'plaintext'}
-                      width="100%"
-                      size="sm"
-                      isWrapped
-                    />
+                    <CodeBlock code={engine === 'python' ? t.python : t.excel} language={engine === 'python' ? 'python' : 'plaintext'} width="100%" size="sm" isWrapped />
                   </Collapsible>
                   <Divider />
                   <Connections
@@ -474,42 +622,90 @@ export function TicketPage({id, onApprove}: {id: number; onApprove: (id: number)
             </Grid>
 
             {/* Sheets: inputs and outputs kept apart */}
-            <Workbook
-              title="Input sheets"
-              description="What the agent reads. Upload an Excel to add its sheets here."
-              sheets={inputSheets}
-              selected={inputSheet}
-              onSelect={setInputSheet}
-              actions={
-                <>
-                  <FileInput
-                    label="Upload Excel"
-                    isLabelHidden
-                    placeholder="Upload Excel"
-                    accept=".xlsx,.xls,.csv"
-                    width={220}
-                    value={upload}
-                    onChange={files => {
-                      const f = Array.isArray(files) ? files[0] : files;
-                      setUpload(f ?? null);
-                      if (f) addUpload(f);
-                    }}
-                  />
-                  <Button label="Download inputs" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
-                </>
-              }
-            />
+            {inputSheets.length > 0 && (
+              <Workbook
+                title="Input sheets"
+                description="What the agent reads. Upload an Excel to add its sheets here."
+                sheets={inputSheets}
+                selected={inputSheet}
+                onSelect={setInputSheet}
+                actions={
+                  <>
+                    <FileInput
+                      label="Upload Excel"
+                      isLabelHidden
+                      placeholder="Upload Excel"
+                      accept=".xlsx,.xls,.csv"
+                      width={220}
+                      value={upload}
+                      onChange={files => {
+                        const f = Array.isArray(files) ? files[0] : files;
+                        setUpload(f ?? null);
+                        if (f) addUpload(f);
+                      }}
+                    />
+                    <Button label="Download inputs" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
+                  </>
+                }
+              />
+            )}
             <Workbook
               title="Output sheets"
               description="What the agent writes. Read only; change the instructions to change these."
               sheets={outputSheets}
               selected={outputSheet}
               onSelect={setOutputSheet}
-              views={views}
-              actions={<Button label="Download output" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />}
+              shownColumns={isPicking ? [] : shownColumns}
+              onPick={isPicking ? p => setPick(p) : undefined}
+              banner={
+                isPicking && (
+                  <Banner
+                    status="info"
+                    container="section"
+                    title="Click what you want to hand off"
+                    description="A column name, a row number, or a single cell."
+                    endContent={<Button label="Cancel" size="sm" onClick={() => setIsPicking(false)} />}
+                    collapsible={false}
+                  />
+                )
+              }
+              actions={
+                <>
+                  {!!t.sheets[outputSheet]?.columns && (
+                    <MultiSelector
+                      label="Columns shown"
+                      isLabelHidden
+                      placeholder="All columns shown"
+                      variant="secondary"
+                      size="sm"
+                      options={t.sheets[outputSheet].columns!.map((c, i) => ({value: c, label: `${letter(i)}  ${c}`}))}
+                      value={shownColumns}
+                      onChange={setShownColumns}
+                      formatValue={items => `${items.length} columns shown`}
+                      hasSelectAll
+                      isDisabled={isPicking}
+                    />
+                  )}
+                  <Button label="Download output" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
+                </>
+              }
             />
             <Text type="supporting" justify="center">Design prototype. Example data. Runs, uploads and downloads are not connected yet.</Text>
           </VStack>
+          {pick && (
+            <AddHandoffDialog
+              key={JSON.stringify(pick)}
+              pick={pick}
+              sheet={t.sheets[outputSheet]}
+              onClose={() => setPick(null)}
+              onAdd={h => {
+                onAddHandoff({...h, id: `h-${Date.now()}`, ticketId: id, workflow: t.workflow, usedBy: []});
+                setPick(null);
+                setIsPicking(false);
+                toast({body: `Added handoff "${h.name}". Other workflows can now pick it as an input.`});
+              }}
+            />
+          )}
         </LayoutContent>
       }
     />

@@ -11,6 +11,7 @@ import {
   BarChart3, Database, Home as HomeIcon, PlayCircle, Search, Tag, UserCircle, Workflow,
 } from 'lucide-react';
 import {RECENT_RUNS, TASKS, type Task} from './data';
+import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
 
@@ -28,6 +29,7 @@ function useHashRoute(): string {
 export default function App() {
   const route = useHashRoute();
   const [tasks, setTasks] = useState<Task[]>(TASKS);
+  const [handoffs, setHandoffs] = useState<Handoff[]>(SEED_HANDOFFS);
   const [query, setQuery] = useState('');
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
@@ -98,7 +100,14 @@ export default function App() {
         </SideNav>
       }>
       {ticketId !== null ? (
-        <TicketPage key={ticketId} id={ticketId} onApprove={markApproved} />
+        <TicketPage
+          key={ticketId}
+          id={ticketId}
+          handoffs={handoffs}
+          onApprove={markApproved}
+          onAddHandoff={h => setHandoffs(prev => [...prev, h])}
+          onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
+        />
       ) : (
         <HomePage tasks={tasks} />
       )}

@@ -32,6 +32,8 @@ export type DataSet = {
   emptyNote?: string;
   feedsInto?: [RefKind, string, string][];
   sheet: string;
+  /** Set when this input is a handoff from another workflow. */
+  handoffId?: string;
 };
 
 export type Sheet = {
@@ -76,7 +78,7 @@ export const TASKS: Task[] = [
   {id: 2, group: 'today', title: "Check the agent's result for Convert to USD", status: 'review', ref: ['step', 'Convert to USD'], why: 'Compare sample rows before it goes live', when: 'Today', ticketId: 2},
   {id: 3, group: 'today', title: 'Approve October sales numbers before they go to Finance', status: 'review', ref: ['workflow', 'Monthly sales close'], when: 'Today', ticketId: 3},
   {id: 4, group: 'today', title: 'Finish setting up Customer churn list', status: 'draft', ref: ['workflow', 'Customer churn list'], why: 'Flag customers at risk has not run yet', when: 'Today', ticketId: 4},
-  {id: 5, group: 'later', title: "Inventory data hasn't updated in 3 days", status: 'stale', ref: ['dataset', 'Inventory'], why: '2 of your reports use it', when: 'Thu', ticketId: 5},
+  {id: 5, group: 'later', title: "Inventory data hasn't updated in 3 days", status: 'stale', ref: ['dataset', 'Inventory'], why: 'A handoff check failed, so Q1 forecast is waiting', when: 'Thu', ticketId: 5},
   {id: 6, group: 'later', title: 'Review the Q1 forecast assumptions', status: 'review', ref: ['workflow', 'Q1 forecast'], when: 'Fri', ticketId: 6},
   {id: 7, group: 'done', title: 'Connect the company sales database', status: 'done', when: 'Mon'},
   {id: 8, group: 'done', title: 'Approve September sales numbers', status: 'done', ref: ['workflow', 'Monthly sales close'], when: 'Mon', ticketId: 8},
@@ -162,6 +164,7 @@ export const TICKETS: Record<number, Ticket> = {
     inputs: [
       {name: 'Orders in USD', source: ['step', 'From step: Convert to USD (October)'], stats: ['5,402 rows', '6 columns'], sheet: 'Orders in USD'},
       {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'Targets'},
+      {name: 'Total revenue (USD)', sheet: '', handoffId: 'h-total-usd'},
     ],
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
     agentSummary: ['Totaled 5,402 orders into 5 regions', 'Matched each region to its October target', 'Sorted by gap, biggest shortfall first'],
@@ -216,6 +219,7 @@ export const TICKETS: Record<number, Ticket> = {
     inputs: [
       {name: 'Sales history, 24 months', source: ['connection', 'From connection: Snowflake'], stats: ['432 rows', '3 columns'], sheet: 'Sales history'},
       {name: 'Low-stock items', source: ['workflow', 'From workflow: Inventory snapshot'], stats: ['41 rows'], warning: 'Upstream data is 3 days old', isWarningStale: true, sheet: 'Low-stock items'},
+      {name: 'Low-stock item count', sheet: '', handoffId: 'h-low-stock'},
     ],
     instructions: "Project Q1 unit sales per product line from the last 24 months with 4% growth. Flag lines where current stock won't cover the forecast.",
     agentSummary: ['Averaged Q1 sales for 2025 and 2026 per product line', 'Applied 4% growth', 'Flagged 2 product lines short of stock'],
