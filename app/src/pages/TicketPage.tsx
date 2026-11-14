@@ -36,7 +36,7 @@ import {
   CHECK_LABEL, checksFor, describeRule, previewValue, rulesForPick, shapeOf,
   type CheckKind, type Handoff, type Pick,
 } from '../handoffs';
-import {REF_ICON, RefLabel, StatusLabel} from './shared';
+import {RefLabel, StatusLabel} from './shared';
 
 const isNumeric = (v: string) => /^[+-]?[\d,]+(\.\d+)?%?$/.test(v);
 const letter = (i: number) => String.fromCharCode(65 + i);
@@ -65,15 +65,6 @@ function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: bool
             <StatusDot variant={data.isWarningStale ? 'warning' : 'error'} label={data.isWarningStale ? 'Out of date' : 'Problem'} />
             <Text type="supporting" weight="medium">{data.warning}</Text>
           </HStack>
-        )}
-        {data.feedsInto && (
-          <VStack gap={0.5} hAlign="start">
-            <Divider />
-            <Text type="supporting">Next step in this workflow</Text>
-            {data.feedsInto.map(([kind, label, href]) => (
-              <Button key={label} label={label} href={href} variant="ghost" size="sm" icon={<Icon icon={REF_ICON[kind]} />} />
-            ))}
-          </VStack>
         )}
       </VStack>
     </ClickableCard>
@@ -538,25 +529,15 @@ export function TicketPage({
                   <Divider />
 
                   {/* Step 2: handoffs, with step 3: checks */}
-                  <HStack hAlign="between" vAlign="start" gap={2} wrap="wrap">
-                    <VStack gap={0.5}>
-                      <Text type="label">{`Handoffs · ${myHandoffs.length}`}</Text>
-                      <Text type="supporting">Values from the result that other workflows can use as inputs.</Text>
-                    </VStack>
-                    <Button
-                      label={isPicking ? 'Picking…' : 'Add handoff'}
-                      size="sm"
-                      icon={<Icon icon={MousePointerClick} />}
-                      isDisabled={!hasResult}
-                      tooltip={hasResult ? 'Click a column, row or cell in the output sheet' : undefined}
-                      onClick={() => {
-                        setOutputSheet(result.sheet);
-                        setShownColumns([]);
-                        setIsPicking(true);
-                      }}
-                    />
-                  </HStack>
-                  {!hasResult && <Text type="supporting">Available after the agent has run.</Text>}
+                  <VStack gap={0.5}>
+                    <Text type="label">{`Handoffs · ${myHandoffs.length}`}</Text>
+                    <Text type="supporting">
+                      {hasResult
+                        ? 'Values from the result that other workflows can use as inputs. Add one from the output sheet below.'
+                        : 'Values other workflows can use as inputs. Available after the agent has run.'}
+                    </Text>
+                  </VStack>
+
                   {myHandoffs.map(h => (
                     <HandoffRow
                       key={h.id}
@@ -686,6 +667,17 @@ export function TicketPage({
                       isDisabled={isPicking}
                     />
                   )}
+                  <Button
+                    label={isPicking ? 'Picking…' : 'Add handoff'}
+                    icon={<Icon icon={MousePointerClick} />}
+                    isDisabled={!hasResult || isPicking}
+                    tooltip={hasResult ? 'Click a column, row or cell in this sheet' : 'Available after the agent has run'}
+                    onClick={() => {
+                      setOutputSheet(result.sheet);
+                      setShownColumns([]);
+                      setIsPicking(true);
+                    }}
+                  />
                   <Button label="Download output" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
                 </>
               }
