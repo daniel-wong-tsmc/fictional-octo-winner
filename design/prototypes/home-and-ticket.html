@@ -1,0 +1,705 @@
+<title>Workspace Home</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap">
+<style>
+/* Layout: smry-style app shell. 232px grey sidebar, white workbench inset on the grey ground.
+   Home = one reading column of tasks. Ticket = inputs | instructions | outputs, workbook underneath.
+   Values measured from smry.ai with dembrandt + Playwright (design/inspiration/smry). */
+:root{
+  --ground:#f1f1f1; --workbench:#ffffff; --row-active:#e4e4e4; --row-hover:#eaeaea;
+  --line:#dedede; --line-soft:#ececec;
+  --ink:#1b1b1b; --ink-2:#525252; --ink-3:#6a6a6a; --ink-4:#9a9a9a;
+  --kbd:#e6e6e6; --btn:#1b1b1b; --on-btn:#ffffff;
+  --grid-head:#f6f6f6;
+  /* Status is the only colour in the product. */
+  --failed:#d1342b; --failed-soft:#fbeceb;
+  --review:#0077d6; --review-soft:#e8f2fc;
+  --stale:#b46a00; --stale-soft:#fbf1e2;
+  --ok:#1f8a4c; --ok-soft:#e7f5ec;
+  --font-ui:"Inter","Inter Fallback",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-head:"Geist","Inter",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r-panel:12px; --r-row:8px; --r-tab:7px; --r-btn:10px;
+  --t:150ms ease;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#050505;--workbench:#0c0c0c;--row-active:#181818;--row-hover:#121212;--line:#232323;--line-soft:#1a1a1a;
+  --ink:#e3e3e3;--ink-2:#a9a9a9;--ink-3:#8e8e8e;--ink-4:#5f5f5f;--kbd:#1e1e1e;--btn:#e3e3e3;--on-btn:#0c0c0c;--grid-head:#111111;
+  --failed:#f0645b;--failed-soft:#2a1514;--review:#4aa8f5;--review-soft:#0f1d2a;--stale:#e2a24a;--stale-soft:#261c0e;--ok:#4cc27e;--ok-soft:#0f2117;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ground:#050505;--workbench:#0c0c0c;--row-active:#181818;--row-hover:#121212;--line:#232323;--line-soft:#1a1a1a;
+  --ink:#e3e3e3;--ink-2:#a9a9a9;--ink-3:#8e8e8e;--ink-4:#5f5f5f;--kbd:#1e1e1e;--btn:#e3e3e3;--on-btn:#0c0c0c;--grid-head:#111111;
+  --failed:#f0645b;--failed-soft:#2a1514;--review:#4aa8f5;--review-soft:#0f1d2a;--stale:#e2a24a;--stale-soft:#261c0e;--ok:#4cc27e;--ok-soft:#0f2117;
+  color-scheme:dark}
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:20px;letter-spacing:-.07px;
+  font-feature-settings:"cv01","cv10","ss07","ss08";-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid color-mix(in oklab,var(--ink) 72%,var(--workbench));outline-offset:2px;border-radius:var(--r-row)}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);height:100%;
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+
+/* ---------- Sidebar ---------- */
+.side{display:flex;flex-direction:column;gap:12px;padding:8px;min-height:0;overflow-y:auto}
+.side-top{display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 4px 0 6px}
+.mark{width:22px;height:22px;border-radius:6px;background:var(--ink);display:grid;place-items:center}
+.mark svg{width:14px;height:14px;stroke:var(--workbench);stroke-width:2;fill:none}
+.side-top .acts{display:flex;align-items:center;gap:2px}
+.ghost{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 8px;border-radius:var(--r-row);color:var(--ink);transition:background-color var(--t),color var(--t);white-space:nowrap}
+.ghost:hover{background:var(--row-hover)}
+.ghost.icon{width:32px;padding:0;justify-content:center;color:var(--ink-2)}
+.ghost.bordered{box-shadow:inset 0 0 0 1px var(--line)}
+.primary{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-btn);background:var(--btn);color:var(--on-btn);font-weight:500;transition:opacity var(--t);white-space:nowrap}
+.primary:hover{opacity:.88}
+.primary[disabled]{opacity:.4;cursor:default}
+.search{display:flex;align-items:center;gap:8px;height:36px;padding:0 6px 0 10px;border-radius:var(--r-btn);background:var(--kbd);color:var(--ink-3);transition:background-color var(--t)}
+.search:hover{background:var(--row-active)}
+.search span{flex:1;text-align:left}
+kbd{font-family:var(--font-ui);font-size:12px;line-height:20px;padding:0 6px;border-radius:6px;background:var(--workbench);color:var(--ink-3);border:1px solid var(--line)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;border-radius:9px;background:var(--kbd)}
+.seg button{height:28px;padding:0 10px;border-radius:var(--r-tab);font-size:12.5px;font-weight:500;letter-spacing:-.06px;color:var(--ink-2);transition:background-color var(--t),color var(--t)}
+.seg button[aria-pressed="true"]{background:var(--ground);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.seg.inline{display:inline-grid;grid-template-columns:auto auto}
+.seg.inline button[aria-pressed="true"]{background:var(--workbench)}
+nav ul,.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:8px;height:32px;padding:0 6px;border-radius:var(--r-row);color:var(--ink-2);text-decoration:none;font-weight:450;transition:background-color var(--t),color var(--t)}
+.nav a:hover{background:var(--row-hover);color:var(--ink)}
+.nav a[aria-current="page"]{background:var(--row-active);color:var(--ink)}
+.nav .count{margin-left:auto;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.label{display:flex;justify-content:space-between;align-items:baseline;padding:0 8px;font-size:11px;font-weight:600;color:var(--ink-2)}
+.label a{color:var(--ink-2);font-weight:500;text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--ink-2) 35%,transparent);text-underline-offset:3px}
+.recent a{display:flex;align-items:center;gap:8px;height:32px;padding:0 6px;border-radius:var(--r-row);color:var(--ink);text-decoration:none;transition:background-color var(--t)}
+.recent a:hover{background:var(--row-hover)}
+.recent .name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent time{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;margin:0 4px}
+.dot.failed{background:var(--failed)} .dot.ok{background:var(--ok)}
+.dot.running{background:var(--review);box-shadow:0 0 0 3px var(--review-soft)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:4px}
+.agents{display:flex;align-items:center;gap:8px;height:36px;padding:0 6px;border-radius:var(--r-row);color:var(--ink-2)}
+.agents:hover{background:var(--row-hover);color:var(--ink)}
+.me{display:flex;align-items:center;gap:10px;padding:6px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--kbd);display:grid;place-items:center;font-weight:500;font-size:13px}
+.me .who{flex:1;min-width:0;line-height:16px}
+.me .who b{display:block;font-weight:500;font-size:13px}
+.me .who small{font-size:12px;color:var(--ink-3)}
+
+/* ---------- Workbench ---------- */
+.main{padding:8px 8px 8px 0;min-width:0;min-height:0}
+.bench{height:100%;background:var(--workbench);border:1px solid var(--line);border-radius:var(--r-panel);display:flex;flex-direction:column;min-height:0}
+.bench-head{display:flex;align-items:center;gap:8px;min-height:56px;padding:0 16px 0 20px;border-bottom:1px solid var(--line-soft)}
+.bench-head h1{font-family:var(--font-head);font-size:15px;font-weight:600;letter-spacing:-.17px;margin:0}
+.bench-head .date{color:var(--ink-3)}
+.spacer{flex:1}
+.menu-btn{display:none}
+.crumbs{display:flex;align-items:center;gap:6px;min-width:0;color:var(--ink-3);font-size:13.5px}
+.crumbs a{color:var(--ink-2);text-decoration:none;border-radius:6px;padding:2px 4px;white-space:nowrap}
+.crumbs a:hover{background:var(--row-hover);color:var(--ink)}
+.crumbs .cur{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroll{flex:1;overflow-y:auto;min-height:0}
+.col{max-width:720px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:28px}
+.wide{max-width:1240px;margin:0 auto;padding:28px 28px 64px;display:flex;flex-direction:column;gap:24px}
+
+.ask{display:flex;align-items:center;gap:10px;height:46px;padding:0 8px 0 14px;border:1px solid var(--line);border-radius:var(--r-btn);color:var(--ink-3);background:var(--workbench);transition:border-color var(--t)}
+.ask:hover{border-color:color-mix(in oklab,var(--ink) 25%,var(--line))}
+.ask span{flex:1;text-align:left}
+.list-head h2{font-family:var(--font-head);font-size:17px;font-weight:600;letter-spacing:-.17px;margin:0}
+.list-head p{margin:2px 0 0;color:var(--ink-3);font-size:13px}
+
+.group{display:flex;flex-direction:column;gap:2px}
+.group-label{display:flex;align-items:center;gap:8px;height:28px;padding:0 4px;font-size:11px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
+.group-label .n{color:var(--ink-4);font-variant-numeric:tabular-nums}
+.group-label button{display:flex;align-items:center;gap:6px;text-transform:inherit;letter-spacing:inherit;font-weight:inherit;color:inherit}
+.group-label button svg{transition:transform var(--t)}
+.group-label button[aria-expanded="false"] svg{transform:rotate(-90deg)}
+
+.task{display:grid;grid-template-columns:20px minmax(0,1fr) auto 16px;align-items:start;gap:12px;padding:10px 8px;border-radius:var(--r-row);transition:background-color var(--t);cursor:pointer}
+.task:hover{background:var(--ground)}
+.task .go{color:var(--ink-4);margin-top:2px;transition:color var(--t)}
+.task:hover .go{color:var(--ink-2)}
+.task.nolink{cursor:default} .task.nolink .go{visibility:hidden}
+.check{width:18px;height:18px;margin-top:1px;border-radius:5px;border:1.5px solid color-mix(in oklab,var(--ink) 35%,var(--workbench));display:grid;place-items:center;transition:background-color var(--t),border-color var(--t)}
+.check svg{width:12px;height:12px;stroke:var(--on-btn);stroke-width:2.4;fill:none;opacity:0;transition:opacity var(--t)}
+.task.done .check{background:var(--btn);border-color:var(--btn)}
+.task.done .check svg{opacity:1}
+.task .title{font-weight:450;color:var(--ink);overflow-wrap:anywhere}
+.task.done .title{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--ink-4)}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:4px;font-size:12.5px;color:var(--ink-3)}
+.ref{display:inline-flex;align-items:center;gap:5px;color:var(--ink-2)}
+.ref svg{width:13px;height:13px}
+.pill{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.failed{color:var(--failed);background:var(--failed-soft)}
+.pill.review{color:var(--review);background:var(--review-soft)}
+.pill.stale{color:var(--stale);background:var(--stale-soft)}
+.pill.ok{color:var(--ok);background:var(--ok-soft)}
+.pill.draft{color:var(--ink-2);background:var(--kbd)}
+.task .when{font-size:12.5px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums;margin-top:1px}
+.task .when.over{color:var(--failed)}
+.empty{padding:20px 8px;color:var(--ink-3)}
+.note{font-size:12px;color:var(--ink-4);text-align:center}
+.task.leaving{animation:leave 220ms ease forwards}
+@keyframes leave{to{opacity:0;transform:translateY(-4px)}}
+
+/* ---------- Ticket ---------- */
+.t-head{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.t-head h2{font-family:var(--font-head);font-size:22px;line-height:28px;font-weight:600;letter-spacing:-.3px;margin:0;text-wrap:balance}
+.t-head p{margin:4px 0 0;color:var(--ink-3);font-size:13px}
+.t-head .acts{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.banner{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--r-btn);font-size:13px}
+.banner.failed{background:var(--failed-soft);color:var(--failed)}
+.banner.stale{background:var(--stale-soft);color:var(--stale)}
+.banner b{font-weight:600}
+.banner span{color:var(--ink)}
+
+.flow{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1.45fr) 20px minmax(0,1fr);align-items:stretch;gap:8px}
+.arrow{display:grid;place-items:center;color:var(--ink-4)}
+.panel{border:1px solid var(--line);border-radius:var(--r-panel);display:flex;flex-direction:column;min-width:0}
+.panel > header{display:flex;align-items:center;gap:8px;height:44px;padding:0 14px;border-bottom:1px solid var(--line-soft)}
+.panel > header h3{margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}
+.panel > header .n{font-size:11px;color:var(--ink-4)}
+.panel .body{padding:12px;display:flex;flex-direction:column;gap:8px;flex:1}
+.panel.mid{background:var(--ground);border-color:transparent}
+.panel.mid > header{border-bottom-color:var(--line)}
+
+.dcard{display:flex;flex-direction:column;gap:6px;text-align:left;padding:12px;border-radius:var(--r-btn);border:1px solid var(--line);background:var(--workbench);transition:border-color var(--t),background-color var(--t)}
+.dcard:hover{border-color:color-mix(in oklab,var(--ink) 25%,var(--line))}
+.dcard[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.dcard .top{display:flex;align-items:center;gap:8px}
+.dcard .nm{font-weight:500;flex:1;min-width:0}
+.dcard .src{font-size:12.5px;color:var(--ink-3);display:flex;align-items:center;gap:5px}
+.dcard .src svg{width:13px;height:13px}
+.dcard .stats{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dcard .warn{font-size:12.5px;color:var(--failed)}
+.dcard .warn.stale{color:var(--stale)}
+.dcard.ghostcard{border-style:dashed;background:transparent}
+.uses{display:flex;flex-direction:column;gap:4px;margin-top:2px;padding-top:8px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-3)}
+.uses a{color:var(--ink-2);text-decoration:none;display:inline-flex;gap:5px;align-items:center}
+.uses a:hover{color:var(--ink)}
+.uses svg{width:13px;height:13px}
+
+.instr{display:flex;flex-direction:column;gap:6px}
+.instr label{font-size:12.5px;color:var(--ink-3)}
+.instr textarea{width:100%;min-height:96px;resize:vertical;padding:10px 12px;border-radius:var(--r-btn);border:1px solid var(--line);background:var(--workbench);line-height:21px;outline:none;transition:border-color var(--t)}
+.instr textarea:focus{border-color:color-mix(in oklab,var(--ink) 45%,var(--line))}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row .lbl{font-size:12.5px;color:var(--ink-3)}
+.did{margin:0;padding:10px 12px;border-radius:var(--r-btn);background:var(--workbench);border:1px solid var(--line-soft);display:flex;flex-direction:column;gap:6px}
+.did h4{margin:0;font-size:12.5px;font-weight:500;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.did ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.did li::marker{color:var(--ink-4)}
+details.code{border-radius:var(--r-btn);border:1px solid var(--line-soft);background:var(--workbench)}
+details.code summary{cursor:pointer;padding:8px 12px;font-size:12.5px;color:var(--ink-2);list-style:none;display:flex;align-items:center;gap:6px}
+details.code summary::-webkit-details-marker{display:none}
+details.code summary svg{transition:transform var(--t);transform:rotate(-90deg)}
+details.code[open] summary svg{transform:none}
+details.code pre{margin:0;padding:10px 12px 12px;border-top:1px solid var(--line-soft);overflow-x:auto;font-family:var(--font-mono);font-size:12px;line-height:18px;color:var(--ink-2)}
+
+.mcp{display:flex;flex-direction:column;gap:8px;position:relative}
+.mcp-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.mcp-head b{font-size:12.5px;font-weight:500;color:var(--ink-2)}
+.mcp-head small{font-size:12px;color:var(--ink-4)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 8px;border-radius:999px;background:var(--workbench);border:1px solid var(--line);font-size:12.5px}
+.chip .ok{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.chip button{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--ink-3);transition:background-color var(--t),color var(--t)}
+.chip button:hover{background:var(--row-hover);color:var(--ink)}
+.chip button svg{width:12px;height:12px}
+.chip.add{padding:0 10px;border-style:dashed;color:var(--ink-2);cursor:pointer;background:transparent}
+.chip.add:hover{color:var(--ink);border-color:var(--ink-4)}
+.pop{position:absolute;left:0;top:calc(100% + 6px);z-index:30;width:min(300px,100%);background:var(--workbench);border:1px solid var(--line);border-radius:var(--r-btn);box-shadow:0 8px 24px rgb(0 0 0 / .12);padding:6px}
+.pop p{margin:4px 8px 6px;font-size:12px;color:var(--ink-3)}
+.pop button{display:flex;width:100%;align-items:center;gap:8px;height:34px;padding:0 8px;border-radius:var(--r-row);text-align:left;transition:background-color var(--t)}
+.pop button:hover{background:var(--row-hover)}
+.pop button small{margin-left:auto;color:var(--ink-3);font-size:12px}
+
+/* Workbook */
+.book{border:1px solid var(--line);border-radius:var(--r-panel);overflow:hidden;display:flex;flex-direction:column}
+.book-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.book-head .xl{width:28px;height:28px;border-radius:7px;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center}
+.book-head .fn{font-weight:500}
+.book-head small{color:var(--ink-3);font-size:12px}
+.book-head .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.grid-wrap{overflow:auto;max-height:340px}
+table.sheet{border-collapse:separate;border-spacing:0;font-size:13px;font-variant-numeric:tabular-nums;min-width:100%}
+.sheet th,.sheet td{height:30px;padding:0 10px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);white-space:nowrap;text-align:left}
+.sheet thead th{position:sticky;top:0;background:var(--grid-head);color:var(--ink-3);font-weight:500;font-size:11.5px;text-align:center;z-index:1}
+.sheet th.rn{position:sticky;left:0;background:var(--grid-head);color:var(--ink-4);font-weight:400;font-size:11.5px;text-align:center;width:40px;min-width:40px;padding:0;z-index:1}
+.sheet thead th.rn{z-index:2}
+.sheet tr.h td{font-weight:600;color:var(--ink)}
+.sheet td.num{text-align:right}
+.sheet td.new{background:var(--review-soft)}
+.sheet tr.h td.new{color:var(--review)}
+.sheet td.neg{color:var(--failed)}
+.sheet td.missing{background:var(--failed-soft);color:var(--failed);font-style:italic}
+.grid-empty{padding:40px 16px;text-align:center;color:var(--ink-3)}
+.tabs{display:flex;gap:2px;padding:6px 8px;border-top:1px solid var(--line-soft);background:var(--grid-head);overflow-x:auto}
+.tabs button{height:28px;padding:0 10px;border-radius:var(--r-tab);font-size:12.5px;color:var(--ink-2);white-space:nowrap;display:flex;align-items:center;gap:6px;transition:background-color var(--t),color var(--t)}
+.tabs button:hover{background:var(--row-hover)}
+.tabs button[aria-selected="true"]{background:var(--workbench);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.tabs .kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-4)}
+.book-foot{padding:8px 14px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--line-soft);display:flex;gap:12px;flex-wrap:wrap}
+.legend{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;background:var(--review-soft);border:1px solid color-mix(in oklab,var(--review) 40%,transparent)}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:50;background:var(--btn);color:var(--on-btn);padding:10px 14px;border-radius:var(--r-btn);font-size:13px;max-width:min(520px,calc(100vw - 32px));box-shadow:0 8px 24px rgb(0 0 0 / .18)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+@media (max-width:1080px){
+  .flow{grid-template-columns:minmax(0,1fr)}
+  .arrow{height:16px}
+  .arrow svg{transform:rotate(90deg)}
+}
+@media (max-width:820px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;inset:0 auto 0 0;width:min(280px,86vw);z-index:20;background:var(--ground);border-right:1px solid var(--line);
+    padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));padding-left:calc(8px + env(safe-area-inset-left,0px));
+    transform:translateX(-105%);transition:transform 200ms ease}
+  .shell.open .side{transform:none}
+  .scrim{position:fixed;inset:0;background:rgb(0 0 0 / .3);z-index:15}
+  .main{padding:0}
+  .bench{border:0;border-radius:0}
+  .menu-btn{display:inline-flex}
+  .bench-head{padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .bench-head .date,.hide-sm{display:none}
+  .col,.wide{padding:20px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+  .task{grid-template-columns:20px minmax(0,1fr) 16px}
+  .task .when{grid-column:2;margin-top:-2px}
+  .task .go{grid-column:3;grid-row:1}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-5v-5h-4v5H5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="5" rx="1.5"/><rect x="15" y="15" width="6" height="5" rx="1.5"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/></symbol>
+  <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></symbol>
+  <symbol id="i-run" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m10 9 5 3-5 3z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16M7 16v-4M12 16V7M17 16v-7"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H5M10 7l-5 5 5 5"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5h4"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-step" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m9 10 2 2-2 2M13 14h3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 5v5h-5"/><path d="M19.5 10A8 8 0 1 0 20 14"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/><path d="M12 10v4M12 17h.01"/></symbol>
+</svg>
+
+<div class="shell" id="shell">
+  <aside class="side" aria-label="Main">
+    <div class="side-top">
+      <span class="mark" aria-label="Workspace"><svg viewBox="0 0 24 24"><path d="M5 7h6v4H5zM13 13h6v4h-6zM11 9h2a2 2 0 0 1 2 2v2"/></svg></span>
+      <div class="acts">
+        <button class="ghost" type="button"><svg class="i"><use href="#i-plus"/></svg>New</button>
+        <button class="ghost icon" type="button" aria-label="Collapse sidebar"><svg class="i"><use href="#i-panel"/></svg></button>
+      </div>
+    </div>
+    <button class="search" type="button"><svg class="i"><use href="#i-search"/></svg><span>Search</span><kbd>⌘K</kbd></button>
+    <div class="seg" role="group" aria-label="Sidebar mode">
+      <button type="button" aria-pressed="true">Build</button>
+      <button type="button" aria-pressed="false">Monitor</button>
+      <button type="button" aria-pressed="false">Agent</button>
+    </div>
+    <nav class="nav">
+      <ul>
+        <li><a href="#home" id="nav-home" aria-current="page"><svg class="i"><use href="#i-home"/></svg>Home<span class="count" id="nav-open">6</span></a></li>
+        <li><a href="#home"><svg class="i"><use href="#i-flow"/></svg>Workflows</a></li>
+        <li><a href="#home"><svg class="i"><use href="#i-db"/></svg>Datasets</a></li>
+        <li><a href="#home"><svg class="i"><use href="#i-run"/></svg>Runs</a></li>
+        <li><a href="#home"><svg class="i"><use href="#i-chart"/></svg>Analytics</a></li>
+        <li><a href="#home"><svg class="i"><use href="#i-tag"/></svg>Tags</a></li>
+      </ul>
+    </nav>
+    <section class="recent" aria-labelledby="recent-l">
+      <div class="label" style="margin:8px 0 4px"><span id="recent-l">Recent runs</span><a href="#home">View all</a></div>
+      <ul class="plain">
+        <li><a href="#ticket-1"><span class="dot failed" aria-label="Failed"></span><span class="name">Weekly revenue report</span><time>2h</time></a></li>
+        <li><a href="#ticket-3"><span class="dot running" aria-label="Running"></span><span class="name">Monthly sales close</span><time>now</time></a></li>
+        <li><a href="#ticket-4"><span class="dot ok" aria-label="Succeeded"></span><span class="name">Customer churn list</span><time>5h</time></a></li>
+        <li><a href="#ticket-5"><span class="dot ok" aria-label="Succeeded"></span><span class="name">Inventory snapshot</span><time>3d</time></a></li>
+      </ul>
+    </section>
+    <div class="side-foot">
+      <button class="agents" type="button"><svg class="i"><use href="#i-bot"/></svg>Connect your AI</button>
+      <div class="me">
+        <span class="avatar">D</span>
+        <span class="who"><b>Daniel</b><small>Team workspace</small></span>
+        <button class="ghost icon" type="button" aria-label="Notifications"><svg class="i"><use href="#i-bell"/></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="bench">
+      <header class="bench-head">
+        <button class="ghost icon menu-btn" type="button" id="menu" aria-label="Open menu" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg></button>
+        <div id="head-home" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          <h1 id="greet">Good afternoon</h1><span class="date" id="today"></span><span class="spacer"></span>
+          <button class="ghost" type="button"><svg class="i"><use href="#i-plus"/></svg>New workflow</button>
+        </div>
+        <div id="head-ticket" hidden style="flex:1;min-width:0">
+          <div class="crumbs" id="crumbs"></div>
+        </div>
+      </header>
+
+      <div class="scroll" id="scroller">
+        <!-- HOME -->
+        <div class="col" id="view-home">
+          <button class="ask" type="button"><svg class="i"><use href="#i-spark"/></svg><span>Ask the agent to set up a workflow or explain a number…</span><kbd>/</kbd></button>
+          <section aria-labelledby="todo-h" style="display:flex;flex-direction:column;gap:16px">
+            <div class="list-head">
+              <h2 id="todo-h">To do</h2>
+              <p>What your workflows need from you. Open a task to see its ticket. Rows below are examples.</p>
+            </div>
+            <div id="groups" style="display:flex;flex-direction:column;gap:20px"></div>
+          </section>
+          <p class="note">Design preview. Example data, nothing is saved to a server.</p>
+        </div>
+
+        <!-- TICKET -->
+        <div class="wide" id="view-ticket" hidden></div>
+      </div>
+    </div>
+  </main>
+</div>
+<input type="file" id="upload" accept=".xlsx,.xls,.csv" class="sr" tabindex="-1" aria-hidden="true">
+
+<script>
+const ICON = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- Example data ---------- */
+const ORDERS_USD = {cols:["Order ID","Date","Region","Currency","Amount","Amount (USD)"],newCols:[5],rows:[
+ ["SO-48211","2026-11-09","Europe","EUR","1,240.00","1,344.28"],["SO-48212","2026-11-09","Japan","JPY","182,500","1,208.15"],
+ ["SO-48215","2026-11-08","UK","GBP","860.50","1,111.34"],["SO-48219","2026-11-08","Europe","EUR","312.00","337.96"],
+ ["SO-48223","2026-11-10","Canada","CAD","2,045.75","1,487.46"],["SO-48230","2026-11-10","US","USD","975.00","975.00"],
+ ["SO-48236","2026-11-11","UK","GBP","4,120.00","5,327.16"],["SO-48241","2026-11-12","Europe","EUR","58.90","64.00"]]};
+const NET = {cols:ORDERS_USD.cols.slice(0,5),rows:ORDERS_USD.rows.map(r=>r.slice(0,5))};
+
+const TICKETS = {
+ 1:{flow:"Weekly revenue report",step:"Combine orders and refunds",n:"Step 1 of 4",status:["failed","Stopped"],ran:"Ran 2h ago, stopped at 09:12",
+   banner:["failed","The run stopped.","This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."],
+   inputs:[{nm:"Orders this week",src:["flow","From workflow: Weekly orders import"],stats:["1,284 rows","5 columns","Received 09:02"],warn:"Missing column: Currency",sheet:"Orders this week"},
+           {nm:"Refunds this week",src:["file","Uploaded: refunds_wk46.xlsx"],stats:["63 rows","3 columns","Uploaded Mon"],sheet:"Refunds"}],
+   instr:"Combine this week's orders with refunds. Subtract each refund from its order using the order number. Keep the currency of each order so the next step can convert it to USD.",
+   did:["Matched 63 refunds to orders by Order ID","Subtracted each refund from its order amount","Stopped before writing the output: no Currency column to carry forward"],
+   py:`orders = read_sheet("Orders this week")\nrefunds = read_sheet("Refunds")\n\nnet = orders.merge(refunds, on="Order ID", how="left")\nnet["Amount"] = net["Amount"] - net["Refund amount"].fillna(0)\nnet = net[["Order ID", "Date", "Region", "Currency", "Amount"]]  # fails: no Currency`,
+   xl:`Net amount (F2):\n=E2 - IFERROR(XLOOKUP(A2, Refunds!A:A, Refunds!C:C), 0)\n\nCurrency (G2):\n=???  orders file has no Currency column`,
+   outputs:[{nm:"Net orders",empty:"Not produced. The run stopped before this step finished.",uses:[["step","Convert to USD","#ticket-2"]],sheet:"Net orders"}],
+   mcps:["SharePoint","Shopify"],
+   sheets:{"Orders this week":{kind:"Input",cols:["Order ID","Date","Customer","Region","Amount","Currency"],missing:[5],rows:[
+     ["SO-48211","2026-11-09","Lindqvist AB","Europe","1,240.00","missing"],["SO-48212","2026-11-09","Tanaka Trading","Japan","182,500","missing"],
+     ["SO-48215","2026-11-08","Harper & Cole","UK","860.50","missing"],["SO-48219","2026-11-08","Maison Ferrand","Europe","312.00","missing"],
+     ["SO-48223","2026-11-10","Northpeak Ltd","Canada","2,045.75","missing"],["SO-48230","2026-11-10","Rivera Supply","US","975.00","missing"]]},
+    "Refunds":{kind:"Input",cols:["Order ID","Refund date","Refund amount"],rows:[["SO-48215","2026-11-10","120.00"],["SO-48230","2026-11-11","975.00"],["SO-48241","2026-11-12","58.90"]]},
+    "Net orders":{kind:"Output",empty:true}},
+   total:"1,284"},
+ 2:{flow:"Weekly revenue report",step:"Convert to USD",n:"Step 2 of 4",status:["review","Needs your OK"],ran:"Agent finished 40 min ago",
+   inputs:[{nm:"Net orders",src:["step","From step: Combine orders and refunds"],stats:["1,221 rows","5 columns","Last week's run"],sheet:"Net orders"},
+           {nm:"Exchange rates",src:["plug","From connection: ECB exchange rates"],stats:["Daily rates","Updated today 06:00"],sheet:"Exchange rates"}],
+   instr:"Convert every order amount to US dollars using the exchange rate on the order date. If there's no rate for that day, use the most recent earlier rate. Round to 2 decimals.",
+   did:["Looked up the rate for each order's currency and date","Used Friday's rate for 37 weekend orders","Added one new column: Amount (USD)"],
+   py:`orders = read_sheet("Net orders").sort_values("Date")\nrates = read_sheet("Exchange rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency",\n                    direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
+   xl:`Amount (USD) (F2):\n=ROUND(E2 * XLOOKUP(1,\n   ('Exchange rates'!B:B = D2) * ('Exchange rates'!A:A <= B2),\n   'Exchange rates'!C:C, 1, 0, -1), 2)`,
+   outputs:[{nm:"Orders in USD",stats:["1,221 rows","6 columns","+1 column vs input"],uses:[["step","Revenue by region","#home"],["flow","Monthly sales close","#ticket-3"]],sheet:"Orders in USD"}],
+   mcps:["ECB exchange rates","SharePoint"],
+   sheets:{"Net orders":{kind:"Input",...NET},
+    "Exchange rates":{kind:"Input",cols:["Date","Currency","Rate to USD"],rows:[["2026-11-06","EUR","1.0832"],["2026-11-06","GBP","1.2915"],["2026-11-09","EUR","1.0841"],["2026-11-09","JPY","0.00662"],["2026-11-10","CAD","0.7271"],["2026-11-11","GBP","1.2930"],["2026-11-12","EUR","1.0866"]]},
+    "Orders in USD":{kind:"Output",...ORDERS_USD}},
+   total:"1,221",approve:true},
+ 3:{flow:"Monthly sales close",step:"Sales summary for Finance",n:"Step 3 of 3",status:["review","Needs your OK"],ran:"Agent finished at 08:30",
+   inputs:[{nm:"Orders in USD",src:["step","From step: Convert to USD (October)"],stats:["5,402 rows","6 columns"],sheet:"Orders in USD"},
+           {nm:"Sales targets",src:["plug","From connection: Google Drive, FY26 targets.xlsx"],stats:["60 rows","3 columns","Edited Oct 2"],sheet:"Targets"}],
+   instr:"Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
+   did:["Totaled 5,402 orders into 5 regions","Matched each region to its October target","Sorted by gap, biggest shortfall first"],
+   py:`orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
+   xl:`Sales (B2):  =SUMIFS('Orders in USD'!F:F, 'Orders in USD'!C:C, A2)\nTarget (C2): =XLOOKUP(A2, Targets!A:A, Targets!C:C)\nGap (D2):    =B2 - C2\nGap % (E2):  =D2 / C2`,
+   outputs:[{nm:"October summary",stats:["5 rows","5 columns"],uses:[["plug","Slack: #finance-close","#home"],["file","Finance close pack","#home"]],sheet:"October summary"}],
+   mcps:["Google Drive","Slack"],
+   sheets:{"Orders in USD":{kind:"Input",...ORDERS_USD,newCols:[]},
+    "Targets":{kind:"Input",cols:["Region","Month","Target (USD)"],rows:[["US","Oct","1,850,000"],["Europe","Oct","1,240,000"],["UK","Oct","610,000"],["Japan","Oct","420,000"],["Canada","Oct","300,000"]]},
+    "October summary":{kind:"Output",cols:["Region","Sales (USD)","Target","Gap","Gap %"],newCols:[1,3,4],neg:[3,4],rows:[
+      ["Europe","1,121,480","1,240,000","-118,520","-9.6%"],["US","1,792,300","1,850,000","-57,700","-3.1%"],["Japan","401,950","420,000","-18,050","-4.3%"],
+      ["Canada","311,200","300,000","+11,200","+3.7%"],["UK","655,870","610,000","+45,870","+7.5%"]]}},
+   total:"5,402",approve:true},
+ 4:{flow:"Customer churn list",step:"Flag customers at risk",n:"Step 2 of 4",status:["draft","Draft"],ran:"Not run yet",
+   inputs:[{nm:"Active customers",src:["plug","From connection: Salesforce"],stats:["2,310 rows","4 columns","Synced 5h ago"],sheet:"Active customers"},
+           {nm:"Support tickets, 90 days",src:["plug","From connection: Zendesk"],stats:["4,118 rows","4 columns","Synced 5h ago"],sheet:"Support tickets"}],
+   instr:"Flag customers who haven't ordered in 60 days, or who opened 3 or more support tickets in the last 90 days. Add a column that says which rule they hit.",
+   did:null,
+   py:`# The agent writes this after the first run.`,xl:`# The agent writes this after the first run.`,
+   outputs:[{nm:"Customers at risk",empty:"Not produced yet. Run the step to see the result here.",uses:[["step","Weekly retention email","#home"]],sheet:"Customers at risk"}],
+   mcps:["Salesforce","Zendesk"],
+   sheets:{"Active customers":{kind:"Input",cols:["Customer","Account owner","Last order","Plan"],rows:[["Lindqvist AB","M. Okafor","2026-11-02","Pro"],["Tanaka Trading","J. Weiss","2026-08-21","Team"],["Harper & Cole","M. Okafor","2026-10-30","Pro"],["Maison Ferrand","A. Dubois","2026-07-14","Starter"],["Northpeak Ltd","J. Weiss","2026-11-10","Team"]]},
+    "Support tickets":{kind:"Input",cols:["Ticket","Customer","Opened","Topic"],rows:[["ZD-9921","Tanaka Trading","2026-10-03","Billing"],["ZD-9988","Tanaka Trading","2026-10-19","Login"],["ZD-10102","Tanaka Trading","2026-11-04","Billing"],["ZD-10140","Harper & Cole","2026-11-06","Export"]]},
+    "Customers at risk":{kind:"Output",empty:true}},
+   total:"2,310",draft:true},
+ 5:{flow:"Inventory snapshot",step:"Find low-stock items",n:"Step 1 of 2",status:["stale","Out of date"],ran:"Last ran Nov 11",
+   banner:["stale","Inventory data is 3 days old.","The stock file in SharePoint hasn't changed since Nov 11. Two of your reports use this output."],
+   inputs:[{nm:"Warehouse stock",src:["plug","From connection: SharePoint, stock_levels.xlsx"],stats:["1,940 rows","4 columns"],warn:"Last updated Nov 11",stale:true,sheet:"Warehouse stock"}],
+   instr:"Take the latest stock file and keep only items where stock on hand is below the reorder point.",
+   did:["Read the newest stock file","Kept 41 items below their reorder point"],
+   py:`stock = read_sheet("Warehouse stock")\nlow = stock[stock["On hand"] < stock["Reorder point"]]\nwrite_sheet("Low-stock items", low)`,
+   xl:`=FILTER('Warehouse stock'!A:D, 'Warehouse stock'!C:C < 'Warehouse stock'!D:D)`,
+   outputs:[{nm:"Low-stock items",stats:["41 rows","4 columns","From Nov 11 data"],uses:[["flow","Q1 forecast","#ticket-6"],["file","Weekly ops report","#home"]],sheet:"Low-stock items"}],
+   mcps:["SharePoint"],
+   sheets:{"Warehouse stock":{kind:"Input",cols:["SKU","Item","On hand","Reorder point"],rows:[["SKU-1102","Steel brackets, 40mm","1,200","800"],["SKU-1107","Hinge set, matte","140","300"],["SKU-1220","Cable ties, 200pk","2,850","1,000"],["SKU-1301","Wall anchors, M6","90","250"],["SKU-1315","Shelf pins","4,400","2,000"]]},
+    "Low-stock items":{kind:"Output",cols:["SKU","Item","On hand","Reorder point"],rows:[["SKU-1107","Hinge set, matte","140","300"],["SKU-1301","Wall anchors, M6","90","250"]]}},
+   total:"1,940"},
+ 6:{flow:"Q1 forecast",step:"Forecast assumptions",n:"Step 2 of 3",status:["review","Needs your OK"],ran:"Agent finished yesterday",
+   inputs:[{nm:"Sales history, 24 months",src:["plug","From connection: Snowflake"],stats:["432 rows","3 columns"],sheet:"Sales history"},
+           {nm:"Low-stock items",src:["flow","From workflow: Inventory snapshot"],stats:["41 rows"],warn:"Upstream data is 3 days old",stale:true,sheet:"Low-stock items"}],
+   instr:"Project Q1 unit sales per product line from the last 24 months with 4% growth. Flag lines where current stock won't cover the forecast.",
+   did:["Averaged Q1 sales for 2025 and 2026 per product line","Applied 4% growth","Flagged 3 product lines short of stock"],
+   py:`hist = read_sheet("Sales history")\nq1 = hist[hist["Month"].str[-2:].isin(["01","02","03"])]\nbase = q1.groupby("Product line")["Units"].sum() / 2\nfc = (base * 1.04).round().rename("Q1 forecast")`,
+   xl:`Q1 forecast (B2): =ROUND(SUMIFS(History!C:C, History!B:B, A2, History!D:D, "Q1") / 2 * 1.04, 0)`,
+   outputs:[{nm:"Q1 forecast by line",stats:["18 rows","4 columns"],uses:[["file","Board pack","#home"]],sheet:"Q1 forecast"}],
+   mcps:["Snowflake"],
+   sheets:{"Sales history":{kind:"Input",cols:["Month","Product line","Units"],rows:[["2026-01","Hardware","18,420"],["2026-02","Hardware","16,980"],["2026-03","Hardware","19,310"],["2026-01","Fasteners","42,100"],["2026-02","Fasteners","39,870"]]},
+    "Low-stock items":{kind:"Input",cols:["SKU","Item","On hand","Reorder point"],rows:[["SKU-1107","Hinge set, matte","140","300"],["SKU-1301","Wall anchors, M6","90","250"]]},
+    "Q1 forecast":{kind:"Output",cols:["Product line","Q1 forecast","Stock on hand","Covered"],newCols:[1,3],neg:[],rows:[["Hardware","56,330","61,200","Yes"],["Fasteners","128,760","104,500","No"],["Anchors","22,410","18,900","No"],["Shelving","9,870","14,300","Yes"]]}},
+   total:"18",approve:true},
+};
+TICKETS[8] = {...TICKETS[3],status:["ok","Approved"],ran:"Approved Mon by Daniel",approve:false,done:true,step:"Sales summary for Finance (September)"};
+
+const AVAILABLE = [["Salesforce","CRM"],["SharePoint","Files"],["Google Drive","Files"],["Snowflake","Warehouse"],["Slack","Messages"],["Shopify","Orders"],["Zendesk","Support"],["ECB exchange rates","Rates"],["HubSpot","CRM"]];
+
+const seed = [
+  {id:1,g:"today",title:"Weekly revenue report didn't finish",status:["failed","Stopped"],ref:["flow","Weekly revenue report"],why:"This week's orders file arrived without a currency column",when:"2h ago",over:true},
+  {id:2,g:"today",title:"Check the agent's result for Convert to USD",status:["review","Needs your OK"],ref:["step","Convert to USD"],why:"Compare sample rows before it goes live",when:"Today"},
+  {id:3,g:"today",title:"Approve October sales numbers before they go to Finance",status:["review","Needs your OK"],ref:["flow","Monthly sales close"],when:"Today"},
+  {id:4,g:"today",title:"Finish setting up Customer churn list",ref:["flow","Customer churn list"],why:"Flag customers at risk has not run yet",when:"Today"},
+  {id:5,g:"later",title:"Inventory data hasn't updated in 3 days",status:["stale","Out of date"],ref:["db","Inventory"],why:"2 of your reports use it",when:"Thu"},
+  {id:6,g:"later",title:"Review the Q1 forecast assumptions",status:["review","Needs your OK"],ref:["flow","Q1 forecast"],when:"Fri"},
+  {id:7,g:"done",title:"Connect the company sales database",when:"Mon",done:true,nolink:true},
+  {id:8,g:"done",title:"Approve September sales numbers",ref:["flow","Monthly sales close"],when:"Mon",done:true},
+];
+let tasks = seed.map(t=>({...t})), doneOpen=false;
+const state = {}; // per-ticket UI state: sheet, engine, mcps, approved
+const groups=[["today","Today"],["later","Upcoming"],["done","Done"]];
+
+/* ---------- Toast ---------- */
+let toastT;
+function toast(msg){let el=document.querySelector(".toast");if(!el){el=document.createElement("div");el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}
+  el.textContent=msg;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3200)}
+
+/* ---------- Home ---------- */
+function row(t){
+  const meta=[];
+  if(t.status) meta.push(`<span class="pill ${t.status[0]}">${t.status[1]}</span>`);
+  if(t.ref) meta.push(`<span class="ref">${ICON(t.ref[0])}${esc(t.ref[1])}</span>`);
+  if(t.why) meta.push(`<span>${esc(t.why)}</span>`);
+  return `<div class="task${t.done?" done":""}${t.nolink?" nolink":""}" data-id="${t.id}">
+    <button class="check" type="button" role="checkbox" aria-checked="${!!t.done}" aria-label="Mark done: ${esc(t.title)}"><svg viewBox="0 0 24 24"><use href="#i-check"/></svg></button>
+    <div style="min-width:0">${t.nolink?`<div class="title">${esc(t.title)}</div>`:`<a class="title" href="#ticket-${t.id}" style="color:inherit;text-decoration:none">${esc(t.title)}</a>`}${meta.length?`<div class="meta">${meta.join("")}</div>`:""}</div>
+    <span class="when${t.over&&!t.done?" over":""}">${t.when}</span>
+    <span class="go">${ICON("right")}</span></div>`;
+}
+function renderHome(){
+  document.getElementById("nav-open").textContent=tasks.filter(t=>!t.done).length;
+  document.getElementById("groups").innerHTML=groups.map(([g,label])=>{
+    const items=tasks.filter(t=>g==="done"?t.done:(!t.done&&t.g===g));
+    if(g==="done") return `<div class="group"><div class="group-label"><button type="button" id="done-t" aria-expanded="${doneOpen}">${ICON("down")}${label} <span class="n">${items.length}</span></button></div>${doneOpen?items.map(row).join(""):""}</div>`;
+    return `<div class="group"><div class="group-label">${label} <span class="n">${items.length}</span></div>${items.length?items.map(row).join(""):`<div class="empty">Nothing ${g==="today"?"due today":"coming up"}.</div>`}</div>`;
+  }).join("");
+}
+document.getElementById("groups").addEventListener("click",e=>{
+  if(e.target.closest("#done-t")){doneOpen=!doneOpen;renderHome();return}
+  const c=e.target.closest(".check"), el=e.target.closest(".task"); if(!el) return;
+  const t=tasks.find(x=>x.id==el.dataset.id);
+  if(!c){ if(!t.nolink && !e.target.closest("a")) location.hash="ticket-"+t.id; return }
+  if(t.done){t.done=false;if(t.g==="done")t.g="today";renderHome();return}
+  el.classList.add("done"); c.setAttribute("aria-checked","true");
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(()=>{el.classList.add("leaving");setTimeout(()=>{t.done=true;renderHome()},reduce?0:220)},reduce?0:450);
+});
+
+/* ---------- Ticket ---------- */
+function dataCard(d,kind,id,sel){
+  const pressed = sel===d.sheet;
+  if(d.empty) return `<button type="button" class="dcard ghostcard" data-sheet="${esc(d.sheet)}" aria-pressed="${pressed}">
+      <div class="top">${ICON("grid")}<span class="nm">${esc(d.nm)}</span></div>
+      <div class="src">${esc(d.empty)}</div>${uses(d)}</button>`;
+  return `<button type="button" class="dcard" data-sheet="${esc(d.sheet)}" aria-pressed="${pressed}">
+      <div class="top">${ICON("grid")}<span class="nm">${esc(d.nm)}</span></div>
+      ${d.src?`<div class="src">${ICON(d.src[0])}${esc(d.src[1])}</div>`:""}
+      ${d.stats?`<div class="stats">${d.stats.map(s=>`<span>${esc(s)}</span>`).join("")}</div>`:""}
+      ${d.warn?`<div class="warn${d.stale?" stale":""}">${esc(d.warn)}</div>`:""}
+      ${uses(d)}</button>`;
+}
+function uses(d){ if(!d.uses) return "";
+  return `<div class="uses"><span>Feeds into</span>${d.uses.map(u=>`<a href="${u[2]}">${ICON(u[0])}${esc(u[1])}</a>`).join("")}</div>`}
+
+function sheetHTML(T,name){
+  const s=T.sheets[name]; if(!s) return "";
+  if(s.empty) return `<div class="grid-empty">${ICON("grid")}<div style="margin-top:6px">This sheet fills in when the step runs.</div></div>`;
+  const L=i=>String.fromCharCode(65+i), nc=s.newCols||[], neg=s.neg||[], miss=s.missing||[];
+  const isNum=v=>/^[+\-]?[\d,]+(\.\d+)?%?$/.test(v);
+  let h=`<table class="sheet"><thead><tr><th class="rn"></th>${s.cols.map((_,i)=>`<th>${L(i)}</th>`).join("")}</tr></thead><tbody>`;
+  h+=`<tr class="h"><th class="rn">1</th>${s.cols.map((c,i)=>`<td class="${nc.includes(i)?"new":""}">${esc(c)}</td>`).join("")}</tr>`;
+  s.rows.forEach((r,ri)=>{h+=`<tr><th class="rn">${ri+2}</th>${r.map((v,i)=>{
+      const cls=[]; if(isNum(v))cls.push("num"); if(nc.includes(i))cls.push("new"); if(neg.includes(i)&&String(v).startsWith("-"))cls.push("neg"); if(miss.includes(i))cls.push("missing");
+      return `<td class="${cls.join(" ")}">${esc(v)}</td>`}).join("")}</tr>`});
+  return h+`</tbody></table>`;
+}
+
+function renderTicket(id){
+  const T=TICKETS[id]; const v=document.getElementById("view-ticket");
+  if(!T){location.hash="home";return}
+  const st = state[id] ||= {sheet:(T.outputs[0].empty?T.inputs[0].sheet:T.outputs[0].sheet),engine:"py",mcps:[...T.mcps],approved:!!T.done,pop:false,upload:null,instr:T.instr};
+  const status = st.approved?["ok","Approved"]:T.status;
+  document.getElementById("crumbs").innerHTML=`<a href="#home">${ICON("back")}</a><a href="#home">Home</a><span>/</span><a href="#home" class="hide-sm">${esc(T.flow)}</a><span class="hide-sm">/</span><span class="cur">${esc(T.step)}</span>`;
+  const sheetNames=Object.keys(T.sheets);
+  const s=T.sheets[st.sheet];
+  const rowsShown = s&&!s.empty ? s.rows.length : 0;
+  v.innerHTML=`
+   <div class="t-head">
+     <div style="min-width:0;flex:1 1 320px">
+       <div class="row" style="margin-bottom:6px"><span class="pill ${status[0]}">${status[1]}</span><span class="lbl">${esc(T.n)} in ${esc(T.flow)}</span></div>
+       <h2>${esc(T.step)}</h2>
+       <p>${esc(st.approved&&!T.done?"Approved just now. The next step will use this output.":T.ran)}</p>
+     </div>
+     <div class="acts">
+       <button class="ghost bordered" type="button" data-act="run">${ICON("redo")}${T.draft?"Run step":"Run again"}</button>
+       ${T.approve&&!st.approved?`<button class="primary" type="button" data-act="approve">${ICON("check")}Approve output</button>`:""}
+     </div>
+   </div>
+   ${T.banner&&!st.approved?`<div class="banner ${T.banner[0]}">${ICON("alert")}<div><b>${esc(T.banner[1])}</b> <span>${esc(T.banner[2])}</span></div></div>`:""}
+
+   <div class="flow">
+     <section class="panel" aria-labelledby="in-h">
+       <header><h3 id="in-h">Inputs</h3><span class="n">${T.inputs.length}</span></header>
+       <div class="body">${T.inputs.map(d=>dataCard(d,"in",id,st.sheet)).join("")}</div>
+     </section>
+     <div class="arrow" aria-hidden="true">${ICON("arrow")}</div>
+     <section class="panel mid" aria-labelledby="ins-h">
+       <header><h3 id="ins-h">Instructions to the agent</h3></header>
+       <div class="body" style="gap:12px">
+         <div class="instr">
+           <label for="instr-${id}">What should happen to the inputs?</label>
+           <textarea id="instr-${id}" data-instr>${esc(st.instr)}</textarea>
+         </div>
+         <div class="row"><span class="lbl">Agent writes it as</span>
+           <div class="seg inline" role="group" aria-label="Agent writes it as">
+             <button type="button" data-engine="py" aria-pressed="${st.engine==="py"}">Python</button>
+             <button type="button" data-engine="xl" aria-pressed="${st.engine==="xl"}">Excel formulas</button>
+           </div>
+           <span class="spacer"></span>
+           <button class="ghost bordered" type="button" data-act="update">${ICON("spark")}Update and rerun</button>
+         </div>
+         <div class="did">
+           <h4>${ICON("bot")}What the agent did</h4>
+           ${T.did?`<ul>${T.did.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<span style="color:var(--ink-3)">Nothing yet. Run the step and the agent explains its work here in plain words.</span>`}
+         </div>
+         <details class="code"><summary>${ICON("down")}Show the ${st.engine==="py"?"Python":"Excel formulas"}</summary><pre>${esc(st.engine==="py"?T.py:T.xl)}</pre></details>
+         <div class="mcp">
+           <div class="mcp-head"><b>Connections the agent can use</b><small>MCP servers</small></div>
+           <div class="chips">
+             ${st.mcps.map(m=>`<span class="chip"><span class="ok"></span>${esc(m)}<button type="button" data-rm="${esc(m)}" aria-label="Disconnect ${esc(m)}">${ICON("x")}</button></span>`).join("")}
+             <button type="button" class="chip add" data-act="pop" aria-expanded="${st.pop}">${ICON("plus")}Add connection</button>
+           </div>
+           ${st.pop?`<div class="pop" role="menu"><p>Approved by your workspace admin</p>${AVAILABLE.filter(a=>!st.mcps.includes(a[0])).map(a=>`<button type="button" role="menuitem" data-add="${esc(a[0])}">${ICON("plug")}${esc(a[0])}<small>${a[1]}</small></button>`).join("")||`<p>All approved connections are already added.</p>`}</div>`:""}
+         </div>
+       </div>
+     </section>
+     <div class="arrow" aria-hidden="true">${ICON("arrow")}</div>
+     <section class="panel" aria-labelledby="out-h">
+       <header><h3 id="out-h">Output</h3></header>
+       <div class="body">${T.outputs.map(d=>dataCard(d,"out",id,st.sheet)).join("")}</div>
+     </section>
+   </div>
+
+   <section class="book" aria-labelledby="book-h" id="book">
+     <div class="book-head">
+       <span class="xl">${ICON("grid")}</span>
+       <div style="min-width:0"><div class="fn" id="book-h">${esc(T.step.toLowerCase().replace(/[^a-z0-9]+/g,"-"))}.xlsx</div>
+         <small>${st.upload?`You uploaded ${esc(st.upload)} just now`:`${sheetNames.length} sheets: inputs and output in one workbook`}</small></div>
+       <div class="acts">
+         <button class="ghost bordered" type="button" data-act="upload">${ICON("up")}Upload Excel</button>
+         <button class="ghost bordered" type="button" data-act="download">${ICON("dl")}Download</button>
+       </div>
+     </div>
+     <div class="grid-wrap" tabindex="0" aria-label="Sheet ${esc(st.sheet)}">${sheetHTML(T,st.sheet)}</div>
+     <div class="tabs" role="tablist" aria-label="Sheets">
+       ${sheetNames.map(n=>`<button type="button" role="tab" data-sheet="${esc(n)}" aria-selected="${n===st.sheet}"><span class="kind">${T.sheets[n].kind}</span>${esc(n)}</button>`).join("")}
+     </div>
+     <div class="book-foot">
+       <span>${rowsShown?`Showing ${rowsShown} sample rows`:"No rows yet"}</span>
+       ${s&&s.newCols&&s.newCols.length?`<span class="legend"><i></i>Added by the agent</span>`:""}
+       ${s&&s.missing?`<span class="legend" style="color:var(--failed)">Red cells: missing in the file you received</span>`:""}
+     </div>
+   </section>
+   <p class="note">Design preview. Example data. Runs, uploads and downloads are not connected yet.</p>`;
+}
+
+document.getElementById("view-ticket").addEventListener("click",e=>{
+  const id=+location.hash.split("-")[1], T=TICKETS[id], st=state[id]; if(!st) return;
+  const b=e.target.closest("[data-sheet],[data-engine],[data-rm],[data-add],[data-act]");
+  if(!b) { if(st.pop && !e.target.closest(".pop")){st.pop=false;renderTicket(id)} return }
+  if(b.dataset.sheet){st.sheet=b.dataset.sheet;renderTicket(id); if(b.classList.contains("dcard")) document.getElementById("book").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"nearest"}); return}
+  if(b.dataset.engine){st.engine=b.dataset.engine;renderTicket(id);return}
+  if(b.dataset.rm){st.mcps=st.mcps.filter(m=>m!==b.dataset.rm);renderTicket(id);toast(`Disconnected ${b.dataset.rm}. The agent can't read from it on this ticket.`);return}
+  if(b.dataset.add){st.mcps.push(b.dataset.add);st.pop=false;renderTicket(id);toast(`Connected ${b.dataset.add} to this ticket.`);return}
+  const a=b.dataset.act;
+  if(a==="pop"){st.pop=!st.pop;renderTicket(id);return}
+  if(a==="approve"){st.approved=true;const t=tasks.find(x=>x.id===id);if(t)t.done=true;renderHome();renderTicket(id);toast(`Approved. ${T.outputs[0].uses?T.outputs[0].uses.map(u=>u[1]).join(" and "):"The next step"} will use this output.`);return}
+  if(a==="run"||a==="update"){toast("Preview only. Running steps comes with the real build.");return}
+  if(a==="upload"){document.getElementById("upload").click();return}
+  if(a==="download"){toast("Preview only. Download comes with the real build.");return}
+});
+document.getElementById("view-ticket").addEventListener("input",e=>{
+  if(e.target.matches("[data-instr]")){const id=+location.hash.split("-")[1]; if(state[id]) state[id].instr=e.target.value}
+});
+document.getElementById("upload").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return; const id=+location.hash.split("-")[1];
+  if(state[id]){state[id].upload=f.name;renderTicket(id)}
+  toast(`Received ${f.name}. In the real build this replaces the matching input sheet.`); e.target.value="";
+});
+
+/* ---------- Routing ---------- */
+function route(){
+  const h=location.hash.slice(1)||"home", m=h.match(/^ticket-(\d+)$/);
+  const isT=!!m&&TICKETS[m[1]];
+  document.getElementById("view-home").hidden=isT; document.getElementById("view-ticket").hidden=!isT;
+  document.getElementById("head-home").hidden=isT; document.getElementById("head-ticket").hidden=!isT;
+  document.getElementById("head-home").style.display=isT?"none":"flex";
+  document.getElementById("nav-home").setAttribute("aria-current",isT?"false":"page");
+  if(isT) renderTicket(+m[1]); else renderHome();
+  document.getElementById("scroller").scrollTop=0;
+  if(shell.classList.contains("open")) menu.click();
+}
+window.addEventListener("hashchange",route);
+
+document.querySelectorAll(".seg:not(.inline) button").forEach(b=>b.addEventListener("click",()=>b.parentElement.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b))));
+const shell=document.getElementById("shell"), menu=document.getElementById("menu");
+menu.addEventListener("click",()=>{const o=!shell.classList.contains("open");shell.classList.toggle("open",o);menu.setAttribute("aria-expanded",o);
+  let s=document.querySelector(".scrim"); if(o&&!s){s=document.createElement("div");s.className="scrim";s.onclick=()=>menu.click();shell.appendChild(s)} else if(!o&&s) s.remove();});
+const now=new Date(),hr=now.getHours();
+document.getElementById("greet").textContent=hr<12?"Good morning":hr<18?"Good afternoon":"Good evening";
+document.getElementById("today").textContent=now.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+route();
+</script>
