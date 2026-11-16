@@ -44,6 +44,11 @@ export const workspaceTheme = defineTheme({
     '--color-warning': ['#b46a00', '#e2a24a'],
     '--color-info': ['#0077d6', '#4aa8f5'],
     '--color-success': ['#1f8a4c', '#4cc27e'],
+    // Status dots and status icons paint the text-* roles, so set those to the same status colours.
+    '--color-text-error': ['#d1342b', '#f0645b'],
+    '--color-text-warning': ['#b46a00', '#e2a24a'],
+    '--color-text-info': ['#0077d6', '#4aa8f5'],
+    '--color-text-success': ['#1f8a4c', '#4cc27e'],
     // Radii: rows 8px, buttons 10px, panels 12px, small chips 6px.
     '--radius-inner': '6px',
     '--radius-element': '10px',
@@ -54,7 +59,7 @@ export const workspaceTheme = defineTheme({
     // "Needs your OK" gets its own blue dot, since accent is ink in this theme.
     'status-dot': {
       'variant:info': {
-        backgroundColor: 'var(--color-info)',
+        backgroundColor: 'var(--color-icon-info)',
         color: 'var(--color-background-surface)',
       },
     },

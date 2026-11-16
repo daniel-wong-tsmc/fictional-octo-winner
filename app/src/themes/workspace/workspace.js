@@ -138,10 +138,10 @@ export const workspaceTheme = {
     "--color-info": "light-dark(#0077d6, #4aa8f5)",
     "--color-info-muted": "light-dark(#b9d7ff, #88bcff3D)",
     "--color-on-info": "light-dark(#ffffff, #111111)",
-    "--color-text-info": "light-dark(#0067ce, #a1caff)",
-    "--color-text-success": "light-dark(#2f7d33, #90ca90)",
-    "--color-text-warning": "light-dark(#836700, #eec448)",
-    "--color-text-error": "light-dark(#c0262c, #ffaea7)",
+    "--color-text-info": "light-dark(#0077d6, #4aa8f5)",
+    "--color-text-success": "light-dark(#1f8a4c, #4cc27e)",
+    "--color-text-warning": "light-dark(#b46a00, #e2a24a)",
+    "--color-text-error": "light-dark(#d1342b, #f0645b)",
     "--color-on-info-muted": "light-dark(#003978, #a1caff)",
     "--color-on-success-muted": "light-dark(#00490b, #90ca90)",
     "--color-on-warning-muted": "light-dark(#4b3900, #eec448)",
@@ -437,7 +437,7 @@ export const workspaceTheme = {
     },
     "status-dot": {
       "variant:info": {
-        "backgroundColor": "var(--color-info)",
+        "backgroundColor": "var(--color-icon-info)",
         "color": "var(--color-background-surface)"
       }
     }

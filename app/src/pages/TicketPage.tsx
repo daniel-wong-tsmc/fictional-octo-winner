@@ -9,7 +9,6 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
-import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
@@ -27,7 +26,6 @@ import {Divider} from '@astryxdesign/core/Divider';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Icon} from '@astryxdesign/core/Icon';
-import {Link} from '@astryxdesign/core/Link';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
   ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plug, Plus, RotateCcw, Sparkles, Trash2,
@@ -42,67 +40,72 @@ import {RefLabel, StatusLabel} from './shared';
 const isNumeric = (v: string) => /^[+-]?[\d,]+(\.\d+)?%?$/.test(v);
 const letter = (i: number) => String.fromCharCode(65 + i);
 
-/* ---------- Inputs and result cards ---------- */
+/* ---------- Inputs, result and handoffs as list rows ---------- */
 
-function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: boolean; onSelect: () => void}) {
+/** A data set row. Clicking it opens its sheet below. */
+function DataRow({data, onSelect}: {data: DataSet; onSelect: () => void}) {
   return (
-    <ClickableCard
-      label={`Go to ${data.name} in the sheets below`}
+    <ListItem
       onClick={onSelect}
-      padding={3}
-      variant={data.emptyNote ? 'muted' : 'default'}
-      elevation={isSelected ? 'low' : 'none'}>
-      <VStack gap={1.5}>
-        <HStack gap={2} vAlign="center">
-          <Icon icon={FileSpreadsheet} size="sm" color="secondary" />
-          <Text weight="medium">{data.name}</Text>
-        </HStack>
-        {data.source && <RefLabel kind={data.source[0]} label={data.source[1]} />}
-        {data.emptyNote && <Text type="supporting">{data.emptyNote}</Text>}
-        {data.stats && <Text type="supporting" hasTabularNumbers>{data.stats.join(' · ')}</Text>}
-        {data.warning && (
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={data.isWarningStale ? 'warning' : 'error'} label={data.isWarningStale ? 'Out of date' : 'Problem'} />
-            <Text type="supporting" weight="medium">{data.warning}</Text>
-          </HStack>
-        )}
-      </VStack>
-    </ClickableCard>
+      align="first-line"
+      startContent={<Icon icon={FileSpreadsheet} size="sm" color="secondary" />}
+      label={<Text weight="medium">{data.name}</Text>}
+      description={
+        <VStack gap={1}>
+          {data.source && <RefLabel kind={data.source[0]} label={data.source[1]} />}
+          {data.emptyNote && <Text type="supporting">{data.emptyNote}</Text>}
+          {data.stats && <Text type="supporting" hasTabularNumbers>{data.stats.join(' · ')}</Text>}
+          {data.warning && (
+            <HStack gap={1.5} vAlign="center">
+              <StatusDot variant={data.isWarningStale ? 'warning' : 'error'} label={data.isWarningStale ? 'Out of date' : 'Problem'} />
+              <Text type="supporting" weight="medium">{data.warning}</Text>
+            </HStack>
+          )}
+        </VStack>
+      }
+      endContent={<Icon icon={ChevronRight} size="sm" color="secondary" />}
+    />
   );
 }
 
 /** An input that arrives from another workflow's handoff. Fills in on every run. */
-function HandoffInputCard({handoff, onRemove}: {handoff: Handoff; onRemove?: () => void}) {
+function HandoffInputRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void}) {
   const failed = !!handoff.checkFailure;
   return (
-    <Card padding={3}>
-      <VStack gap={1.5}>
-        <HStack gap={2} vAlign="center" hAlign="between">
-          <HStack gap={2} vAlign="center">
-            <Icon icon={ArrowRightLeft} size="sm" color="secondary" />
-            <Text weight="medium">{handoff.name}</Text>
+    <ListItem
+      align="first-line"
+      startContent={<Icon icon={ArrowRightLeft} size="sm" color="secondary" />}
+      label={<Text weight="medium">{handoff.name}</Text>}
+      description={
+        <VStack gap={1}>
+          <RefLabel kind="workflow" label={`Handoff from ${handoff.workflow}`} />
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            <Token size="sm" label={shapeOf(handoff.rule)} />
+            <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
           </HStack>
-          {onRemove && <IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
-        </HStack>
-        <RefLabel kind="workflow" label={`Handoff from ${handoff.workflow}`} />
-        <HStack gap={2} vAlign="center" wrap="wrap">
-          <Token size="sm" label={shapeOf(handoff.rule)} />
-          <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
-        </HStack>
-        <HStack gap={1.5} vAlign="center">
-          <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Waiting' : 'Ready'} />
-          <Text type="supporting" weight="medium">
-            {failed ? `Waiting: ${handoff.checkFailure} This step won't run until it passes.` : 'Fills in automatically on every run'}
-          </Text>
-        </HStack>
-      </VStack>
-    </Card>
+          <HStack gap={1.5} vAlign="center">
+            <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Waiting' : 'Ready'} />
+            <Text type="supporting" weight="medium">
+              {failed ? `Waiting: ${handoff.checkFailure} This step won't run until it passes.` : 'Fills in automatically on every run'}
+            </Text>
+          </HStack>
+        </VStack>
+      }
+      endContent={<IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
+    />
   );
 }
 
-function Column({title, count, endContent, children}: {title: string; count?: number; endContent?: React.ReactNode; children: React.ReactNode}) {
+/** A page region on the ticket. One card per region; what sits inside is rows, never more cards. */
+function Region({title, count, endContent, variant = 'section', children}: {
+  title: string;
+  count?: number;
+  endContent?: React.ReactNode;
+  variant?: 'section' | 'muted';
+  children: React.ReactNode;
+}) {
   return (
-    <Card padding={3}>
+    <Card variant={variant === 'muted' ? 'muted' : 'default'} padding={4}>
       <VStack gap={3}>
         <HStack hAlign="between" vAlign="center" gap={2}>
           <Text type="label" color="secondary">{count !== undefined ? `${title} · ${count}` : title}</Text>
@@ -119,39 +122,38 @@ function Column({title, count, endContent, children}: {title: string; count?: nu
 function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void}) {
   const failed = !!handoff.checkFailure;
   return (
-    <Card padding={3} variant={failed ? 'red' : 'default'}>
-      <VStack gap={2}>
-        <HStack hAlign="between" vAlign="start" gap={2}>
-          <VStack gap={0.5}>
-            <Text weight="medium">{handoff.name}</Text>
-            <Text type="supporting">{describeRule(handoff.rule)}</Text>
-          </VStack>
-          <IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />
-        </HStack>
-        <HStack gap={2} vAlign="center" wrap="wrap">
-          <Token size="sm" label={shapeOf(handoff.rule)} />
-          <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
-        </HStack>
-        {handoff.check !== 'none' && (
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Check failed' : 'Check passed'} />
-            <Text type="supporting" weight="medium">
-              {failed
-                ? `Check failed: ${CHECK_LABEL[handoff.check].toLowerCase()}. ${handoff.checkFailure}`
-                : `Check passed: ${CHECK_LABEL[handoff.check].toLowerCase()}`}
-            </Text>
+    <ListItem
+      align="first-line"
+      label={<Text weight="medium">{handoff.name}</Text>}
+      description={
+        <VStack gap={1}>
+          <Text type="supporting">{describeRule(handoff.rule)}</Text>
+          <HStack gap={2} vAlign="center" wrap="wrap">
+            <Token size="sm" label={shapeOf(handoff.rule)} />
+            <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
           </HStack>
-        )}
-        <HStack gap={1.5} vAlign="center" wrap="wrap">
-          <Text type="supporting">Used by</Text>
-          {handoff.usedBy.length ? (
-            handoff.usedBy.map(w => <RefLabel key={w} kind="workflow" label={failed ? `${w} (waiting)` : w} />)
-          ) : (
-            <Text type="supporting">Not used yet</Text>
+          {handoff.check !== 'none' && (
+            <HStack gap={1.5} vAlign="center">
+              <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Check failed' : 'Check passed'} />
+              <Text type="supporting" weight="medium">
+                {failed
+                  ? `Check failed: ${CHECK_LABEL[handoff.check].toLowerCase()}. ${handoff.checkFailure}`
+                  : `Check passed: ${CHECK_LABEL[handoff.check].toLowerCase()}`}
+              </Text>
+            </HStack>
           )}
-        </HStack>
-      </VStack>
-    </Card>
+          <HStack gap={1.5} vAlign="center" wrap="wrap">
+            <Text type="supporting">Used by</Text>
+            {handoff.usedBy.length ? (
+              handoff.usedBy.map(w => <RefLabel key={w} kind="workflow" label={failed ? `${w} (waiting)` : w} />)
+            ) : (
+              <Text type="supporting">Not used yet</Text>
+            )}
+          </HStack>
+        </VStack>
+      }
+      endContent={<IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
+    />
   );
 }
 
@@ -292,7 +294,7 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
       key: '_row', header: <Text type="supporting">1</Text>, width: pixel(52), align: 'end',
       renderCell: item =>
         onPick ? (
-          <Link tooltip={`Hand off row ${item._row}`} onClick={() => onPick({kind: 'row', row: item._row})}>{String(item._row)}</Link>
+          <Button label={String(item._row)} variant="ghost" size="sm" tooltip={`Hand off row ${item._row}`} onClick={() => onPick({kind: 'row', row: item._row})} />
         ) : (
           <Text type="supporting" hasTabularNumbers>{item._row}</Text>
         ),
@@ -304,7 +306,7 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
         <VStack gap={0}>
           <Text type="supporting">{letter(c)}</Text>
           {onPick ? (
-            <Link tooltip={`Hand off column ${letter(c)}`} onClick={() => onPick({kind: 'column', col: c})}>{name}</Link>
+            <Button label={name} variant="ghost" size="sm" tooltip={`Hand off column ${letter(c)}`} onClick={() => onPick({kind: 'column', col: c})} />
           ) : (
             <HStack gap={1} vAlign="center">
               <Text weight="semibold">{name}</Text>
@@ -324,7 +326,7 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
           );
         }
         if (onPick) {
-          return <Link tooltip={`Hand off cell ${letter(c)}${item._row}`} onClick={() => onPick({kind: 'cell', col: c, row: item._row})}>{v}</Link>;
+          return <Button label={v} variant="ghost" size="sm" tooltip={`Hand off cell ${letter(c)}${item._row}`} onClick={() => onPick({kind: 'cell', col: c, row: item._row})} />;
         }
         return <Text hasTabularNumbers weight={added.includes(c) ? 'medium' : 'normal'}>{v}</Text>;
       },
@@ -526,7 +528,7 @@ export function TicketPage({
               <HStack gap={2} wrap="wrap">
                 <Button
                   label={runLabel}
-                  variant={hasEdits ? 'primary' : 'secondary'}
+                  variant={hasEdits && !(t.canApprove && !isApproved) ? 'primary' : 'secondary'}
                   icon={<Icon icon={hasEdits ? Sparkles : RotateCcw} />}
                   tooltip={hasEdits ? 'The agent rewrites the code from your new instructions, then runs it' : 'Runs the same code on the latest inputs'}
                   onClick={() => preview(hasEdits ? 'Updating and running' : 'Running steps')}
@@ -581,7 +583,7 @@ export function TicketPage({
             {/* Inputs and output on the left, instructions on the right */}
             <Grid columns={{minWidth: 320, repeat: 'fit'}} gap={3} align="start">
               <VStack gap={3}>
-                <Column
+                <Region
                   title="Inputs"
                   count={inputCount}
                   endContent={
@@ -604,22 +606,28 @@ export function TicketPage({
                       }
                     />
                   }>
-                  {fileInputs.map(d => (
-                    <DataCard key={d.name} data={d} isSelected={inputsOpen && inputSheet === d.sheet} onSelect={() => goToInput(d.sheet)} />
-                  ))}
-                  {linkedInputs.map(hid => {
-                    const h = handoffs.find(x => x.id === hid);
-                    return h ? <HandoffInputCard key={hid} handoff={h} onRemove={() => setLinkedInputs(prev => prev.filter(x => x !== hid))} /> : null;
-                  })}
-                </Column>
+                  <List hasDividers edge="outset">
+                    {fileInputs.map(d => <DataRow key={d.name} data={d} onSelect={() => goToInput(d.sheet)} />)}
+                  </List>
+                  {linkedInputs.length > 0 && (
+                    <List hasDividers edge="outset" header={<Text type="supporting">From other workflows</Text>}>
+                      {linkedInputs.map(hid => {
+                        const h = handoffs.find(x => x.id === hid);
+                        return h ? <HandoffInputRow key={hid} handoff={h} onRemove={() => setLinkedInputs(prev => prev.filter(x => x !== hid))} /> : null;
+                      })}
+                    </List>
+                  )}
+                </Region>
 
-                <Column title="Output">
+                <Region title="Output">
                   {/* Step 1: the result, always passed on */}
                   <VStack gap={1.5}>
                     <Text type="label">Result</Text>
                     <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
                   </VStack>
-                  <DataCard data={result} isSelected={false} onSelect={() => goToOutput(result.sheet)} />
+                  <List edge="outset">
+                    <DataRow data={result} onSelect={() => goToOutput(result.sheet)} />
+                  </List>
 
                   <Divider />
 
@@ -633,6 +641,7 @@ export function TicketPage({
                     </Text>
                   </VStack>
 
+                  <List hasDividers edge="outset">
                   {myHandoffs.map(h => (
                     <HandoffRow
                       key={h.id}
@@ -643,12 +652,12 @@ export function TicketPage({
                       }}
                     />
                   ))}
-                </Column>
+                  </List>
+                </Region>
               </VStack>
 
-              <Card variant="muted" padding={3}>
+              <Region title="Instructions to the agent" variant="muted">
                 <VStack gap={4}>
-                  <Text type="label" color="secondary">Instructions to the agent</Text>
                   {isEditing ? (
                     <VStack gap={2}>
                       <TextArea label="What should happen to the inputs?" value={instructions} onChange={setInstructions} rows={5} hasAutoFocus />
@@ -675,7 +684,7 @@ export function TicketPage({
                       <Button label="Edit instructions" variant="ghost" size="sm" icon={<Icon icon={Pencil} />} onClick={() => setIsEditing(true)} />
                     </VStack>
                   )}
-                  <Card padding={3}>
+                  <Divider />
                     <VStack gap={2}>
                       <HStack gap={1.5} vAlign="center">
                         <Icon icon={Bot} size="sm" color="secondary" />
@@ -689,7 +698,6 @@ export function TicketPage({
                         <Text type="supporting">Nothing yet. Run the step and the agent explains its work here in plain words.</Text>
                       )}
                     </VStack>
-                  </Card>
                   <Collapsible
                     defaultIsOpen={false}
                     chevronPosition="start"
@@ -725,7 +733,7 @@ export function TicketPage({
                     }}
                   />
                 </VStack>
-              </Card>
+              </Region>
             </Grid>
 
             {/* Sheets: output first (what you approve), inputs collapsed */}
