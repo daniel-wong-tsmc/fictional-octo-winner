@@ -74,14 +74,7 @@ export const AVAILABLE_CONNECTIONS: [string, string][] = [
 ];
 
 export const TASKS: Task[] = [
-  {id: 1, group: 'today', title: "Weekly revenue report didn't finish", status: 'failed', ref: ['workflow', 'Weekly revenue report'], why: "This week's orders file arrived without a currency column", when: '2h ago', isOverdue: true, ticketId: 1},
-  {id: 2, group: 'today', title: "Check the agent's result for Convert to USD", status: 'review', ref: ['step', 'Convert to USD'], why: 'Compare sample rows before it goes live', when: 'Today', ticketId: 2},
-  {id: 3, group: 'today', title: 'Approve October sales numbers before they go to Finance', status: 'review', ref: ['workflow', 'Monthly sales close'], when: 'Today', ticketId: 3},
-  {id: 4, group: 'today', title: 'Finish setting up Customer churn list', status: 'draft', ref: ['workflow', 'Customer churn list'], why: 'Flag customers at risk has not run yet', when: 'Today', ticketId: 4},
-  {id: 5, group: 'later', title: "Inventory data hasn't updated in 3 days", status: 'stale', ref: ['dataset', 'Inventory'], why: 'A handoff check failed, so Q1 forecast is waiting', when: 'Thu', ticketId: 5},
-  {id: 6, group: 'later', title: 'Review the Q1 forecast assumptions', status: 'review', ref: ['workflow', 'Q1 forecast'], when: 'Fri', ticketId: 6},
-  {id: 7, group: 'done', title: 'Connect the company sales database', status: 'done', when: 'Mon'},
-  {id: 8, group: 'done', title: 'Approve September sales numbers', status: 'done', ref: ['workflow', 'Monthly sales close'], when: 'Mon', ticketId: 8},
+  {id: 3, group: 'today', title: 'Approve October sales numbers before they go to Finance', status: 'review', ref: ['workflow', 'Monthly sales close'], why: 'Sales summary for Finance is ready', when: 'Today', ticketId: 3},
 ];
 
 export const RECENT_RUNS: {name: string; dot: 'error' | 'info' | 'success'; label: string; ago: string; ticketId: number}[] = [

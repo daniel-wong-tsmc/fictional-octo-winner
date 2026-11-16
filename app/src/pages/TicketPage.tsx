@@ -396,6 +396,9 @@ export function TicketPage({
   const [upload, setUpload] = useState<File | null>(null);
 
   const preview = (what: string) => toast({body: `Preview only. ${what} comes with the real build.`});
+  // One run button. It turns into "Update and run" once the instructions or the code language change.
+  const hasEdits = instructions !== t.instructions || engine !== 'python';
+  const runLabel = hasEdits ? 'Update and run' : t.isDraft ? 'Run step' : 'Run again';
   const status = isApproved ? 'done' : t.status;
   const myHandoffs = handoffs.filter(h => h.ticketId === id);
   const otherHandoffs = handoffs.filter(h => h.ticketId !== id && !linkedInputs.includes(h.id));
@@ -454,7 +457,13 @@ export function TicketPage({
                 </Text>
               </VStack>
               <HStack gap={2} wrap="wrap">
-                <Button label={t.isDraft ? 'Run step' : 'Run again'} icon={<Icon icon={RotateCcw} />} onClick={() => preview('Running steps')} />
+                <Button
+                  label={runLabel}
+                  variant={hasEdits ? 'primary' : 'secondary'}
+                  icon={<Icon icon={hasEdits ? Sparkles : RotateCcw} />}
+                  tooltip={hasEdits ? 'The agent rewrites the code from your new instructions, then runs it' : 'Runs the same code on the latest inputs'}
+                  onClick={() => preview(hasEdits ? 'Updating and running' : 'Running steps')}
+                />
                 {t.canApprove && !isApproved && (
                   <Button
                     label="Approve output"
@@ -563,8 +572,24 @@ export function TicketPage({
                         <SegmentedControlItem value="excel" label="Excel formulas" />
                       </SegmentedControl>
                     </HStack>
-                    <Button label="Update and rerun" size="sm" icon={<Icon icon={Sparkles} />} onClick={() => preview('Rerunning')} />
                   </HStack>
+                  {hasEdits && (
+                    <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+                      <HStack gap={1.5} vAlign="center">
+                        <StatusDot variant="info" label="Changed" />
+                        <Text type="supporting">Changed. Use Update and run at the top to apply it.</Text>
+                      </HStack>
+                      <Button
+                        label="Undo changes"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setInstructions(t.instructions);
+                          setEngine('python');
+                        }}
+                      />
+                    </HStack>
+                  )}
                   <Card padding={3}>
                     <VStack gap={2}>
                       <HStack gap={1.5} vAlign="center">

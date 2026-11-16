@@ -102,15 +102,19 @@ export function HomePage({tasks}: {tasks: Task[]}) {
                 </Text>
               </VStack>
               <TaskGroup title="Today" tasks={tasks.filter(t => t.group === 'today')} />
-              <TaskGroup title="Upcoming" tasks={tasks.filter(t => t.group === 'later')} />
-              <Collapsible
-                defaultIsOpen={false}
-                chevronPosition="start"
-                trigger={<Text type="label" color="secondary">{`Done · ${done.length}`}</Text>}>
-                <List density="balanced" edge="outset">
-                  {done.map(t => <TaskRow key={t.id} task={t} />)}
-                </List>
-              </Collapsible>
+              {tasks.some(t => t.group === 'later') && (
+                <TaskGroup title="Upcoming" tasks={tasks.filter(t => t.group === 'later')} />
+              )}
+              {done.length > 0 && (
+                <Collapsible
+                  defaultIsOpen={false}
+                  chevronPosition="start"
+                  trigger={<Text type="label" color="secondary">{`Done · ${done.length}`}</Text>}>
+                  <List density="balanced" edge="outset">
+                    {done.map(t => <TaskRow key={t.id} task={t} />)}
+                  </List>
+                </Collapsible>
+              )}
             </VStack>
           </VStack>
         </LayoutContent>
