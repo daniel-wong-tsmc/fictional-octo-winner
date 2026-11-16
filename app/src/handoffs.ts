@@ -42,13 +42,13 @@ export const CHECK_LABEL: Record<CheckKind, string> = {
   fresh: 'Data is less than 2 days old',
 };
 
-export type ValueShape = 'Single value' | 'List' | 'Rows' | 'One row';
+export type ValueShape = 'One value' | 'A column' | 'Some rows' | 'One row';
 
 export function shapeOf(rule: HandoffRule): ValueShape {
   switch (rule.kind) {
-    case 'sum': case 'count': case 'cell': return 'Single value';
-    case 'column': return 'List';
-    case 'rowsWhere': return 'Rows';
+    case 'sum': case 'count': case 'cell': return 'One value';
+    case 'column': return 'A column';
+    case 'rowsWhere': return 'Some rows';
     case 'row': return 'One row';
   }
 }
@@ -132,8 +132,8 @@ export function rulesForPick(pick: Pick, sheet: Sheet): {rule: HandoffRule; sugg
 
 export function checksFor(rule: HandoffRule): CheckKind[] {
   switch (shapeOf(rule)) {
-    case 'Single value': return rule.kind === 'sum' || rule.kind === 'count' ? ['positive', 'notEmpty', 'fresh', 'none'] : ['notEmpty', 'fresh', 'none'];
-    case 'Rows': return ['atLeastOneRow', 'fresh', 'none'];
+    case 'One value': return rule.kind === 'sum' || rule.kind === 'count' ? ['positive', 'notEmpty', 'fresh', 'none'] : ['notEmpty', 'fresh', 'none'];
+    case 'Some rows': return ['atLeastOneRow', 'fresh', 'none'];
     default: return ['notEmpty', 'fresh', 'none'];
   }
 }

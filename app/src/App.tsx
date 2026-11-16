@@ -90,6 +90,7 @@ export default function App() {
           id={ticketId}
           handoffs={handoffs}
           onApprove={markApproved}
+          onUndoApprove={tid => setTasks(prev => prev.map(t => (t.ticketId === tid ? TASKS.find(o => o.id === t.id) ?? t : t)))}
           onAddHandoff={h => setHandoffs(prev => [...prev, h])}
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />

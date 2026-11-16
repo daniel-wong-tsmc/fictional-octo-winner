@@ -27,9 +27,10 @@ import {Divider} from '@astryxdesign/core/Divider';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Icon} from '@astryxdesign/core/Icon';
+import {Link} from '@astryxdesign/core/Link';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
-  ArrowRightLeft, Bot, Check, Download, FileSpreadsheet, MousePointerClick, Plug, Plus, RotateCcw, Sparkles, Trash2,
+  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plug, Plus, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
 import {AVAILABLE_CONNECTIONS, TICKETS, type DataSet, type Sheet} from '../data';
 import {
@@ -46,7 +47,7 @@ const letter = (i: number) => String.fromCharCode(65 + i);
 function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: boolean; onSelect: () => void}) {
   return (
     <ClickableCard
-      label={`Show ${data.name} in the sheets below`}
+      label={`Go to ${data.name} in the sheets below`}
       onClick={onSelect}
       padding={3}
       variant={data.emptyNote ? 'muted' : 'default'}
@@ -55,7 +56,6 @@ function DataCard({data, isSelected, onSelect}: {data: DataSet; isSelected: bool
         <HStack gap={2} vAlign="center">
           <Icon icon={FileSpreadsheet} size="sm" color="secondary" />
           <Text weight="medium">{data.name}</Text>
-          {isSelected && <Token size="sm" label="Shown below" />}
         </HStack>
         {data.source && <RefLabel kind={data.source[0]} label={data.source[1]} />}
         {data.emptyNote && <Text type="supporting">{data.emptyNote}</Text>}
@@ -156,8 +156,9 @@ function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void
 }
 
 function AddHandoffDialog({
-  pick, sheet, onClose, onAdd,
+  pick, sheet, existing, onClose, onAdd,
 }: {
+  existing: Handoff[];
   pick: Pick | null;
   sheet: Sheet;
   onClose: () => void;
@@ -170,17 +171,20 @@ function AddHandoffDialog({
   const checks = chosen ? checksFor(chosen.rule) : [];
   const [check, setCheck] = useState<CheckKind>(checks[0] ?? 'none');
   if (!pick || !chosen) return null;
+  const duplicate = existing.find(h => JSON.stringify(h.rule) === JSON.stringify(chosen.rule));
+  const valueNote = (r: Parameters<typeof previewValue>[0]) =>
+    r.kind === 'cell' || r.kind === 'row' ? `now ${previewValue(r, sheet)}` : 'worked out from all rows on the next run';
 
   const clicked =
     pick.kind === 'column' ? `column ${letter(pick.col)}` : pick.kind === 'row' ? `row ${pick.row}` : `cell ${letter(pick.col)}${pick.row}`;
 
   return (
     <Dialog isOpen onOpenChange={open => !open && onClose()} width={520} purpose="form">
-      <DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose how to find it on every run.`} onOpenChange={open => !open && onClose()} />
+      <DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />
       <VStack gap={4} padding={4}>
         <RadioList
           label="Save it as"
-          description="Saved by meaning, so it stays right when rows move or the data grows."
+          description="We find it by its name or ID, not its cell position, so it stays right when rows move or new rows arrive."
           value={choice}
           onChange={v => {
             setChoice(v);
@@ -193,11 +197,19 @@ function AddHandoffDialog({
               key={i}
               value={String(i)}
               label={describeRule(o.rule)}
-              description={`${shapeOf(o.rule)} · now ${previewValue(o.rule, sheet)}${i === 0 ? ' · recommended' : ''}`}
+              description={`${shapeOf(o.rule)} · ${valueNote(o.rule)}${i === 0 ? ' · recommended' : ''}`}
             />
           ))}
         </RadioList>
-        <Text type="supporting">{`Not offered: ${clicked.replace('column ', '').replace('row ', 'row ').replace('cell ', '')} as a fixed position. It points at different data after the next run.`}</Text>
+        <Text type="supporting">{`We won't save ${clicked} itself. After the next run it may hold different data.`}</Text>
+        {duplicate && (
+          <Banner
+            status="warning"
+            title={`Already handed off as "${duplicate.name}"`}
+            description="Other workflows can already pick it. Use that one so there is only one name for this value."
+            collapsible={false}
+          />
+        )}
         <TextInput label="Name" description="How other workflows will see it." value={name} onChange={setName} />
         <Selector
           label="Check before passing it on"
@@ -211,8 +223,13 @@ function AddHandoffDialog({
           <Button
             label="Add handoff"
             variant="primary"
-            isDisabled={!name.trim()}
-            onClick={() => onAdd({name: name.trim(), rule: chosen.rule, value: `${previewValue(chosen.rule, sheet)} (sample)`, check})}
+            isDisabled={!name.trim() || !!duplicate}
+            onClick={() => onAdd({
+              name: name.trim(),
+              rule: chosen.rule,
+              value: chosen.rule.kind === 'cell' || chosen.rule.kind === 'row' ? previewValue(chosen.rule, sheet) : 'Worked out on the next run',
+              check,
+            })}
           />
         </HStack>
       </VStack>
@@ -228,7 +245,6 @@ function Connections({items, onAdd, onRemove}: {items: string[]; onAdd: (n: stri
     <VStack gap={2}>
       <HStack hAlign="between" vAlign="center">
         <Text type="label">Connections the agent can use</Text>
-        <Text type="supporting">MCP servers</Text>
       </HStack>
       <HStack gap={1.5} wrap="wrap" vAlign="center">
         {items.map(name => (
@@ -276,7 +292,7 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
       key: '_row', header: <Text type="supporting">1</Text>, width: pixel(52), align: 'end',
       renderCell: item =>
         onPick ? (
-          <Button label={String(item._row)} variant="ghost" size="sm" tooltip={`Hand off row ${item._row}`} onClick={() => onPick({kind: 'row', row: item._row})} />
+          <Link tooltip={`Hand off row ${item._row}`} onClick={() => onPick({kind: 'row', row: item._row})}>{String(item._row)}</Link>
         ) : (
           <Text type="supporting" hasTabularNumbers>{item._row}</Text>
         ),
@@ -288,7 +304,7 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
         <VStack gap={0}>
           <Text type="supporting">{letter(c)}</Text>
           {onPick ? (
-            <Button label={name} variant="ghost" size="sm" tooltip={`Hand off column ${letter(c)}`} onClick={() => onPick({kind: 'column', col: c})} />
+            <Link tooltip={`Hand off column ${letter(c)}`} onClick={() => onPick({kind: 'column', col: c})}>{name}</Link>
           ) : (
             <HStack gap={1} vAlign="center">
               <Text weight="semibold">{name}</Text>
@@ -308,18 +324,22 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
           );
         }
         if (onPick) {
-          return <Button label={v} variant="ghost" size="sm" tooltip={`Hand off cell ${letter(c)}${item._row}`} onClick={() => onPick({kind: 'cell', col: c, row: item._row})} />;
+          return <Link tooltip={`Hand off cell ${letter(c)}${item._row}`} onClick={() => onPick({kind: 'cell', col: c, row: item._row})}>{v}</Link>;
         }
         return <Text hasTabularNumbers weight={added.includes(c) ? 'medium' : 'normal'}>{v}</Text>;
       },
     })),
   ];
-  return <Table data={data} columns={columns} idKey="_row" density="compact" dividers="grid" textOverflow="truncate" />;
+  return <Table data={data} columns={columns} idKey="_row" density="compact" dividers="grid" textOverflow="truncate" hasHover={!!onPick} />;
 }
 
 function Workbook({
-  title, description, sheets, selected, onSelect, actions, banner, shownColumns, onPick,
+  title, description, sheets, selected, onSelect, actions, banner, shownColumns, onPick, anchorId, rowTotals, isOpen = true, onToggle,
 }: {
+  anchorId: string;
+  rowTotals: Record<string, string>;
+  isOpen?: boolean;
+  onToggle?: () => void;
   title: string;
   description: string;
   sheets: [string, Sheet][];
@@ -340,30 +360,51 @@ function Workbook({
           <HStack gap={2} vAlign="center">
             <Icon icon={FileSpreadsheet} color="success" />
             <VStack gap={0}>
-              <Text weight="medium">{`${title} · ${sheets.length}`}</Text>
+              <Text weight="medium" id={anchorId}>{`${title} · ${sheets.length}`}</Text>
               <Text type="supporting">{description}</Text>
             </VStack>
           </HStack>
-          <HStack gap={2} wrap="wrap" vAlign="center">{actions}</HStack>
+          <HStack gap={2} wrap="wrap" vAlign="center">
+            {isOpen && actions}
+            {onToggle && (
+              <Button
+                label={isOpen ? 'Hide sheets' : 'Show sheets'}
+                variant="ghost"
+                icon={<Icon icon={isOpen ? ChevronDown : ChevronRight} />}
+                onClick={onToggle}
+              />
+            )}
+          </HStack>
         </HStack>
-        {banner}
-        <TabList value={currentName} onChange={onSelect} size="sm" hasDivider>
-          {sheets.map(([name, s]) => (
-            <Tab key={name} value={name} label={name} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
-          ))}
-        </TabList>
-        <SheetTable sheet={current} shownColumns={shownColumns} onPick={onPick} />
-        <HStack gap={4} padding={3} wrap="wrap">
-          <Text type="supporting">
-            {current.fromFile ? `From ${current.fromFile}` : current.rows ? `Showing ${current.rows.length} sample rows${hidden ? `, ${hidden} columns hidden` : ''}` : 'No rows yet'}
-          </Text>
-          {!!current.addedColumns?.length && (
-            <HStack gap={1.5} vAlign="center">
-              <StatusDot variant="info" label="Added by the agent" />
-              <Text type="supporting">Column added by the agent</Text>
+        {isOpen && banner}
+        {isOpen && (
+          <>
+            <TabList value={currentName} onChange={onSelect} size="sm" hasDivider>
+              {sheets.map(([name, s]) => (
+                <Tab key={name} value={name} label={name} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
+              ))}
+            </TabList>
+            {current.rows && !current.fromFile && (
+              <HStack paddingInline={3} paddingBlockStart={2}>
+                <Text type="supporting" weight="medium" hasTabularNumbers>
+                  {`Preview: ${current.rows.length} of ${rowTotals[currentName] ?? `${current.rows.length} rows`}. The agent works on all of them.`}
+                </Text>
+              </HStack>
+            )}
+            <SheetTable sheet={current} shownColumns={shownColumns} onPick={onPick} />
+            <HStack gap={4} padding={3} wrap="wrap">
+              <Text type="supporting">
+                {current.fromFile ? `From ${current.fromFile}` : current.rows ? (hidden ? `${hidden} columns hidden` : 'All columns shown') : 'No rows yet'}
+              </Text>
+              {!!current.addedColumns?.length && (
+                <HStack gap={1.5} vAlign="center">
+                  <StatusDot variant="info" label="Added by the agent" />
+                  <Text type="supporting">Column added by the agent</Text>
+                </HStack>
+              )}
             </HStack>
-          )}
-        </HStack>
+          </>
+        )}
       </VStack>
     </Card>
   );
@@ -372,11 +413,12 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, handoffs, onApprove, onAddHandoff, onRemoveHandoff,
+  id, handoffs, onApprove, onUndoApprove, onAddHandoff, onRemoveHandoff,
 }: {
   id: number;
   handoffs: Handoff[];
   onApprove: (id: number) => void;
+  onUndoApprove: (id: number) => void;
   onAddHandoff: (h: Handoff) => void;
   onRemoveHandoff: (handoffId: string) => void;
 }) {
@@ -394,6 +436,8 @@ export function TicketPage({
   const [connections, setConnections] = useState(t.connections);
   const [isApproved, setIsApproved] = useState(t.status === 'done');
   const [upload, setUpload] = useState<File | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputsOpen, setInputsOpen] = useState(false);
 
   const preview = (what: string) => toast({body: `Preview only. ${what} comes with the real build.`});
   // One run button. It turns into "Update and run" once the instructions or the code language change.
@@ -414,6 +458,27 @@ export function TicketPage({
     ...uploadedSheets,
   ];
   const outputSheets = Object.entries(t.sheets).filter(([, s]) => s.kind === 'Output');
+  // Full row counts per sheet, read from the cards ("5,402 rows"), for the preview line above each table.
+  const rowTotals: Record<string, string> = Object.fromEntries(
+    [...t.inputs, ...t.outputs].flatMap(d => {
+      const rows = d.stats?.find(x => /rows$/.test(x));
+      return d.sheet && rows ? [[d.sheet, rows]] : [];
+    }),
+  );
+  // Where an approval sends the numbers, shown before the click.
+  const destinations = [...new Set([...(result.feedsInto?.map(f => f[1]) ?? []), ...myHandoffs.flatMap(h => h.usedBy)])];
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scrollTo = (anchorId: string) =>
+    window.setTimeout(() => document.getElementById(anchorId)?.scrollIntoView({behavior: reduceMotion() ? 'auto' : 'smooth', block: 'center'}), 50);
+  const goToInput = (sheet: string) => {
+    setInputSheet(sheet);
+    setInputsOpen(true);
+    scrollTo('input-sheets');
+  };
+  const goToOutput = (sheet: string) => {
+    setOutputSheet(sheet);
+    scrollTo('output-sheets');
+  };
 
   // Prototype only: a real upload reads the workbook's sheet names. Here we stand in two.
   const addUpload = (file: File) => {
@@ -425,6 +490,8 @@ export function TicketPage({
     }]);
     setUploadedSheets(prev => [...prev.filter(([, s]) => s.fromFile !== file.name), ...added]);
     setInputSheet(names[0]);
+    setInputsOpen(true);
+    setUpload(null);
     toast({body: `Added ${names.length} ${names.length === 1 ? 'sheet' : 'sheets'} from ${file.name} to Input sheets.`});
   };
 
@@ -436,7 +503,6 @@ export function TicketPage({
         <LayoutHeader hasDivider padding={4}>
           <Breadcrumbs>
             <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            <BreadcrumbItem href="#home">{t.workflow}</BreadcrumbItem>
             <BreadcrumbItem isCurrent>{t.step}</BreadcrumbItem>
           </Breadcrumbs>
         </LayoutHeader>
@@ -449,13 +515,14 @@ export function TicketPage({
               <VStack gap={1.5}>
                 <HStack gap={3} vAlign="center" wrap="wrap">
                   <StatusLabel status={status} />
-                  <Text type="supporting">{`${t.position} in ${t.workflow}`}</Text>
+                  <Text type="supporting">{`Part of ${t.workflow}`}</Text>
                 </HStack>
                 <Heading level={1} textWrap="balance">{t.step}</Heading>
                 <Text type="supporting">
                   {isApproved && t.status !== 'done' ? 'Approved just now. The next step and any handoffs use this output.' : t.ran}
                 </Text>
               </VStack>
+              <VStack gap={1.5} hAlign="end">
               <HStack gap={2} wrap="wrap">
                 <Button
                   label={runLabel}
@@ -472,12 +539,31 @@ export function TicketPage({
                     onClick={() => {
                       setIsApproved(true);
                       onApprove(id);
-                      const users = [...new Set(myHandoffs.flatMap(h => h.usedBy))];
-                      toast({body: `Approved. ${users.length ? `${users.join(' and ')} will get the new handoff values.` : 'The next step will use this output.'}`});
+                      let dismiss = () => {};
+                      dismiss = toast({
+                        body: `Approved. Sent to ${destinations.length ? destinations.join(', ') : 'the next step'}.`,
+                        autoHideDuration: 10000,
+                        endContent: (
+                          <Button
+                            label="Undo"
+                            size="sm"
+                            onClick={() => {
+                              setIsApproved(false);
+                              onUndoApprove(id);
+                              dismiss();
+                              toast({body: 'Approval undone. Nothing was sent.'});
+                            }}
+                          />
+                        ),
+                      });
                     }}
                   />
                 )}
               </HStack>
+              {t.canApprove && !isApproved && destinations.length > 0 && (
+                <Text type="supporting">{`Approving sends it to: ${destinations.join(', ')}`}</Text>
+              )}
+              </VStack>
             </HStack>
 
             {t.banner && !isApproved && (
@@ -493,7 +579,7 @@ export function TicketPage({
             )}
 
             {/* Inputs and output on the left, instructions on the right */}
-            <Grid columns={{minWidth: 380, repeat: 'fit'}} gap={3} align="start">
+            <Grid columns={{minWidth: 320, repeat: 'fit'}} gap={3} align="start">
               <VStack gap={3}>
                 <Column
                   title="Inputs"
@@ -519,7 +605,7 @@ export function TicketPage({
                     />
                   }>
                   {fileInputs.map(d => (
-                    <DataCard key={d.name} data={d} isSelected={inputSheet === d.sheet} onSelect={() => setInputSheet(d.sheet)} />
+                    <DataCard key={d.name} data={d} isSelected={inputsOpen && inputSheet === d.sheet} onSelect={() => goToInput(d.sheet)} />
                   ))}
                   {linkedInputs.map(hid => {
                     const h = handoffs.find(x => x.id === hid);
@@ -533,7 +619,7 @@ export function TicketPage({
                     <Text type="label">Result</Text>
                     <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
                   </VStack>
-                  <DataCard data={result} isSelected={outputSheet === result.sheet} onSelect={() => setOutputSheet(result.sheet)} />
+                  <DataCard data={result} isSelected={false} onSelect={() => goToOutput(result.sheet)} />
 
                   <Divider />
 
@@ -563,32 +649,31 @@ export function TicketPage({
               <Card variant="muted" padding={3}>
                 <VStack gap={4}>
                   <Text type="label" color="secondary">Instructions to the agent</Text>
-                  <TextArea label="What should happen to the inputs?" value={instructions} onChange={setInstructions} rows={5} />
-                  <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
-                    <HStack gap={2} vAlign="center">
-                      <Text type="supporting">Agent writes it as</Text>
-                      <SegmentedControl label="Agent writes it as" value={engine} onChange={setEngine} size="sm">
-                        <SegmentedControlItem value="python" label="Python" />
-                        <SegmentedControlItem value="excel" label="Excel formulas" />
-                      </SegmentedControl>
-                    </HStack>
-                  </HStack>
-                  {hasEdits && (
-                    <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
-                      <HStack gap={1.5} vAlign="center">
-                        <StatusDot variant="info" label="Changed" />
-                        <Text type="supporting">Changed. Use Update and run at the top to apply it.</Text>
+                  {isEditing ? (
+                    <VStack gap={2}>
+                      <TextArea label="What should happen to the inputs?" value={instructions} onChange={setInstructions} rows={5} hasAutoFocus />
+                      <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
+                        <HStack gap={1.5} vAlign="center">
+                          {hasEdits && <StatusDot variant="info" label="Changed" />}
+                          <Text type="supporting">{hasEdits ? 'Changed. Use Update and run at the top to apply it.' : 'Editing. Nothing changes until you run it.'}</Text>
+                        </HStack>
+                        <Button
+                          label={hasEdits ? 'Discard changes' : 'Done'}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setInstructions(t.instructions);
+                            setEngine('python');
+                            setIsEditing(false);
+                          }}
+                        />
                       </HStack>
-                      <Button
-                        label="Undo changes"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setInstructions(t.instructions);
-                          setEngine('python');
-                        }}
-                      />
-                    </HStack>
+                    </VStack>
+                  ) : (
+                    <VStack gap={2} hAlign="start">
+                      <Text as="p">{instructions}</Text>
+                      <Button label="Edit instructions" variant="ghost" size="sm" icon={<Icon icon={Pencil} />} onClick={() => setIsEditing(true)} />
+                    </VStack>
                   )}
                   <Card padding={3}>
                     <VStack gap={2}>
@@ -608,8 +693,24 @@ export function TicketPage({
                   <Collapsible
                     defaultIsOpen={false}
                     chevronPosition="start"
-                    trigger={<Text type="supporting" weight="medium">{engine === 'python' ? 'Show the Python' : 'Show the Excel formulas'}</Text>}>
-                    <CodeBlock code={engine === 'python' ? t.python : t.excel} language={engine === 'python' ? 'python' : 'plaintext'} width="100%" size="sm" isWrapped />
+                    trigger={<Text type="supporting" weight="medium">Show the code</Text>}>
+                    <VStack gap={2}>
+                      <HStack gap={2} vAlign="center" wrap="wrap">
+                        <Text type="supporting">Written as</Text>
+                        <SegmentedControl
+                          label="Written as"
+                          value={engine}
+                          onChange={v => {
+                            setEngine(v);
+                            setIsEditing(true);
+                          }}
+                          size="sm">
+                          <SegmentedControlItem value="python" label="Python" />
+                          <SegmentedControlItem value="excel" label="Excel formulas" />
+                        </SegmentedControl>
+                      </HStack>
+                      <CodeBlock code={engine === 'python' ? t.python : t.excel} language={engine === 'python' ? 'python' : 'plaintext'} width="100%" size="sm" isWrapped />
+                    </VStack>
                   </Collapsible>
                   <Divider />
                   <Connections
@@ -627,40 +728,15 @@ export function TicketPage({
               </Card>
             </Grid>
 
-            {/* Sheets: inputs and outputs kept apart */}
-            {inputSheets.length > 0 && (
-              <Workbook
-                title="Input sheets"
-                description="What the agent reads. Upload an Excel to add its sheets here."
-                sheets={inputSheets}
-                selected={inputSheet}
-                onSelect={setInputSheet}
-                actions={
-                  <>
-                    <FileInput
-                      label="Upload Excel"
-                      isLabelHidden
-                      placeholder="Upload Excel"
-                      accept=".xlsx,.xls,.csv"
-                      width={220}
-                      value={upload}
-                      onChange={files => {
-                        const f = Array.isArray(files) ? files[0] : files;
-                        setUpload(f ?? null);
-                        if (f) addUpload(f);
-                      }}
-                    />
-                    <Button label="Download inputs" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
-                  </>
-                }
-              />
-            )}
+            {/* Sheets: output first (what you approve), inputs collapsed */}
             <Workbook
               title="Output sheets"
               description="What the agent writes. Read only; change the instructions to change these."
               sheets={outputSheets}
               selected={outputSheet}
               onSelect={setOutputSheet}
+              anchorId="output-sheets"
+              rowTotals={rowTotals}
               shownColumns={isPicking ? [] : shownColumns}
               onPick={isPicking ? p => setPick(p) : undefined}
               banner={
@@ -707,6 +783,36 @@ export function TicketPage({
                 </>
               }
             />
+            {inputSheets.length > 0 && (
+              <Workbook
+                title="Input sheets"
+                description="What the agent reads. Upload an Excel to add its sheets here."
+                sheets={inputSheets}
+                selected={inputSheet}
+                onSelect={setInputSheet}
+                anchorId="input-sheets"
+                rowTotals={rowTotals}
+                isOpen={inputsOpen}
+                onToggle={() => setInputsOpen(o => !o)}
+                actions={
+                  <>
+                    <FileInput
+                      label="Upload Excel"
+                      isLabelHidden
+                      placeholder="Upload Excel"
+                      accept=".xlsx,.xls,.csv"
+                      width={220}
+                      value={upload}
+                      onChange={files => {
+                        const f = Array.isArray(files) ? files[0] : files;
+                        if (f) addUpload(f);
+                      }}
+                    />
+                    <Button label="Download inputs" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
+                  </>
+                }
+              />
+            )}
             <Text type="supporting" justify="center">Design prototype. Example data. Runs, uploads and downloads are not connected yet.</Text>
           </VStack>
           {pick && (
@@ -714,6 +820,7 @@ export function TicketPage({
               key={JSON.stringify(pick)}
               pick={pick}
               sheet={t.sheets[outputSheet]}
+              existing={myHandoffs}
               onClose={() => setPick(null)}
               onAdd={h => {
                 onAddHandoff({...h, id: `h-${Date.now()}`, ticketId: id, workflow: t.workflow, usedBy: []});
