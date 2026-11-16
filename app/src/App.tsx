@@ -4,13 +4,11 @@ import {SideNav, SideNavHeading, SideNavItem, SideNavSection} from '@astryxdesig
 import {NavIcon} from '@astryxdesign/core/NavIcon';
 import {Icon} from '@astryxdesign/core/Icon';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Badge} from '@astryxdesign/core/Badge';
-import {Button} from '@astryxdesign/core/Button';
 import {
   BarChart3, Database, Home as HomeIcon, PlayCircle, Search, Tag, UserCircle, Workflow,
 } from 'lucide-react';
-import {RECENT_RUNS, TASKS, type Task} from './data';
+import {TASKS, type Task} from './data';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
@@ -83,19 +81,6 @@ export default function App() {
             <SideNavItem label="Runs" icon={PlayCircle} href="#home" />
             <SideNavItem label="Analytics" icon={BarChart3} href="#home" />
             <SideNavItem label="Tags" icon={Tag} href="#home" />
-          </SideNavSection>
-          <SideNavSection
-            title="Recent runs"
-            endContent={<Button label="View all" variant="ghost" size="sm" href="#home" />}>
-            {RECENT_RUNS.map(run => (
-              <SideNavItem
-                key={run.name}
-                label={run.name}
-                href={`#ticket-${run.ticketId}`}
-                isSelected={ticketId === run.ticketId}
-                endContent={<StatusDot variant={run.dot} label={run.label} tooltip={`${run.label}, ${run.ago} ago`} />}
-              />
-            ))}
           </SideNavSection>
         </SideNav>
       }>

@@ -77,13 +77,6 @@ export const TASKS: Task[] = [
   {id: 3, group: 'today', title: 'Approve October sales numbers before they go to Finance', status: 'review', ref: ['workflow', 'Monthly sales close'], why: 'Sales summary for Finance is ready', when: 'Today', ticketId: 3},
 ];
 
-export const RECENT_RUNS: {name: string; dot: 'error' | 'info' | 'success'; label: string; ago: string; ticketId: number}[] = [
-  {name: 'Weekly revenue report', dot: 'error', label: 'Stopped', ago: '2h', ticketId: 1},
-  {name: 'Monthly sales close', dot: 'info', label: 'Running', ago: 'now', ticketId: 3},
-  {name: 'Customer churn list', dot: 'success', label: 'Finished', ago: '5h', ticketId: 4},
-  {name: 'Inventory snapshot', dot: 'success', label: 'Finished', ago: '3d', ticketId: 5},
-];
-
 const ORDERS_USD: Sheet = {
   kind: 'Output',
   columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'],
