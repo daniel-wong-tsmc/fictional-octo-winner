@@ -505,6 +505,7 @@ export function TicketPage({
         <LayoutHeader hasDivider padding={4}>
           <Breadcrumbs>
             <BreadcrumbItem href="#home">Home</BreadcrumbItem>
+            {t.workflow === 'Monthly sales close' && <BreadcrumbItem href="#workflow-1">{t.workflow}</BreadcrumbItem>}
             <BreadcrumbItem isCurrent>{t.step}</BreadcrumbItem>
           </Breadcrumbs>
         </LayoutHeader>
