@@ -225,7 +225,11 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
 }
 const nodeTypes = {tile: Tile};
 /** Dots big enough to grab with a mouse or a finger. */
-const HANDLE_STYLE: CSSProperties = {width: 'var(--spacing-3)', height: 'var(--spacing-3)'};
+const HANDLE_STYLE: CSSProperties = {
+  width: 'var(--spacing-5)',
+  height: 'var(--spacing-5)',
+  borderWidth: 'var(--spacing-0-5)',
+};
 
 /* ---------- Connection (a line between tiles) ---------- */
 
@@ -485,7 +489,7 @@ type BoardNode = {id: string; step: Step; position: {x: number; y: number}; meas
 
 let nextId = 1;
 const newId = () => `n${nextId++}`;
-const COL = 310;
+const COL = 360;
 const ROW = 210;
 
 function startingBoard(isEditing: boolean): BoardNode[] {
@@ -856,7 +860,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
         // Centre the tile on the pointer (tiles are 250 wide, about 130 tall).
         place(kind, {x: p.x - 125, y: p.y - 60});
       }}
-      connectionRadius={32}
+      connectionRadius={48}
       fitView
       fitViewOptions={FIT}
       minZoom={0.3}
