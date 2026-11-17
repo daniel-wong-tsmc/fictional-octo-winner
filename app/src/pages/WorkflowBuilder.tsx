@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react';
 import {
-  Background, BackgroundVariant, Controls, Handle, Panel, Position, ReactFlow, applyNodeChanges, useReactFlow,
+  Background, BackgroundVariant, Handle, Panel, Position, ReactFlow, ReactFlowProvider, applyNodeChanges, useReactFlow, useViewport,
   type Edge, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -21,13 +21,14 @@ import {Switch} from '@astryxdesign/core/Switch';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
+import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Database, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
+import {Database, Maximize, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
 import {PEOPLE} from '../workflow';
 
 /* ---------- Steps ---------- */
@@ -39,11 +40,14 @@ type InstructionsStep = {kind: 'instructions'; text: string; writtenAs: string};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
-const KIND_INFO: Record<StepKind, {label: string; icon: typeof Send}> = {
-  input: {label: 'Input', icon: Database},
-  instructions: {label: 'Instructions', icon: WandSparkles},
-  output: {label: 'Output', icon: Send},
+const KIND_INFO: Record<StepKind, {label: string; icon: typeof Send; hint: string}> = {
+  input: {label: 'Input', icon: Database, hint: 'Excel upload or an app through MCP'},
+  instructions: {label: 'LLM', icon: WandSparkles, hint: 'Tell the AI what to do with the data'},
+  output: {label: 'Pass on to', icon: Send, hint: 'Who gets the result, and who OKs it'},
 };
+const KINDS: StepKind[] = ['input', 'instructions', 'output'];
+/** Drag type used when a node is dragged from the toolbar onto the board. */
+const DRAG_TYPE = 'application/x-workflow-node';
 
 /** Apps the workspace admin has connected through MCP. */
 const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
@@ -377,24 +381,98 @@ const flowTheme = {
 
 /** Keeps every tile in view as tiles are added or removed, without shrinking text past readable. */
 const FIT = {padding: 0.2, maxZoom: 1, minZoom: 0.6, duration: 250};
-function FitOnChange({count}: {count: number}) {
+function FitOnChange({fitKey}: {fitKey: number}) {
   const {fitView} = useReactFlow();
   useEffect(() => {
     const t = window.setTimeout(() => fitView(FIT), 60);
     return () => window.clearTimeout(t);
-  }, [count, fitView]);
+  }, [fitKey, fitView]);
   return null;
+}
+
+/** Where a tile goes when it's added by a click rather than dropped: the flow reads left to right. */
+function placeFor(board: BoardNode[], kind: StepKind, fromId?: string): {x: number; y: number} {
+  const sameKind = board.filter(n => n.step.kind === kind).length;
+  if (kind === 'input') return {x: 0, y: sameKind * ROW};
+  const steps = board.filter(n => n.step.kind === 'instructions');
+  const anchor = board.find(n => n.id === fromId) ?? steps[steps.length - 1] ?? board.find(n => n.step.kind === 'input');
+  if (!anchor) return {x: kind === 'instructions' ? COL : COL * 2, y: 0};
+  return {x: anchor.position.x + COL, y: anchor.position.y + (kind === 'output' ? sameKind * ROW : 0)};
+}
+
+/* ---------- Bottom toolbar (like a FigJam toolbar) ---------- */
+
+function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
+  const {zoomIn, zoomOut, fitView} = useReactFlow();
+  const {zoom} = useViewport();
+  // On a phone the node buttons drop their words so the bar fits; tooltips and labels still name them.
+  const isSmall = useMediaQuery('(max-width: 640px)');
+  return (
+    <Card padding={1.5} elevation="high">
+      <Toolbar
+        label="Board tools"
+        size="sm"
+        gap={2}
+        startContent={
+          <HStack gap={2} vAlign="center">
+            {!isSmall && <Text type="supporting" weight="medium">Nodes</Text>}
+            <HStack gap={1}>
+              {KINDS.map(kind => {
+                const info = KIND_INFO[kind];
+                return (
+                  <Button
+                    key={kind}
+                    label={info.label}
+                    variant="ghost"
+                    isIconOnly={isSmall}
+                    icon={<Icon icon={info.icon} />}
+                    tooltip={`${info.hint}. Drag onto the board, or click to add.`}
+                    draggable
+                    onDragStart={e => {
+                      e.dataTransfer.setData(DRAG_TYPE, kind);
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onClick={() => onAdd(kind)}
+                  />
+                );
+              })}
+            </HStack>
+          </HStack>
+        }
+        endContent={
+          <HStack gap={1} vAlign="center">
+            <Divider orientation="vertical" />
+            <IconButton label="Zoom out" tooltip="Zoom out" variant="ghost" icon={<Icon icon={Minus} />} onClick={() => zoomOut({duration: 150})} />
+            {!isSmall && <Text type="supporting" hasTabularNumbers>{`${Math.round(zoom * 100)}%`}</Text>}
+            <IconButton label="Zoom in" tooltip="Zoom in" variant="ghost" icon={<Icon icon={Plus} />} onClick={() => zoomIn({duration: 150})} />
+            <IconButton label="Fit board to screen" tooltip="Fit to screen" variant="ghost" icon={<Icon icon={Maximize} />} onClick={() => fitView(FIT)} />
+          </HStack>
+        }
+      />
+    </Card>
+  );
 }
 
 /* ---------- Page ---------- */
 
-export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => void}) {
+export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: () => void}) {
+  return (
+    <ReactFlowProvider>
+      <Builder {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => void}) {
+  const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const [name, setName] = useState(isEditing ? 'Monthly sales close' : 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => startingBoard(isEditing));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
+  // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
+  const [fitKey, setFitKey] = useState(0);
 
   const selected = board.find(n => n.id === selectedId) ?? null;
   const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
@@ -402,25 +480,22 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
   const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
     ? 'Start here: select the Input tile and add your data.'
     : !count('instructions')
-      ? 'Next: click “Add instructions” on the Input tile.'
+      ? 'Next: drag an LLM node from the toolbar, or click “Add LLM step” on the Input tile.'
       : !count('output')
-        ? 'Next: click “Add output” on the last Instructions tile.'
+        ? 'Next: drag a Pass on to node from the toolbar, or click “Add pass on to”.'
         : 'Finish the tiles marked Needs setup.';
 
-  const add = useCallback((fromId: string, kind: StepKind) => {
+  const place = useCallback((kind: StepKind, at?: {x: number; y: number}, fromId?: string) => {
     const id = newId();
     setBoard(prev => {
-      const from = prev.find(n => n.id === fromId);
       const sameKind = prev.filter(n => n.step.kind === kind).length;
-      const position =
-        kind === 'input'
-          ? {x: 0, y: sameKind * ROW}
-          : {x: (from?.position.x ?? 0) + COL, y: (from?.position.y ?? 0) + (kind === 'output' ? sameKind * ROW : 0)};
-      return [...prev, {id, step: blankStep(kind, sameKind), position}];
+      return [...prev, {id, step: blankStep(kind, sameKind), position: at ?? placeFor(prev, kind, fromId)}];
     });
+    if (!at) setFitKey(k => k + 1);
     setSelectedId(id);
     setTrial('none');
   }, []);
+  const add = useCallback((fromId: string, kind: StepKind) => place(kind, undefined, fromId), [place]);
 
   const update = (id: string, step: Step) => {
     setBoard(prev => prev.map(n => (n.id === id ? {...n, step} : n)));
@@ -438,9 +513,9 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
     const hasOutput = board.some(n => n.step.kind === 'output');
     return board.map(n => {
       let next: TileData['next'] = [];
-      if (n.step.kind === 'input' && !steps.length) next = [{label: 'Add instructions', kind: 'instructions'}];
+      if (n.step.kind === 'input' && !steps.length) next = [{label: 'Add LLM step', kind: 'instructions'}];
       if (n.step.kind === 'instructions' && n.id === lastStep?.id) {
-        next = [{label: 'Add a step', kind: 'instructions'}, ...(hasOutput ? [] : [{label: 'Add output', kind: 'output' as StepKind}])];
+        next = [{label: 'Add LLM step', kind: 'instructions'}, ...(hasOutput ? [] : [{label: 'Add pass on to', kind: 'output' as StepKind}])];
       }
       const title =
         n.step.kind === 'input'
@@ -475,6 +550,19 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
       onNodesChange={onNodesChange}
       onNodeClick={(_, node) => setSelectedId(node.id)}
       onPaneClick={() => setSelectedId(null)}
+      onDragOver={e => {
+        if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={e => {
+        const kind = e.dataTransfer.getData(DRAG_TYPE) as StepKind;
+        if (!KINDS.includes(kind)) return;
+        e.preventDefault();
+        const p = screenToFlowPosition({x: e.clientX, y: e.clientY});
+        // Centre the tile on the pointer (tiles are 250 wide, about 130 tall).
+        place(kind, {x: p.x - 125, y: p.y - 60});
+      }}
       nodesConnectable={false}
       fitView
       fitViewOptions={FIT}
@@ -483,9 +571,8 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
       colorMode="system"
       style={flowTheme}
       aria-label="Workflow board">
-      <FitOnChange count={board.length} />
+      <FitOnChange fitKey={fitKey} />
       <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
-      <Controls showInteractive={false} />
       <Panel position="top-left">
         <VStack gap={2} maxWidth={420}>
           {trial === 'done' && (
@@ -494,8 +581,8 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
           {!allReady && <Text type="supporting" weight="medium">{nextHint}</Text>}
         </VStack>
       </Panel>
-      <Panel position="bottom-right">
-        <Button label="Add another input" size="sm" icon={<Icon icon={Plus} />} onClick={() => add('', 'input')} />
+      <Panel position="bottom-center">
+        <BoardToolbar onAdd={kind => place(kind)} />
       </Panel>
     </ReactFlow>
   );
