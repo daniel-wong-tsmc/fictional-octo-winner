@@ -11,7 +11,7 @@ import {neutralTheme} from '@astryxdesign/theme-neutral';
 export const workspaceTheme = defineTheme({
   name: 'workspace',
   extends: neutralTheme,
-  // Fonts load from Google Fonts in index.html.
+  // Fonts: Google Fonts, linked in index.html (with preconnect) and in workspace.fonts.css.
   typography: {
     scale: {base: 14, ratio: 1.2},
     body: {

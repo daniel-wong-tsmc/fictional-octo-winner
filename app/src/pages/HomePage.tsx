@@ -7,6 +7,7 @@ import {List, ListItem} from '@astryxdesign/core/List';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Icon} from '@astryxdesign/core/Icon';
+import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Link} from '@astryxdesign/core/Link';
 import {ChevronRight, Plus, Sparkles} from 'lucide-react';
 import {useState} from 'react';
@@ -109,6 +110,8 @@ export function HomePage({tasks}: {tasks: Task[]}) {
               placeholder="Ask the agent to set up a workflow or explain a number…"
               value={ask}
               onChange={setAsk}
+              isDisabled
+              disabledMessage="Coming soon: ask the agent from here."
             />
             <VStack gap={6}>
               <VStack gap={1}>
@@ -117,7 +120,9 @@ export function HomePage({tasks}: {tasks: Task[]}) {
                   What your workflows need from you, grouped by workflow. Open a task to see its ticket. Rows are example data.
                 </Text>
               </VStack>
-              {open.length === 0 && <Text type="supporting">Nothing needs you right now.</Text>}
+              {open.length === 0 && (
+                <EmptyState isCompact title="Nothing needs you right now" description="New tasks show up here when a workflow needs your OK or runs into a problem." />
+              )}
               {[...new Set(open.map(workflowOf))].map(name => (
                 <WorkflowGroup key={name} name={name} tasks={open.filter(t => workflowOf(t) === name)} />
               ))}

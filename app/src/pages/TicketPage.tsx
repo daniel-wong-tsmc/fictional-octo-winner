@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {FileInput} from '@astryxdesign/core/FileInput';
-import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
+import {Layout, LayoutContent, LayoutFooter, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Grid} from '@astryxdesign/core/Grid';
 import {Heading, Text} from '@astryxdesign/core/Text';
@@ -26,6 +26,8 @@ import {Divider} from '@astryxdesign/core/Divider';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Icon} from '@astryxdesign/core/Icon';
+import {EmptyState} from '@astryxdesign/core/EmptyState';
+import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
   ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plug, Plus, RotateCcw, Sparkles, Trash2,
@@ -182,8 +184,12 @@ function AddHandoffDialog({
 
   return (
     <Dialog isOpen onOpenChange={open => !open && onClose()} width={520} purpose="form">
-      <DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />
-      <VStack gap={4} padding={4}>
+      <Layout
+        height="auto"
+        header={<DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />}
+        content={
+          <LayoutContent padding={4}>
+      <VStack gap={4}>
         <RadioList
           label="Save it as"
           description="We find it by its name or ID, not its cell position, so it stays right when rows move or new rows arrive."
@@ -220,6 +226,11 @@ function AddHandoffDialog({
           onChange={v => setCheck(v as CheckKind)}
           options={checks.map(c => ({value: c, label: CHECK_LABEL[c]}))}
         />
+      </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter padding={4}>
         <HStack gap={2} hAlign="end">
           <Button label="Cancel" variant="ghost" onClick={onClose} />
           <Button
@@ -234,7 +245,9 @@ function AddHandoffDialog({
             })}
           />
         </HStack>
-      </VStack>
+          </LayoutFooter>
+        }
+      />
     </Dialog>
   );
 }
@@ -273,9 +286,13 @@ type Row = Record<string, unknown> & {_row: number};
 function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?: string[]; onPick?: (p: Pick) => void}) {
   if (sheet.isEmpty || !sheet.columns || !sheet.rows) {
     return (
-      <VStack padding={8} hAlign="center" gap={1}>
-        <Icon icon={FileSpreadsheet} color="secondary" />
-        <Text type="supporting">{sheet.emptyNote ?? 'This sheet fills in when the step runs.'}</Text>
+      <VStack padding={6}>
+        <EmptyState
+          isCompact
+          icon={<Icon icon={FileSpreadsheet} color="secondary" />}
+          title={sheet.fromFile ? 'Uploaded' : 'No rows yet'}
+          description={sheet.emptyNote ?? 'This sheet fills in when the step runs.'}
+        />
       </VStack>
     );
   }
@@ -358,34 +375,43 @@ function Workbook({
   return (
     <Card padding={0}>
       <VStack>
-        <HStack gap={3} padding={3} vAlign="center" hAlign="between" wrap="wrap">
-          <HStack gap={2} vAlign="center">
-            <Icon icon={FileSpreadsheet} color="success" />
-            <VStack gap={0}>
-              <Text weight="medium" id={anchorId}>{`${title} · ${sheets.length}`}</Text>
-              <Text type="supporting">{description}</Text>
-            </VStack>
-          </HStack>
-          <HStack gap={2} wrap="wrap" vAlign="center">
-            {isOpen && actions}
-            {onToggle && (
-              <Button
-                label={isOpen ? 'Hide sheets' : 'Show sheets'}
-                variant="ghost"
-                icon={<Icon icon={isOpen ? ChevronDown : ChevronRight} />}
-                onClick={onToggle}
-              />
-            )}
-          </HStack>
-        </HStack>
+        <VStack padding={3}>
+          <Toolbar
+            label={title}
+            gap={2}
+            startContent={
+              <HStack gap={2} vAlign="center">
+                <Icon icon={FileSpreadsheet} color="success" />
+                <VStack gap={0}>
+                  <Text weight="medium" id={anchorId}>{`${title} · ${sheets.length}`}</Text>
+                  <Text type="supporting">{description}</Text>
+                </VStack>
+              </HStack>
+            }
+            endContent={
+              <>
+                {isOpen && actions}
+                {onToggle && (
+                  <Button
+                    label={isOpen ? 'Hide sheets' : 'Show sheets'}
+                    variant="ghost"
+                    icon={<Icon icon={isOpen ? ChevronDown : ChevronRight} />}
+                    onClick={onToggle}
+                  />
+                )}
+              </>
+            }
+          />
+        </VStack>
         {isOpen && banner}
         {isOpen && (
           <>
-            <TabList value={currentName} onChange={onSelect} size="sm" hasDivider>
+            <TabList value={currentName} onChange={onSelect} size="sm" hasDivider role="tablist">
               {sheets.map(([name, s]) => (
-                <Tab key={name} value={name} label={name} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
+                <Tab key={name} value={name} label={name} panelId={`${anchorId}-panel`} endContent={s.fromFile ? <Text type="supporting">Uploaded</Text> : undefined} />
               ))}
             </TabList>
+            <VStack id={`${anchorId}-panel`} role="tabpanel" aria-label={currentName}>
             {current.rows && !current.fromFile && (
               <HStack paddingInline={3} paddingBlockStart={2}>
                 <Text type="supporting" weight="medium" hasTabularNumbers>
@@ -394,6 +420,7 @@ function Workbook({
               </HStack>
             )}
             <SheetTable sheet={current} shownColumns={shownColumns} onPick={onPick} />
+            </VStack>
             <HStack gap={4} padding={3} wrap="wrap">
               <Text type="supporting">
                 {current.fromFile ? `From ${current.fromFile}` : current.rows ? (hidden ? `${hidden} columns hidden` : 'All columns shown') : 'No rows yet'}
@@ -582,7 +609,7 @@ export function TicketPage({
             )}
 
             {/* Inputs and output on the left, instructions on the right */}
-            <Grid columns={{minWidth: 320, repeat: 'fit'}} gap={3} align="start">
+            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
               <VStack gap={3}>
                 <Region
                   title="Inputs"
