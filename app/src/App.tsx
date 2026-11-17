@@ -11,7 +11,8 @@ import {TASKS, type Task} from './data';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
-import {CreateWorkflowPage, DraftWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
+import {LiveWorkflowPage} from './pages/WorkflowPages';
+import {WorkflowBuilderPage} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
   const read = () => window.location.hash.slice(1) || 'home';
@@ -66,8 +67,8 @@ export default function App() {
               endContent={<Text type="supporting" hasTabularNumbers>{String(openCount)}</Text>}
             />
             <SideNavItem label="Workflows" icon={Workflow} collapsible={{defaultIsCollapsed: false}}>
-              <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || ticketId === 3} />
-              <SideNavItem label="New workflow" icon={Plus} href="#workflow-new" isSelected={route === 'workflow-new' || route === 'workflow-draft'} />
+              <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
+              <SideNavItem label="New workflow" icon={Plus} href="#workflow-new" isSelected={route === 'workflow-new'} />
             </SideNavItem>
           </SideNavSection>
         </SideNav>
@@ -82,10 +83,8 @@ export default function App() {
           onAddHandoff={h => setHandoffs(prev => [...prev, h])}
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />
-      ) : route === 'workflow-new' ? (
-        <CreateWorkflowPage />
-      ) : route === 'workflow-draft' ? (
-        <DraftWorkflowPage onTurnOn={() => (window.location.hash = 'workflow-1')} />
+      ) : route === 'workflow-new' || route === 'workflow-edit' ? (
+        <WorkflowBuilderPage key={route} isEditing={route === 'workflow-edit'} onTurnOn={() => (window.location.hash = 'workflow-1')} />
       ) : route === 'workflow-1' ? (
         <LiveWorkflowPage handoffs={handoffs} isStep3Approved={isStep3Approved} />
       ) : (

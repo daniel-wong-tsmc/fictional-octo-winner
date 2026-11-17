@@ -5,27 +5,18 @@ import {Grid} from '@astryxdesign/core/Grid';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
-import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {FileInput} from '@astryxdesign/core/FileInput';
-import {Selector} from '@astryxdesign/core/Selector';
 import {List, ListItem} from '@astryxdesign/core/List';
-import {Token} from '@astryxdesign/core/Token';
-import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
-import {Divider} from '@astryxdesign/core/Divider';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useToast} from '@astryxdesign/core/Toast';
-import {ArrowRight, ArrowRightLeft, CalendarClock, ChevronRight, Pencil, Play, Plus, Power, Send, Sparkles, UserCheck} from 'lucide-react';
-import {
-  DESTINATION_OPTIONS, DRAFT_DESCRIPTION, DRAFT_FILE_NAME, DRAFT_QUESTIONS, DRAFT_STEPS, EXAMPLE_DESCRIPTIONS,
-  MONTHLY_SALES_CLOSE, PEOPLE, SCHEDULES, TEMPLATES, type WorkflowStep,
-} from '../workflow';
+import {ArrowRight, ArrowRightLeft, CalendarClock, Pencil, Play, Send, UserCheck} from 'lucide-react';
+import {MONTHLY_SALES_CLOSE, type WorkflowStep} from '../workflow';
 import type {Handoff} from '../handoffs';
 import {FlowChart} from './FlowChart';
 
@@ -122,260 +113,6 @@ function StepDialog({step, index, isEditable, onClose, onSave}: {
   );
 }
 
-/* ---------- Create: describe and/or drop a file ---------- */
-
-export function CreateWorkflowPage() {
-  const [description, setDescription] = useState(DRAFT_DESCRIPTION);
-  const [file, setFile] = useState<File | null>(() => new File([''], DRAFT_FILE_NAME));
-  const [isDrafting, setIsDrafting] = useState(false);
-  const draft = () => {
-    setIsDrafting(true);
-    window.setTimeout(() => (window.location.hash = 'workflow-draft'), 1200);
-  };
-  return (
-    <Layout
-      height="fill"
-      contentWidth={720}
-      header={
-        <LayoutHeader hasDivider padding={4}>
-          <Breadcrumbs>
-            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            <BreadcrumbItem isCurrent>New workflow</BreadcrumbItem>
-          </Breadcrumbs>
-        </LayoutHeader>
-      }
-      content={
-        <LayoutContent padding={6}>
-          <VStack gap={6}>
-            <VStack gap={1}>
-              <Heading level={1}>Set up a workflow</Heading>
-              <Text type="supporting">
-                Describe how you do it today, or drop the spreadsheet you use. The agent drafts the steps and asks about anything unclear.
-              </Text>
-            </VStack>
-            <TextArea
-              label="Describe the process"
-              description="In your own words, like you’d explain it to a new colleague."
-              value={description}
-              onChange={setDescription}
-              rows={5}
-            />
-            <HStack gap={2} vAlign="center" wrap="wrap">
-              <Text type="supporting">Examples:</Text>
-              <Token size="sm" label="Monthly sales close" onClick={() => setDescription(EXAMPLE_DESCRIPTIONS[0])} />
-              <Token size="sm" label="Overdue invoices" onClick={() => setDescription(EXAMPLE_DESCRIPTIONS[1])} />
-              <Token size="sm" label="Low stock alert" onClick={() => setDescription(EXAMPLE_DESCRIPTIONS[2])} />
-            </HStack>
-            <FileInput
-              label="And/or drop the file you use today"
-              description="A workbook, a how-to doc or an email. The agent reads its steps and formulas."
-              mode="dropzone"
-              accept=".xlsx,.xls,.csv,.docx,.pdf"
-              value={file}
-              onChange={files => setFile(Array.isArray(files) ? files[0] ?? null : files)}
-            />
-            <HStack hAlign="end">
-              <Button
-                label="Draft my workflow"
-                variant="primary"
-                icon={<Icon icon={Sparkles} />}
-                isLoading={isDrafting}
-                isDisabled={!description.trim() && !file}
-                onClick={draft}
-              />
-            </HStack>
-            <Divider />
-            <List
-              header={<Text type="label" color="secondary">Or start from a template</Text>}
-              hasDividers
-              edge="outset">
-              {TEMPLATES.map(t => (
-                <ListItem
-                  key={t.name}
-                  label={<Text weight="medium">{t.name}</Text>}
-                  description={t.about}
-                  endContent={<Icon icon={ChevronRight} size="sm" color="secondary" />}
-                  onClick={draft}
-                />
-              ))}
-            </List>
-          </VStack>
-        </LayoutContent>
-      }
-    />
-  );
-}
-
-/* ---------- Draft review ---------- */
-
-export function DraftWorkflowPage({onTurnOn}: {onTurnOn: () => void}) {
-  const toast = useToast();
-  const [name, setName] = useState(MONTHLY_SALES_CLOSE.name);
-  const [answers, setAnswers] = useState<Record<string, string>>(Object.fromEntries(DRAFT_QUESTIONS.map(q => [q.id, q.answer])));
-  const [steps, setSteps] = useState<WorkflowStep[]>(DRAFT_STEPS);
-  const [schedule, setSchedule] = useState(SCHEDULES[0]);
-  const [destinations, setDestinations] = useState<string[]>(MONTHLY_SALES_CLOSE.destinations);
-  const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
-  const [openStep, setOpenStep] = useState<number | null>(null);
-  const approver = answers['q-approver'];
-  const answered = DRAFT_QUESTIONS.filter(q => answers[q.id]).length;
-  const waitingOnConnection = steps.some(s => s.inputs.some(i => i.status === 'needsConnection'));
-
-  return (
-    <Layout
-      height="fill"
-      contentWidth={1240}
-      header={
-        <LayoutHeader hasDivider padding={4}>
-          <Breadcrumbs>
-            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            <BreadcrumbItem href="#workflow-new">New workflow</BreadcrumbItem>
-            <BreadcrumbItem isCurrent>Draft</BreadcrumbItem>
-          </Breadcrumbs>
-        </LayoutHeader>
-      }
-      content={
-        <LayoutContent padding={6}>
-          <VStack gap={5}>
-            <Banner
-              status="info"
-              title="Your draft is ready"
-              description={`Drafted from your description and ${DRAFT_FILE_NAME}. Answer the questions, check the steps, then try it on last month.`}
-              collapsible={false}
-            />
-            <TextInput label="Workflow name" value={name} onChange={setName} width={420} />
-
-            <Card padding={4}>
-              <VStack gap={4}>
-                <HStack hAlign="between" vAlign="center" wrap="wrap" gap={2}>
-                  <Text type="label">Questions from the agent</Text>
-                  <Text type="supporting">{`${answered} of ${DRAFT_QUESTIONS.length} answered`}</Text>
-                </HStack>
-                <Grid columns={{minWidth: 300, max: 3, repeat: 'fit'}} gap={4}>
-                  {DRAFT_QUESTIONS.map(q => (
-                    <Selector
-                      key={q.id}
-                      label={q.question}
-                      description={q.why}
-                      options={q.options}
-                      value={answers[q.id]}
-                      onChange={v => setAnswers(prev => ({...prev, [q.id]: v}))}
-                    />
-                  ))}
-                </Grid>
-              </VStack>
-            </Card>
-
-            <VStack gap={2}>
-              <HStack hAlign="between" vAlign="end" wrap="wrap" gap={2}>
-                <VStack gap={0.5}>
-                  <Text type="label">How it will run</Text>
-                  <Text type="supporting">Click a step to change it.</Text>
-                </VStack>
-                {waitingOnConnection && (
-                  <HStack gap={1.5} vAlign="center">
-                    <StatusDot variant="warning" label="Needs connection" />
-                    <Text type="supporting">Shopify isn’t connected yet. You can still finish setup.</Text>
-                  </HStack>
-                )}
-              </HStack>
-              <FlowChart
-                steps={steps}
-                mode={trial === 'done' ? 'trial' : 'draft'}
-                schedule={schedule}
-                approver={approver}
-                destinations={destinations}
-                onOpenStep={s => setOpenStep(steps.findIndex(x => x.id === s.id))}
-              />
-            </VStack>
-
-            <Card padding={4}>
-              <VStack gap={4}>
-                <Text type="label">Settings</Text>
-                <Grid columns={{minWidth: 260, max: 3, repeat: 'fit'}} gap={4}>
-                  <Selector label="When it runs" options={SCHEDULES} value={schedule} onChange={setSchedule} />
-                  <Selector
-                    label="Who gives the OK"
-                    options={PEOPLE}
-                    value={approver}
-                    onChange={v => setAnswers(prev => ({...prev, 'q-approver': v}))}
-                  />
-                  <VStack gap={1.5}>
-                    <Text type="label">Sends results to</Text>
-                    <HStack gap={1.5} wrap="wrap" vAlign="center">
-                      {destinations.map(d => (
-                        <Token key={d} label={d} onRemove={() => setDestinations(prev => prev.filter(x => x !== d))} />
-                      ))}
-                      <DropdownMenu
-                        button={{label: 'Add', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
-                        items={
-                          DESTINATION_OPTIONS.filter(d => !destinations.includes(d)).map(d => ({
-                            label: d,
-                            onClick: () => setDestinations(prev => [...prev, d]),
-                          }))
-                        }
-                      />
-                    </HStack>
-                  </VStack>
-                </Grid>
-              </VStack>
-            </Card>
-
-            {trial === 'done' && (
-              <Banner
-                status="success"
-                title="Tried on September 2026"
-                description="Every step ran. Each step shows what it produced. If the numbers look right, turn it on."
-                collapsible={false}
-              />
-            )}
-            <HStack gap={2} hAlign="end" wrap="wrap">
-              <Button
-                label={trial === 'done' ? 'Try again' : 'Try on last month'}
-                icon={<Icon icon={Play} />}
-                isLoading={trial === 'running'}
-                onClick={() => {
-                  setTrial('running');
-                  window.setTimeout(() => setTrial('done'), 1500);
-                }}
-              />
-              <Button
-                label="Turn on"
-                variant="primary"
-                icon={<Icon icon={Power} />}
-                isDisabled={trial !== 'done'}
-                tooltip={trial !== 'done' ? 'Try it on last month first' : undefined}
-                onClick={() => {
-                  onTurnOn();
-                  toast({
-                    body: waitingOnConnection
-                      ? `${name} is on. Step 1 waits for Shopify access; it reads your workbook until then.`
-                      : `${name} is on. Next run: ${MONTHLY_SALES_CLOSE.nextRun}.`,
-                  });
-                }}
-              />
-            </HStack>
-          </VStack>
-          {openStep !== null && (
-            <StepDialog
-              key={openStep}
-              step={steps[openStep]}
-              index={openStep}
-              isEditable
-              onClose={() => setOpenStep(null)}
-              onSave={updated => {
-                setSteps(prev => prev.map((s, i) => (i === openStep ? updated : s)));
-                setOpenStep(null);
-                setTrial(t => (t === 'done' ? 'none' : t));
-              }}
-            />
-          )}
-        </LayoutContent>
-      }
-    />
-  );
-}
-
 /* ---------- Live ---------- */
 
 type RunRow = Record<string, unknown> & {period: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string};
@@ -432,7 +169,7 @@ export function LiveWorkflowPage({handoffs, isStep3Approved}: {handoffs: Handoff
               </VStack>
               <HStack gap={2} wrap="wrap">
                 <Button label="Run now" icon={<Icon icon={Play} />} onClick={() => toast({body: 'Preview only. Running a workflow comes with the real build.'})} />
-                <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href="#workflow-draft" />
+                <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href="#workflow-edit" />
               </HStack>
             </HStack>
 
