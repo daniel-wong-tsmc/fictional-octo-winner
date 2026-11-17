@@ -4,7 +4,7 @@ import {
   type Edge, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import {Layout, LayoutContent, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
+import {Layout, LayoutContent, LayoutFooter, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
@@ -28,8 +28,10 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Database, Maximize, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
+import {Database, Eye, Maximize, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
 import {PEOPLE} from '../workflow';
+import {TICKETS, type Sheet} from '../data';
+import {SheetTable} from './TicketPage';
 
 /* ---------- Steps ---------- */
 
@@ -92,18 +94,55 @@ function summary(s: Step): string {
   return `${s.format}${s.needsOk ? `, after an OK from ${s.approver.replace(' (you)', '')}` : ''} → ${s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet'}`;
 }
 
-const TRIAL: Record<StepKind, string> = {
-  input: '4,988 rows read',
-  instructions: 'Ran on September data',
-  output: 'October summary, 5 rows',
+/* ---------- Trial run (prefilled) ---------- */
+
+/** "Try on last month" runs on the last full month. Today is in November 2026. */
+const TRIAL_MONTH = 'October 2026';
+const TRIAL_ORDERS: Sheet = {
+  kind: 'Output',
+  columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'],
+  addedColumns: [5],
+  rows: [
+    ['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,240.00', '1,344.28'],
+    ['SO-47118', '2026-10-02', 'Japan', 'JPY', '182,500', '1,208.15'],
+    ['SO-47240', '2026-10-06', 'UK', 'GBP', '860.50', '1,111.34'],
+    ['SO-47311', '2026-10-09', 'Europe', 'EUR', '312.00', '337.96'],
+    ['SO-47506', '2026-10-15', 'Canada', 'CAD', '2,045.75', '1,487.46'],
+    ['SO-47622', '2026-10-20', 'US', 'USD', '975.00', '975.00'],
+    ['SO-47815', '2026-10-27', 'UK', 'GBP', '4,120.00', '5,327.16'],
+    ['SO-47930', '2026-10-31', 'Europe', 'EUR', '58.90', '64.00'],
+  ],
 };
+const TRIAL_SUMMARY: Sheet = TICKETS[3].sheets['October summary'];
+
+type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
+
+/** What each tile produced on the trial. The last LLM step and every Pass on to tile end with the summary. */
+function trialFor(node: BoardNode, board: BoardNode[]): TrialResult {
+  const steps = board.filter(n => n.step.kind === 'instructions');
+  if (node.step.kind === 'input') return {line: node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
+  if (node.step.kind === 'instructions') {
+    return node.id === steps[steps.length - 1]?.id
+      ? {line: '5 rows: sales by region against target', sheet: TRIAL_SUMMARY}
+      : {line: '4,988 rows, 1 column added', sheet: TRIAL_ORDERS, rowsShown: `First ${TRIAL_ORDERS.rows!.length} of 4,988 rows`};
+  }
+  return {line: `${node.step.name || 'Output'}, 5 rows`, sheet: TRIAL_SUMMARY};
+}
+
+function sendSentence(s: OutputStep): string {
+  const to = s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet (pick who gets it in the tile)';
+  return s.needsOk ? `On a real run this waits for an OK from ${s.approver}, then goes to ${to}.` : `On a real run this goes straight to ${to}.`;
+}
 
 /* ---------- Tile (a node on the board) ---------- */
 
 type TileData = {
   step: Step;
   title: string;
-  isTried: boolean;
+  trial: TrialResult | null;
+  /** Pass on to tile whose trial output nobody has opened yet. */
+  isUnchecked: boolean;
+  onOpenTrial: (id: string) => void;
   next: {label: string; kind: StepKind}[];
   onAdd: (from: string, kind: StepKind) => void;
 };
@@ -113,7 +152,9 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   const {step} = data;
   const info = KIND_INFO[step.kind];
   const ready = isReady(step);
-  const status = data.isTried
+  const status = data.isUnchecked
+    ? {dot: 'info' as const, label: 'Check output'}
+    : data.trial
     ? {dot: 'success' as const, label: 'Tried'}
     : ready
       ? {dot: 'success' as const, label: 'Ready'}
@@ -134,8 +175,27 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         </HStack>
         <Text weight="semibold">{data.title}</Text>
         <Text type="supporting" maxLines={3}>{summary(step)}</Text>
-        {data.isTried && <Text weight="medium">{TRIAL[step.kind]}</Text>}
-        {ready && data.next.length > 0 && (
+        {data.trial && (
+          <VStack gap={1}>
+            <Text weight="medium">{data.trial.line}</Text>
+            {data.trial.sheet && (
+              <HStack>
+                <Button
+                  className="nodrag"
+                  label={step.kind === 'output' ? 'See output' : 'See result'}
+                  size="sm"
+                  variant={data.isUnchecked ? 'primary' : 'secondary'}
+                  icon={<Icon icon={Eye} />}
+                  onClick={e => {
+                    e.stopPropagation();
+                    data.onOpenTrial(id);
+                  }}
+                />
+              </HStack>
+            )}
+          </VStack>
+        )}
+        {!data.trial && ready && data.next.length > 0 && (
           <HStack gap={1} wrap="wrap">
             {data.next.map(n => (
               <Button
@@ -253,7 +313,13 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
   );
 }
 
-function StepPanel({step, onChange, onRemove}: {step: Step | null; onChange: (s: Step) => void; onRemove: () => void}) {
+function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
+  step: Step | null;
+  trial: TrialResult | null;
+  onOpenTrial: () => void;
+  onChange: (s: Step) => void;
+  onRemove: () => void;
+}) {
   if (!step) {
     return <EmptyState isCompact title="Select a tile" description="Click a tile on the board to set it up." />;
   }
@@ -264,6 +330,22 @@ function StepPanel({step, onChange, onRemove}: {step: Step | null; onChange: (s:
         <Icon icon={info.icon} size="sm" />
         <Heading level={3}>{info.label}</Heading>
       </HStack>
+
+      {trial && (
+        <>
+          <VStack gap={1.5}>
+            <Text type="label">{`Trial result, ${TRIAL_MONTH}`}</Text>
+            <Text>{trial.line}</Text>
+            {step.kind === 'output' && <Text type="supporting">{`Not sent. ${sendSentence(step)}`}</Text>}
+            {trial.sheet && (
+              <HStack>
+                <Button label={step.kind === 'output' ? 'See output' : 'See result'} icon={<Icon icon={Eye} />} onClick={onOpenTrial} />
+              </HStack>
+            )}
+          </VStack>
+          <Divider />
+        </>
+      )}
 
       {step.kind === 'input' && <InputPanel step={step} onChange={onChange} />}
 
@@ -317,6 +399,46 @@ function StepPanel({step, onChange, onRemove}: {step: Step | null; onChange: (s:
         <Button label="Remove tile" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
       </HStack>
     </VStack>
+  );
+}
+
+/* ---------- Trial result preview ---------- */
+
+function TrialDialog({title, step, trial, onClose}: {title: string; step: Step; trial: TrialResult; onClose: () => void}) {
+  const isOutput = step.kind === 'output';
+  return (
+    <Dialog isOpen onOpenChange={open => !open && onClose()} width={760} maxHeight="85dvh">
+      <Layout
+        height="auto"
+        header={
+          <DialogHeader
+            title={isOutput ? `Output: ${title}` : `Result: ${title}`}
+            subtitle={`Trial on ${TRIAL_MONTH} data. ${trial.rowsShown ?? trial.line}.`}
+            onOpenChange={open => !open && onClose()}
+          />
+        }
+        content={
+          <LayoutContent padding={4}>
+            <VStack gap={3}>
+              {isOutput && (
+                <Banner status="info" title="Not sent" description={sendSentence(step)} collapsible={false} />
+              )}
+              {!isOutput && (
+                <Text type="supporting">What this step hands to the next one. Columns marked with a dot were added by the AI.</Text>
+              )}
+              <Card padding={0}>{trial.sheet && <SheetTable sheet={trial.sheet} />}</Card>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter padding={4}>
+            <HStack gap={2} hAlign="end">
+              <Button label={isOutput ? 'Looks right' : 'Close'} variant={isOutput ? 'primary' : 'secondary'} onClick={onClose} />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </Dialog>
   );
 }
 
@@ -460,15 +582,25 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
+  const isPhone = useMediaQuery('(max-width: 640px)');
   const [name, setName] = useState(isEditing ? 'Monthly sales close' : 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => startingBoard(isEditing));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
   const [fitKey, setFitKey] = useState(0);
+  // Trial output the user is looking at, and the Pass on to tiles they've opened since the last trial.
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string[]>([]);
+  const isTried = trial === 'done';
+  useEffect(() => {
+    if (trial !== 'done') setChecked([]);
+  }, [trial]);
 
   const selected = board.find(n => n.id === selectedId) ?? null;
   const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
+  const outputs = board.filter(n => n.step.kind === 'output');
+  const allChecked = outputs.every(o => checked.includes(o.id));
   const allReady = board.every(n => isReady(n.step)) && count('input') > 0 && count('instructions') > 0 && count('output') > 0;
   const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
     ? 'Start here: select the Input tile and add your data.'
@@ -494,6 +626,15 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
     setBoard(prev => prev.map(n => (n.id === id ? {...n, step} : n)));
     setTrial('none');
   };
+  const openTrial = useCallback(
+    (id: string) => {
+      setViewingId(id);
+      setChecked(c => (c.includes(id) ? c : [...c, id]));
+      // On small screens the tile panel is itself a full-screen dialog; close it so dialogs don't stack.
+      if (isNarrow) setSelectedId(null);
+    },
+    [isNarrow],
+  );
   const remove = (id: string) => {
     setBoard(prev => prev.filter(n => n.id !== id));
     setSelectedId(null);
@@ -516,9 +657,16 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
           : n.step.kind === 'instructions'
             ? `Step ${steps.findIndex(s => s.id === n.id) + 1}`
             : n.step.name || 'Output';
-      return {id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, data: {step: n.step, title, isTried: trial === 'done', next, onAdd: add}};
+      const result = trial === 'done' ? trialFor(n, board) : null;
+      const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
+      return {
+        id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId,
+        data: {step: n.step, title, trial: result, isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+      };
     });
-  }, [board, selectedId, trial, add]);
+  }, [board, selectedId, trial, checked, add, openTrial]);
+  const titleOf = (id: string) => nodes.find(n => n.id === id)?.data.title ?? '';
+  const viewing = board.find(n => n.id === viewingId) ?? null;
   const edges = useMemo(() => edgesFor(board), [board]);
 
   // React Flow reports drags (position) and measured tile sizes (dimensions). We keep both;
@@ -569,7 +717,29 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
       <Panel position="top-left">
         <VStack gap={2} maxWidth={420}>
           {trial === 'done' && (
-            <Banner status="success" title="Tried on September 2026" description="Every tile ran. Each shows what it produced. If it looks right, turn it on." collapsible={false} />
+            <Banner
+              status={allChecked ? 'success' : 'info'}
+              title={`Tried on ${TRIAL_MONTH}`}
+              description={
+                allChecked
+                  ? 'You checked the output. Nothing was sent. If it looks right, turn it on.'
+                  : 'Nothing was sent. Check the output before you turn this on.'
+              }
+              collapsible={false}
+            />
+          )}
+          {isTried && !allChecked && (
+            <HStack>
+              <Button
+                label="See output"
+                variant="primary"
+                icon={<Icon icon={Eye} />}
+                onClick={() => {
+                  const next = outputs.find(o => !checked.includes(o.id));
+                  if (next) openTrial(next.id);
+                }}
+              />
+            </HStack>
           )}
           {!allReady && <Text type="supporting" weight="medium">{nextHint}</Text>}
         </VStack>
@@ -580,53 +750,62 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
     </ReactFlow>
   );
 
+  const titleBlock = (
+    <VStack gap={1}>
+      <Breadcrumbs>
+        <BreadcrumbItem href="#home">Home</BreadcrumbItem>
+        {isEditing && <BreadcrumbItem href="#workflow-1">Monthly sales close</BreadcrumbItem>}
+        <BreadcrumbItem isCurrent>{isEditing ? 'Edit' : 'New workflow'}</BreadcrumbItem>
+      </Breadcrumbs>
+      <TextInput label="Workflow name" isLabelHidden value={name} onChange={setName} width={isPhone ? '100%' : 320} />
+    </VStack>
+  );
+  const actions = (
+    <HStack gap={2} wrap="wrap">
+      <Button
+        label={trial === 'done' ? 'Try again' : 'Try on last month'}
+        icon={<Icon icon={Play} />}
+        isDisabled={!allReady}
+        tooltip={allReady ? `Runs every tile on ${TRIAL_MONTH} data, without sending anything` : 'Finish the tiles first'}
+        isLoading={trial === 'running'}
+        onClick={() => {
+          setTrial('running');
+          window.setTimeout(() => setTrial('done'), 1400);
+        }}
+      />
+      <Button
+        label="Turn on"
+        variant="primary"
+        icon={<Icon icon={Power} />}
+        isDisabled={!isTried || !allChecked}
+        tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
+        onClick={() => {
+          onTurnOn();
+          toast({body: `${name} is on. It runs on the first business day of each month.`});
+        }}
+      />
+    </HStack>
+  );
+  // On a phone the name and the buttons stack, so neither gets cut off.
   const header = (
     <LayoutHeader hasDivider padding={4}>
-      <Toolbar
-        label="Workflow"
-        gap={3}
-        startContent={
-          <VStack gap={1}>
-            <Breadcrumbs>
-              <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-              {isEditing && <BreadcrumbItem href="#workflow-1">Monthly sales close</BreadcrumbItem>}
-              <BreadcrumbItem isCurrent>{isEditing ? 'Edit' : 'New workflow'}</BreadcrumbItem>
-            </Breadcrumbs>
-            <TextInput label="Workflow name" isLabelHidden value={name} onChange={setName} width={320} />
-          </VStack>
-        }
-        endContent={
-          <HStack gap={2} wrap="wrap">
-            <Button
-              label={trial === 'done' ? 'Try again' : 'Try on last month'}
-              icon={<Icon icon={Play} />}
-              isDisabled={!allReady}
-              tooltip={allReady ? 'Runs every tile on September’s data, without sending anything' : 'Finish the tiles first'}
-              isLoading={trial === 'running'}
-              onClick={() => {
-                setTrial('running');
-                window.setTimeout(() => setTrial('done'), 1400);
-              }}
-            />
-            <Button
-              label="Turn on"
-              variant="primary"
-              icon={<Icon icon={Power} />}
-              isDisabled={trial !== 'done'}
-              tooltip={trial !== 'done' ? 'Try it on last month first' : undefined}
-              onClick={() => {
-                onTurnOn();
-                toast({body: `${name} is on. It runs on the first business day of each month.`});
-              }}
-            />
-          </HStack>
-        }
-      />
+      {isPhone ? (
+        <VStack gap={3}>
+          {titleBlock}
+          {actions}
+        </VStack>
+      ) : (
+        <Toolbar label="Workflow" gap={3} startContent={titleBlock} endContent={actions} />
+      )}
     </LayoutHeader>
   );
 
   const panel = (
-    <StepPanel step={selected?.step ?? null} onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
+    <StepPanel
+      step={selected?.step ?? null}
+      trial={selected && isTried ? trialFor(selected, board) : null}
+      onOpenTrial={() => selected && openTrial(selected.id)}
+      onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
   );
 
   return (
@@ -648,6 +827,9 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
           )
         }
       />
+      {viewing && isTried && (
+        <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board)} onClose={() => setViewingId(null)} />
+      )}
       {isNarrow && (
         <Dialog isOpen={!!selected} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
           <Layout

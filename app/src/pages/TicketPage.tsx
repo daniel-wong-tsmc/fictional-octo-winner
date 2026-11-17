@@ -23,7 +23,7 @@ import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Divider} from '@astryxdesign/core/Divider';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
-import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
+import {Table, pixel, type TableColumn, proportional} from '@astryxdesign/core/Table';
 import {Icon} from '@astryxdesign/core/Icon';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
@@ -282,7 +282,7 @@ function Connections({items, onAdd, onRemove}: {items: string[]; onAdd: (n: stri
 
 type Row = Record<string, unknown> & {_row: number};
 
-function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?: string[]; onPick?: (p: Pick) => void}) {
+export function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?: string[]; onPick?: (p: Pick) => void}) {
   if (sheet.isEmpty || !sheet.columns || !sheet.rows) {
     return (
       <VStack padding={6}>
@@ -317,6 +317,8 @@ function SheetTable({sheet, shownColumns, onPick}: {sheet: Sheet; shownColumns?:
     },
     ...cols.map(([name, c]): TableColumn<Row> => ({
       key: `c${c}`,
+      // A floor wide enough for a full number, so narrow screens scroll the sheet instead of cutting values off.
+      width: proportional(1, {minWidth: 104}),
       align: isNumeric(sheet.rows![0][c]) ? 'end' : 'start',
       header: (
         <VStack gap={0}>
