@@ -723,23 +723,10 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
               description={
                 allChecked
                   ? 'You checked the output. Nothing was sent. If it looks right, turn it on.'
-                  : 'Nothing was sent. Check the output before you turn this on.'
+                  : 'Nothing was sent. Click “See output” on the Pass on to tile and check it before you turn this on.'
               }
               collapsible={false}
             />
-          )}
-          {isTried && !allChecked && (
-            <HStack>
-              <Button
-                label="See output"
-                variant="primary"
-                icon={<Icon icon={Eye} />}
-                onClick={() => {
-                  const next = outputs.find(o => !checked.includes(o.id));
-                  if (next) openTrial(next.id);
-                }}
-              />
-            </HStack>
           )}
           {!allReady && <Text type="supporting" weight="medium">{nextHint}</Text>}
         </VStack>
