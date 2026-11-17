@@ -30,7 +30,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
 import {Database, Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
-import {PEOPLE} from '../workflow';
+import {PEOPLE, type BuiltStage} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
 
@@ -639,9 +639,53 @@ function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
   );
 }
 
+/* ---------- Saving ---------- */
+
+/**
+ * Turns the board into run order. A tile's column is how many tiles come before it on its longest
+ * path from an input, so the saved workflow reads left to right the way the board does.
+ */
+function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
+  const depth = new Map<string, number>();
+  const depthOf = (id: string): number => {
+    const known = depth.get(id);
+    if (known !== undefined) return known;
+    const before = links.filter(l => l.target === id).map(l => depthOf(l.source));
+    const d = before.length ? Math.max(...before) + 1 : 0;
+    depth.set(id, d);
+    return d;
+  };
+  board.forEach(n => depthOf(n.id));
+  const columns: BoardNode[][] = [];
+  board.forEach(n => (columns[depth.get(n.id)!] ??= []).push(n));
+  const count = {input: 0, instructions: 0, output: 0};
+  return columns
+    .filter(Boolean)
+    .map(col =>
+      [...col]
+        .sort((a, b) => a.position.y - b.position.y)
+        .map((n): BuiltStage => {
+          const s = n.step;
+          const k = ++count[s.kind];
+          if (s.kind === 'input') {
+            return s.source === 'mcp'
+              ? {id: n.id, kind: 'input', label: `Input ${k}`, title: s.app, detail: `${s.resource}, through MCP`}
+              : {id: n.id, kind: 'input', label: `Input ${k}`, title: s.fileName, detail: `Excel upload: ${s.sheets.join(', ')}`};
+          }
+          if (s.kind === 'instructions') return {id: n.id, kind: 'instructions', label: `Step ${k}`, title: `Step ${k}`, detail: s.text};
+          return {
+            id: n.id, kind: 'output', label: 'Pass on to', title: s.name, detail: s.format,
+            approver: s.needsOk ? s.approver : undefined, sendTo: s.sendTo,
+          };
+        }),
+    );
+}
+
 /* ---------- Page ---------- */
 
-export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: () => void}) {
+type TurnOn = (name: string, columns: BuiltStage[][]) => void;
+
+export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: TurnOn}) {
   return (
     <ReactFlowProvider>
       <Builder {...props} />
@@ -649,7 +693,7 @@ export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: () => 
   );
 }
 
-function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => void}) {
+function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: TurnOn}) {
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
@@ -923,8 +967,8 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
         isDisabled={!isTried || !allChecked}
         tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
         onClick={() => {
-          onTurnOn();
-          toast({body: `${name} is on. It runs on the first business day of each month.`});
+          onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links));
+          toast({body: `${name.trim() || 'Untitled workflow'} is on. It runs on the first business day of each month.`});
         }}
       />
     </HStack>

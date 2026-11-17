@@ -11,7 +11,9 @@ import {TASKS, type Task} from './data';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
-import {LiveWorkflowPage} from './pages/WorkflowPages';
+import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
+import {SCHEDULES, MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow} from './workflow';
+import {useToast} from '@astryxdesign/core/Toast';
 import {WorkflowBuilderPage} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
@@ -29,6 +31,29 @@ export default function App() {
   const route = useHashRoute();
   const [tasks, setTasks] = useState<Task[]>(TASKS);
   const [handoffs, setHandoffs] = useState<Handoff[]>(SEED_HANDOFFS);
+  // Workflows turned on from the board. Monthly sales close is the prefilled one and can be deleted too.
+  const [built, setBuilt] = useState<BuiltWorkflow[]>([]);
+  const [hasSalesClose, setHasSalesClose] = useState(true);
+  const toast = useToast();
+  const builtMatch = route.match(/^workflow-(\d+)$/);
+  const openBuilt = builtMatch ? built.find(w => w.id === Number(builtMatch[1])) ?? null : null;
+
+  const turnOn = (name: string, columns: BuiltStage[][]) => {
+    const id = Math.max(1, ...built.map(w => w.id)) + 1;
+    setBuilt(prev => [...prev, {id, name, columns, schedule: SCHEDULES[0], nextRun: MONTHLY_SALES_CLOSE.nextRun, createdOn: 'November 17'}]);
+    window.location.hash = `workflow-${id}`;
+  };
+  const deleteBuilt = (w: BuiltWorkflow) => {
+    setBuilt(prev => prev.filter(x => x.id !== w.id));
+    window.location.hash = 'home';
+    toast({body: `${w.name} is deleted.`});
+  };
+  const deleteSalesClose = () => {
+    setHasSalesClose(false);
+    setTasks(prev => prev.filter(t => !(t.ref?.[0] === 'workflow' && t.ref[1] === MONTHLY_SALES_CLOSE.name)));
+    window.location.hash = 'home';
+    toast({body: `${MONTHLY_SALES_CLOSE.name} is deleted.`});
+  };
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
@@ -67,7 +92,12 @@ export default function App() {
               endContent={<Text type="supporting" hasTabularNumbers>{String(openCount)}</Text>}
             />
             <SideNavItem label="Workflows" icon={Workflow} collapsible={{defaultIsCollapsed: false}}>
-              <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
+              {hasSalesClose && (
+                <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
+              )}
+              {built.map(w => (
+                <SideNavItem key={w.id} label={w.name} href={`#workflow-${w.id}`} isSelected={route === `workflow-${w.id}`} />
+              ))}
               <SideNavItem label="New workflow" icon={Plus} href="#workflow-new" isSelected={route === 'workflow-new'} />
             </SideNavItem>
           </SideNavSection>
@@ -84,9 +114,15 @@ export default function App() {
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />
       ) : route === 'workflow-new' || route === 'workflow-edit' ? (
-        <WorkflowBuilderPage key={route} isEditing={route === 'workflow-edit'} onTurnOn={() => (window.location.hash = 'workflow-1')} />
-      ) : route === 'workflow-1' ? (
-        <LiveWorkflowPage handoffs={handoffs} isStep3Approved={isStep3Approved} />
+        <WorkflowBuilderPage
+          key={route}
+          isEditing={route === 'workflow-edit'}
+          onTurnOn={(name, columns) => (route === 'workflow-edit' ? (window.location.hash = 'workflow-1') : turnOn(name, columns))}
+        />
+      ) : route === 'workflow-1' && hasSalesClose ? (
+        <LiveWorkflowPage handoffs={handoffs} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />
+      ) : openBuilt ? (
+        <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (
         <HomePage tasks={tasks} />
       )}

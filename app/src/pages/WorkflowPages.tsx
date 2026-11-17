@@ -13,10 +13,14 @@ import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
+import {AlertDialog} from '@astryxdesign/core/AlertDialog';
+import {EmptyState} from '@astryxdesign/core/EmptyState';
+import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {Icon} from '@astryxdesign/core/Icon';
+import {Divider} from '@astryxdesign/core/Divider';
 import {useToast} from '@astryxdesign/core/Toast';
-import {ArrowRight, ArrowRightLeft, CalendarClock, Pencil, Play, Send, UserCheck} from 'lucide-react';
-import {MONTHLY_SALES_CLOSE, type WorkflowStep} from '../workflow';
+import {ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Database, Pencil, Play, Send, Trash2, UserCheck, WandSparkles} from 'lucide-react';
+import {MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow, type WorkflowStep} from '../workflow';
 import type {Handoff} from '../handoffs';
 import {FlowChart} from './FlowChart';
 
@@ -113,11 +117,34 @@ function StepDialog({step, index, isEditable, onClose, onSave}: {
   );
 }
 
+/* ---------- Delete ---------- */
+
+/** Asks before deleting, since a deleted workflow stops running and can't be brought back. */
+function DeleteWorkflowButton({name, onDelete}: {name: string; onDelete: () => void}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <Button label="Delete workflow" variant="ghost" icon={<Icon icon={Trash2} />} onClick={() => setIsOpen(true)} />
+      <AlertDialog
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+        title={`Delete ${name}?`}
+        description="It stops running and is removed for everyone. Its open tasks leave Home. Past outputs that were already sent stay where they went."
+        actionLabel="Delete workflow"
+        onAction={() => {
+          setIsOpen(false);
+          onDelete();
+        }}
+      />
+    </>
+  );
+}
+
 /* ---------- Live ---------- */
 
 type RunRow = Record<string, unknown> & {period: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string};
 
-export function LiveWorkflowPage({handoffs, isStep3Approved}: {handoffs: Handoff[]; isStep3Approved: boolean}) {
+export function LiveWorkflowPage({handoffs, isStep3Approved, onDelete}: {handoffs: Handoff[]; isStep3Approved: boolean; onDelete: () => void}) {
   const toast = useToast();
   const w = MONTHLY_SALES_CLOSE;
   const steps = w.steps.map(s => (s.ticketId === 3 && isStep3Approved ? {...s, status: 'done' as const} : s));
@@ -170,6 +197,7 @@ export function LiveWorkflowPage({handoffs, isStep3Approved}: {handoffs: Handoff
               <HStack gap={2} wrap="wrap">
                 <Button label="Run now" icon={<Icon icon={Play} />} onClick={() => toast({body: 'Preview only. Running a workflow comes with the real build.'})} />
                 <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href="#workflow-edit" />
+                <DeleteWorkflowButton name={w.name} onDelete={onDelete} />
               </HStack>
             </HStack>
 
@@ -240,6 +268,129 @@ export function LiveWorkflowPage({handoffs, isStep3Approved}: {handoffs: Handoff
           {openStep !== null && (
             <StepDialog key={openStep} step={steps[openStep]} index={openStep} isEditable={false} onClose={() => setOpenStep(null)} />
           )}
+        </LayoutContent>
+      }
+    />
+  );
+}
+
+/* ---------- A workflow built on the board ---------- */
+
+const STAGE_ICON = {input: Database, instructions: WandSparkles, output: Send} as const;
+
+function StageCard({stage}: {stage: BuiltStage}) {
+  return (
+    <Card padding={3} width="100%">
+      <VStack gap={2}>
+        <HStack gap={1.5} vAlign="center">
+          <Icon icon={STAGE_ICON[stage.kind]} size="sm" color="secondary" />
+          <Text type="supporting">{stage.label}</Text>
+        </HStack>
+        {stage.kind !== 'instructions' && <Text weight="semibold">{stage.title}</Text>}
+        <Text type={stage.kind === 'instructions' ? 'body' : 'supporting'}>{stage.detail}</Text>
+        {stage.kind === 'output' && (
+          <>
+            <Divider />
+            <Text type="supporting">{stage.approver ? `Waits for an OK from ${stage.approver}` : 'Goes out without an OK'}</Text>
+            <Text type="supporting">{`Goes to ${stage.sendTo?.length ? stage.sendTo.join(', ') : 'nobody yet'}`}</Text>
+          </>
+        )}
+      </VStack>
+    </Card>
+  );
+}
+
+export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkflow; onDelete: () => void}) {
+  const toast = useToast();
+  const isVertical = useMediaQuery('(max-width: 900px)');
+  const stages = w.columns.flat();
+  const outputs = stages.filter(s => s.kind === 'output');
+  const approvers = [...new Set(outputs.map(o => o.approver).filter(Boolean))] as string[];
+  const sendTo = [...new Set(outputs.flatMap(o => o.sendTo ?? []))];
+  const count = (k: BuiltStage['kind']) => stages.filter(s => s.kind === k).length;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  return (
+    <Layout
+      height="fill"
+      contentWidth={1240}
+      header={
+        <LayoutHeader hasDivider padding={4}>
+          <Breadcrumbs>
+            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
+            <BreadcrumbItem isCurrent>{w.name}</BreadcrumbItem>
+          </Breadcrumbs>
+        </LayoutHeader>
+      }
+      content={
+        <LayoutContent padding={6}>
+          <VStack gap={6}>
+            <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
+              <VStack gap={1.5}>
+                <HStack gap={3} vAlign="center" wrap="wrap">
+                  <HStack gap={1.5} vAlign="center">
+                    <StatusDot variant="success" label="On" />
+                    <Text type="supporting" weight="medium">On</Text>
+                  </HStack>
+                  <Text type="supporting">{`Next run: ${w.nextRun}`}</Text>
+                </HStack>
+                <Heading level={1}>{w.name}</Heading>
+                <Text type="supporting">
+                  {`${plural(count('input'), 'input', 'inputs')}, ${plural(count('instructions'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'pass on to', 'pass on tos')}. Turned on ${w.createdOn}.`}
+                </Text>
+              </VStack>
+              <HStack gap={2} wrap="wrap">
+                <Button label="Run now" icon={<Icon icon={Play} />} onClick={() => toast({body: 'Preview only. Running a workflow comes with the real build.'})} />
+                <DeleteWorkflowButton name={w.name} onDelete={onDelete} />
+              </HStack>
+            </HStack>
+
+            <MetadataList orientation="horizontal">
+              <MetadataListItem label="Starts" icon={<Icon icon={CalendarClock} size="sm" />}>{w.schedule}</MetadataListItem>
+              <MetadataListItem label="Needs an OK from" icon={<Icon icon={UserCheck} size="sm" />}>{approvers.length ? approvers.join(', ') : 'Nobody'}</MetadataListItem>
+              <MetadataListItem label="Sends to" icon={<Icon icon={Send} size="sm" />}>{sendTo.length ? sendTo.join(', ') : 'Nobody yet'}</MetadataListItem>
+            </MetadataList>
+
+            <VStack gap={2}>
+              <VStack gap={0.5}>
+                <Text type="label">How it runs</Text>
+                <Text type="supporting">The tiles you placed on the board, in the order they run. Tiles stacked together run side by side.</Text>
+              </VStack>
+              {isVertical ? (
+                <VStack gap={2}>
+                  {w.columns.map((col, i) => (
+                    <VStack key={i} gap={2}>
+                      {i > 0 && (
+                        <HStack hAlign="center">
+                          <Icon icon={ArrowDown} color="secondary" />
+                        </HStack>
+                      )}
+                      {col.map(st => <StageCard key={st.id} stage={st} />)}
+                    </VStack>
+                  ))}
+                </VStack>
+              ) : (
+                <HStack gap={2} vAlign="center" isScrollable>
+                  {w.columns.map((col, i) => (
+                    <HStack key={i} gap={2} vAlign="center">
+                      {i > 0 && <Icon icon={ArrowRight} color="secondary" />}
+                      <VStack gap={2} width={260}>
+                        {col.map(st => <StageCard key={st.id} stage={st} />)}
+                      </VStack>
+                    </HStack>
+                  ))}
+                </HStack>
+              )}
+            </VStack>
+
+            <Card padding={0}>
+              <VStack>
+                <HStack padding={4}>
+                  <Text type="label">Recent runs</Text>
+                </HStack>
+                <EmptyState isCompact title="No runs yet" description={`The first run is ${w.nextRun}.`} />
+              </VStack>
+            </Card>
+          </VStack>
         </LayoutContent>
       }
     />

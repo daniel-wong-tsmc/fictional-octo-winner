@@ -91,3 +91,27 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
     {period: 'August 2026', result: 'rerun', detail: 'Rerun after targets were fixed, then approved', finished: 'Sep 2, 14:40'},
   ],
 };
+
+/* ---------- Workflows built on the board ---------- */
+
+export type BuiltStage = {
+  id: string;
+  kind: 'input' | 'instructions' | 'output';
+  /** "Input 1", "Step 2", "Pass on to". */
+  label: string;
+  title: string;
+  /** Where the data comes from, the AI instructions, or who gets the result. */
+  detail: string;
+  approver?: string;
+  sendTo?: string[];
+};
+
+export type BuiltWorkflow = {
+  id: number;
+  name: string;
+  schedule: string;
+  nextRun: string;
+  createdOn: string;
+  /** Stages in run order. Each column runs after the one before it; stages in a column run side by side. */
+  columns: BuiltStage[][];
+};
