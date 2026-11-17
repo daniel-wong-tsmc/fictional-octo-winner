@@ -1,4 +1,9 @@
-import {useState, type DragEvent} from 'react';
+import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react';
+import {
+  Background, BackgroundVariant, Controls, Handle, Panel, Position, ReactFlow, applyNodeChanges, useReactFlow,
+  type Edge, type Node, type NodeChange, type NodeProps,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import {Layout, LayoutContent, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
@@ -6,14 +11,13 @@ import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
+import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {FileInput} from '@astryxdesign/core/FileInput';
 import {Selector} from '@astryxdesign/core/Selector';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
-import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Switch} from '@astryxdesign/core/Switch';
-import {List, ListItem} from '@astryxdesign/core/List';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
@@ -23,313 +27,363 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {ArrowDown, FileSpreadsheet, GripVertical, Play, Plus, Power, Send, Sparkles, Trash2, WandSparkles} from 'lucide-react';
+import {Database, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
 import {PEOPLE} from '../workflow';
 
-/* ---------- Blocks ---------- */
+/* ---------- Steps ---------- */
 
-type BlockKind = 'file' | 'instructions' | 'output';
+type StepKind = 'input' | 'instructions' | 'output';
 
-type FileBlock = {id: string; kind: 'file'; source: 'upload' | 'connection'; fileName: string; connection: string; sheets: string[]};
-type InstructionsBlock = {id: string; kind: 'instructions'; text: string; writtenAs: string};
-type OutputBlock = {
-  id: string;
-  kind: 'output';
-  name: string;
-  format: string;
-  needsOk: boolean;
-  approver: string;
-  sendTo: string[];
-  shareWithWorkflows: boolean;
-};
-type Block = FileBlock | InstructionsBlock | OutputBlock;
+type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | null; fileName: string; sheets: string[]; app: string; resource: string};
+type InstructionsStep = {kind: 'instructions'; text: string; writtenAs: string};
+type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
+type Step = InputStep | InstructionsStep | OutputStep;
 
-const KINDS: {kind: BlockKind; title: string; about: string; icon: typeof FileSpreadsheet; stage: string}[] = [
-  {kind: 'file', title: 'File', about: 'An Excel or CSV you upload, or a file from a connected app.', icon: FileSpreadsheet, stage: 'Files'},
-  {kind: 'instructions', title: 'Instructions', about: 'Tell the AI, in plain words, what to do with the files.', icon: WandSparkles, stage: 'Instructions'},
-  {kind: 'output', title: 'Output', about: 'What it produces, and who gets it.', icon: Send, stage: 'Output'},
-];
-const kindInfo = (k: BlockKind) => KINDS.find(x => x.kind === k)!;
-
-// Example content, so every block arrives filled in when you click around.
-const FILE_PRESETS: Omit<FileBlock, 'id' | 'kind'>[] = [
-  {source: 'upload', fileName: 'Sales close – Oct 2026.xlsx', connection: '', sheets: ['Orders', 'Rates', 'Notes']},
-  {source: 'connection', fileName: '', connection: 'Google Drive: FY26 targets.xlsx', sheets: ['Targets']},
-  {source: 'connection', fileName: '', connection: 'Shopify: Orders, last month', sheets: ['Orders']},
-];
-const INSTRUCTION_PRESETS = [
-  'Convert every order to US dollars using the exchange rate on its order date.',
-  'Total sales by region. Show each region’s target and the gap in dollars and percent. Biggest miss first.',
-  'Flag any region more than 5% below target.',
-];
-const OUTPUT_PRESETS: Omit<OutputBlock, 'id' | 'kind'>[] = [
-  {name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close', 'Google Drive: Finance close pack'], shareWithWorkflows: true},
-  {name: 'Regions below target', format: 'Excel sheet', needsOk: false, approver: PEOPLE[0], sendTo: ['Email: Marco Ruiz'], shareWithWorkflows: false},
-];
-const TRIAL_RESULT: Record<BlockKind, string[]> = {
-  file: ['4,988 rows read', '60 rows read', '4,988 rows read'],
-  instructions: ['4,988 orders converted', '5 regions, 2.1% below target overall', '2 regions flagged'],
-  output: ['October summary, 5 rows', 'Regions below target, 2 rows'],
+const KIND_INFO: Record<StepKind, {label: string; icon: typeof Send}> = {
+  input: {label: 'Input', icon: Database},
+  instructions: {label: 'Instructions', icon: WandSparkles},
+  output: {label: 'Output', icon: Send},
 };
 
+/** Apps the workspace admin has connected through MCP. */
+const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
+  {name: 'Google Drive', isConnected: true, reads: ['FY26 targets.xlsx', 'Finance close pack (folder)']},
+  {name: 'SharePoint', isConnected: true, reads: ['stock_levels.xlsx', 'Close archive (folder)']},
+  {name: 'Shopify', isConnected: false, reads: ['Orders, last month', 'Refunds, last month']},
+  {name: 'Salesforce', isConnected: true, reads: ['Active customers', 'Open opportunities']},
+  {name: 'Snowflake', isConnected: true, reads: ['sales_history', 'inventory_daily']},
+];
+const appInfo = (name: string) => MCP_APPS.find(a => a.name === name);
+
+const INSTRUCTION_EXAMPLES: [string, string][] = [
+  ['Convert to USD', 'Convert every order to US dollars using the exchange rate on its order date.'],
+  ['Total vs target', 'Total sales by region. Show each region’s target and the gap in dollars and percent. Biggest miss first.'],
+  ['Flag misses', 'Flag any region more than 5% below target.'],
+];
 const SEND_OPTIONS = [
   {type: 'section' as const, title: 'People', options: ['Email: Priya Shah', 'Email: Marco Ruiz', 'Email: finance@company.com'].map(v => ({value: v, label: v}))},
   {type: 'section' as const, title: 'Channels and folders', options: ['Slack: #finance-close', 'Google Drive: Finance close pack', 'SharePoint: Close archive'].map(v => ({value: v, label: v}))},
 ];
-const CONNECTED_FILES = ['Google Drive: FY26 targets.xlsx', 'Shopify: Orders, last month', 'SharePoint: stock_levels.xlsx', 'Snowflake: sales_history'];
+const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Orders', 'Rates']};
 
-let nextId = 1;
-const newId = () => `b${nextId++}`;
-
-function makeBlock(kind: BlockKind, existing: Block[]): Block {
-  const n = existing.filter(b => b.kind === kind).length;
-  if (kind === 'file') return {id: newId(), kind, ...FILE_PRESETS[n % FILE_PRESETS.length]};
-  if (kind === 'instructions') return {id: newId(), kind, text: INSTRUCTION_PRESETS[n % INSTRUCTION_PRESETS.length], writtenAs: 'Let the AI choose'};
-  return {id: newId(), kind, ...OUTPUT_PRESETS[n % OUTPUT_PRESETS.length]};
+function blankStep(kind: StepKind, n: number): Step {
+  if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
+  if (kind === 'instructions') return {kind, text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1], writtenAs: 'Let the AI choose'};
+  return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
 }
 
-function exampleBlocks(): Block[] {
-  const blocks: Block[] = [];
-  for (const k of ['file', 'file', 'instructions', 'instructions', 'output'] as BlockKind[]) blocks.push(makeBlock(k, blocks));
-  return blocks;
+function isReady(s: Step): boolean {
+  if (s.kind === 'input') return s.source === 'upload' ? !!s.fileName : s.source === 'mcp' ? !!s.app && !!s.resource : false;
+  if (s.kind === 'instructions') return !!s.text.trim();
+  return !!s.name.trim();
 }
 
-function summary(b: Block): string {
-  if (b.kind === 'file') return b.source === 'upload' ? (b.fileName || 'No file yet') : (b.connection || 'No connection picked');
-  if (b.kind === 'instructions') return b.text || 'No instructions yet';
-  const send = b.sendTo.length ? b.sendTo.join(', ') : 'nobody yet';
-  return `${b.format}${b.needsOk ? `, after an OK from ${b.approver.replace(' (you)', '')}` : ''} → ${send}`;
+function summary(s: Step): string {
+  if (s.kind === 'input') {
+    if (s.source === 'upload') return s.fileName ? `${s.fileName} · ${s.sheets.join(', ')}` : 'Upload an Excel file';
+    if (s.source === 'mcp') return s.app ? `${s.app}${s.resource ? `: ${s.resource}` : ''} (via MCP)` : 'Pick an app';
+    return 'Select this tile to add your data: upload Excel or connect an app.';
+  }
+  if (s.kind === 'instructions') return s.text;
+  return `${s.format}${s.needsOk ? `, after an OK from ${s.approver.replace(' (you)', '')}` : ''} → ${s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet'}`;
 }
 
-function title(b: Block): string {
-  if (b.kind === 'file') return b.source === 'upload' ? 'Uploaded file' : 'From a connection';
-  if (b.kind === 'instructions') return 'Instructions';
-  return b.name || 'Output';
-}
+const TRIAL: Record<StepKind, string> = {
+  input: '4,988 rows read',
+  instructions: 'Ran on September data',
+  output: 'October summary, 5 rows',
+};
 
-/* ---------- Drag and drop ---------- */
+/* ---------- Tile (a node on the board) ---------- */
 
-const DRAG_TYPE = 'application/x-workflow-block';
+type TileData = {
+  step: Step;
+  title: string;
+  isTried: boolean;
+  next: {label: string; kind: StepKind}[];
+  onAdd: (from: string, kind: StepKind) => void;
+};
+type TileNode = Node<TileData, 'tile'>;
 
-/* ---------- Palette ---------- */
-
-function Palette({onAdd, onDragKind, onExample}: {onAdd: (k: BlockKind) => void; onDragKind: (k: BlockKind | null) => void; onExample: () => void}) {
+function Tile({id, data, selected}: NodeProps<TileNode>) {
+  const {step} = data;
+  const info = KIND_INFO[step.kind];
+  const ready = isReady(step);
+  const status = data.isTried
+    ? {dot: 'success' as const, label: 'Tried'}
+    : ready
+      ? {dot: 'success' as const, label: 'Ready'}
+      : {dot: 'warning' as const, label: 'Needs setup'};
   return (
-    <VStack gap={4}>
-      <VStack gap={0.5}>
-        <Heading level={2}>Blocks</Heading>
-        <Text type="supporting">Drag a block onto the canvas, or click Add.</Text>
+    <Card padding={3} width={250} elevation={selected ? 'high' : 'low'}>
+      {step.kind !== 'input' && <Handle type="target" position={Position.Left} />}
+      <VStack gap={2}>
+        <HStack hAlign="between" vAlign="center" gap={2}>
+          <HStack gap={1.5} vAlign="center">
+            <Icon icon={info.icon} size="sm" color="secondary" />
+            <Text type="supporting" weight="medium">{info.label}</Text>
+          </HStack>
+          <HStack gap={1} vAlign="center">
+            <StatusDot variant={status.dot} label={status.label} />
+            <Text type="supporting">{status.label}</Text>
+          </HStack>
+        </HStack>
+        <Text weight="semibold">{data.title}</Text>
+        <Text type="supporting" maxLines={3}>{summary(step)}</Text>
+        {data.isTried && <Text weight="medium">{TRIAL[step.kind]}</Text>}
+        {ready && data.next.length > 0 && (
+          <HStack gap={1} wrap="wrap">
+            {data.next.map(n => (
+              <Button
+                key={n.kind}
+                className="nodrag"
+                label={n.label}
+                size="sm"
+                variant="ghost"
+                icon={<Icon icon={Plus} />}
+                onClick={e => {
+                  e.stopPropagation();
+                  data.onAdd(id, n.kind);
+                }}
+              />
+            ))}
+          </HStack>
+        )}
       </VStack>
-      {KINDS.map(k => (
-        <Card
-          key={k.kind}
-          padding={3}
-          draggable
-          aria-label={`${k.title} block. Drag onto the canvas, or use Add.`}
-          onDragStart={(e: DragEvent<HTMLDivElement>) => {
-            e.dataTransfer.setData(DRAG_TYPE, k.kind);
-            e.dataTransfer.effectAllowed = 'copy';
-            onDragKind(k.kind);
-          }}
-          onDragEnd={() => onDragKind(null)}>
-          <VStack gap={2}>
+      {step.kind !== 'output' && <Handle type="source" position={Position.Right} />}
+    </Card>
+  );
+}
+const nodeTypes = {tile: Tile};
+
+/* ---------- Side panel ---------- */
+
+function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep) => void}) {
+  const toast = useToast();
+  const chooseUpload = () => onChange({...step, source: 'upload', ...UPLOAD_EXAMPLE});
+  const chooseApp = () => onChange({...step, source: 'mcp', app: 'Google Drive', resource: 'FY26 targets.xlsx'});
+
+  if (step.source === null) {
+    return (
+      <VStack gap={3}>
+        <Text>Where does the data come from?</Text>
+        <ClickableCard label="Upload Excel" padding={3} onClick={chooseUpload}>
+          <VStack gap={1}>
             <HStack gap={2} vAlign="center">
-              <Icon icon={GripVertical} size="sm" color="secondary" />
-              <Icon icon={k.icon} size="sm" />
-              <Text weight="semibold">{k.title}</Text>
+              <Icon icon={Upload} size="sm" />
+              <Text weight="semibold">Upload Excel</Text>
             </HStack>
-            <Text type="supporting">{k.about}</Text>
-            <HStack>
-              <Button label={`Add ${k.title.toLowerCase()}`} size="sm" icon={<Icon icon={Plus} />} onClick={() => onAdd(k.kind)} />
+            <Text type="supporting">Drop an Excel or CSV file. You can upload a new one each run.</Text>
+          </VStack>
+        </ClickableCard>
+        <ClickableCard label="Connect an app through MCP" padding={3} onClick={chooseApp}>
+          <VStack gap={1}>
+            <HStack gap={2} vAlign="center">
+              <Icon icon={Plug} size="sm" />
+              <Text weight="semibold">Connect an app (MCP)</Text>
+            </HStack>
+            <Text type="supporting">Read straight from Google Drive, SharePoint, Shopify and other apps your admin connected.</Text>
+          </VStack>
+        </ClickableCard>
+      </VStack>
+    );
+  }
+
+  if (step.source === 'upload') {
+    return (
+      <VStack gap={4}>
+        <FileInput
+          label="Excel file"
+          description="Excel or CSV. Upload a new one each run, or keep this one."
+          mode="dropzone"
+          accept=".xlsx,.xls,.csv"
+          value={step.fileName ? new File([''], step.fileName) : null}
+          onChange={files => {
+            const f = Array.isArray(files) ? files[0] : files;
+            onChange({...step, fileName: f?.name ?? '', sheets: f ? ['Sheet1', 'Sheet2'] : []});
+          }}
+        />
+        {step.sheets.length > 0 && (
+          <VStack gap={1.5}>
+            <Text type="label">Sheets the AI will read</Text>
+            <HStack gap={1.5} wrap="wrap">
+              {step.sheets.map(s => (
+                <Token key={s} label={s} onRemove={() => onChange({...step, sheets: step.sheets.filter(x => x !== s)})} />
+              ))}
             </HStack>
           </VStack>
-        </Card>
-      ))}
-      <Divider />
-      <Button label="Fill in an example" variant="ghost" icon={<Icon icon={Sparkles} />} onClick={onExample} />
+        )}
+        <HStack>
+          <Button label="Connect an app instead" variant="ghost" icon={<Icon icon={Plug} />} onClick={chooseApp} />
+        </HStack>
+      </VStack>
+    );
+  }
+
+  const app = appInfo(step.app);
+  return (
+    <VStack gap={4}>
+      <Selector
+        label="App"
+        description="Apps your workspace admin connected through MCP."
+        options={MCP_APPS.map(a => ({value: a.name, label: a.name, description: a.isConnected ? 'Connected' : 'Not connected yet'}))}
+        value={step.app}
+        onChange={appName => onChange({...step, app: appName, resource: appInfo(appName)?.reads[0] ?? ''})}
+      />
+      {app && (
+        <HStack gap={1.5} vAlign="center" hAlign="between" wrap="wrap">
+          <HStack gap={1.5} vAlign="center">
+            <StatusDot variant={app.isConnected ? 'success' : 'warning'} label={app.isConnected ? 'Connected' : 'Not connected'} />
+            <Text type="supporting">{app.isConnected ? 'Connected through MCP. Read only.' : 'Not connected yet. The step waits until it is.'}</Text>
+          </HStack>
+          {!app.isConnected && (
+            <Button label="Request access" size="sm" onClick={() => toast({body: `Asked your workspace admin to connect ${app.name}. You can keep building meanwhile.`})} />
+          )}
+        </HStack>
+      )}
+      {app && <Selector label="What to read" options={app.reads} value={step.resource} onChange={resource => onChange({...step, resource})} />}
+      <HStack>
+        <Button label="Upload a file instead" variant="ghost" icon={<Icon icon={Upload} />} onClick={chooseUpload} />
+      </HStack>
     </VStack>
   );
 }
 
-/* ---------- Canvas ---------- */
-
-function Stage({kind, index, blocks, selectedId, dragKind, trialRun, onSelect, onAdd}: {
-  kind: BlockKind;
-  index: number;
-  blocks: Block[];
-  selectedId: string | null;
-  dragKind: BlockKind | null;
-  trialRun: boolean;
-  onSelect: (id: string) => void;
-  onAdd: () => void;
-}) {
-  const info = kindInfo(kind);
-  const isTarget = dragKind === kind;
-  return (
-    <Card padding={3} variant={isTarget ? 'default' : 'muted'} elevation={isTarget ? 'med' : 'none'}>
-      <VStack gap={3}>
-        <HStack hAlign="between" vAlign="center" gap={2}>
-          <HStack gap={1.5} vAlign="center">
-            <Icon icon={info.icon} size="sm" color="secondary" />
-            <Text type="label">{`${index}. ${info.stage}`}</Text>
-          </HStack>
-          {isTarget && <Text type="supporting" weight="medium">Drop to add</Text>}
-        </HStack>
-        {blocks.length === 0 ? (
-          <EmptyState
-            isCompact
-            title={`Drop ${kind === 'file' ? 'a' : 'an'} ${info.title} block here`}
-            description={kind === 'file' ? 'Start with the file the work begins from.' : kind === 'instructions' ? 'Then say what the AI should do.' : 'Last: what it makes and who gets it.'}
-            actions={<Button label={`Add ${info.title.toLowerCase()}`} size="sm" icon={<Icon icon={Plus} />} onClick={onAdd} />}
-          />
-        ) : (
-          <>
-            <List hasDividers edge="outset">
-              {blocks.map((b, i) => (
-                <ListItem
-                  key={b.id}
-                  isSelected={b.id === selectedId}
-                  onClick={() => onSelect(b.id)}
-                  align="first-line"
-                  label={<Text weight="medium">{kind === 'instructions' ? `Step ${i + 1}` : title(b)}</Text>}
-                  description={
-                    <VStack gap={1}>
-                      <Text type="supporting" maxLines={3}>{summary(b)}</Text>
-                      {trialRun && (
-                        <HStack gap={1.5} vAlign="center">
-                          <StatusDot variant="success" label="Tried" />
-                          <Text type="supporting" weight="medium">{TRIAL_RESULT[kind][i % TRIAL_RESULT[kind].length]}</Text>
-                        </HStack>
-                      )}
-                    </VStack>
-                  }
-                />
-              ))}
-            </List>
-            <HStack>
-              <Button label={`Add ${info.title.toLowerCase()}`} variant="ghost" size="sm" icon={<Icon icon={Plus} />} onClick={onAdd} />
-            </HStack>
-          </>
-        )}
-      </VStack>
-    </Card>
-  );
-}
-
-/* ---------- Inspector ---------- */
-
-function Inspector({block, onChange, onRemove}: {block: Block | null; onChange: (b: Block) => void; onRemove: () => void}) {
-  if (!block) {
-    return <EmptyState isCompact title="Select a block" description="Click a block on the canvas to fill it in." />;
+function StepPanel({step, onChange, onRemove}: {step: Step | null; onChange: (s: Step) => void; onRemove: () => void}) {
+  if (!step) {
+    return <EmptyState isCompact title="Select a tile" description="Click a tile on the board to set it up." />;
   }
-  const info = kindInfo(block.kind);
+  const info = KIND_INFO[step.kind];
   return (
     <VStack gap={4}>
       <HStack gap={2} vAlign="center">
         <Icon icon={info.icon} size="sm" />
-        <Heading level={3}>{info.title}</Heading>
+        <Heading level={3}>{info.label}</Heading>
       </HStack>
 
-      {block.kind === 'file' && (
-        <>
-          <SegmentedControl label="Where the file comes from" value={block.source} onChange={v => onChange({...block, source: v as FileBlock['source']})} layout="fill">
-            <SegmentedControlItem value="upload" label="Upload" />
-            <SegmentedControlItem value="connection" label="From a connection" />
-          </SegmentedControl>
-          {block.source === 'upload' ? (
-            <FileInput
-              label="File"
-              description="Excel or CSV. Upload a new one each run, or keep this one."
-              mode="dropzone"
-              accept=".xlsx,.xls,.csv"
-              value={block.fileName ? new File([''], block.fileName) : null}
-              onChange={files => {
-                const f = Array.isArray(files) ? files[0] : files;
-                onChange({...block, fileName: f?.name ?? '', sheets: f ? ['Sheet1', 'Sheet2'] : []});
-              }}
-            />
-          ) : (
-            <Selector
-              label="File"
-              description="From an app your admin has connected."
-              options={CONNECTED_FILES}
-              value={block.connection}
-              onChange={v => onChange({...block, connection: v, sheets: [v.split(': ')[1]?.split('.')[0] ?? 'Sheet1']})}
-            />
-          )}
-          {block.sheets.length > 0 && (
-            <VStack gap={1.5}>
-              <Text type="label">Sheets the AI will read</Text>
-              <HStack gap={1.5} wrap="wrap">
-                {block.sheets.map(s => (
-                  <Token key={s} label={s} onRemove={() => onChange({...block, sheets: block.sheets.filter(x => x !== s)})} />
-                ))}
-              </HStack>
-            </VStack>
-          )}
-        </>
-      )}
+      {step.kind === 'input' && <InputPanel step={step} onChange={onChange} />}
 
-      {block.kind === 'instructions' && (
+      {step.kind === 'instructions' && (
         <>
           <TextArea
             label="What should the AI do?"
-            description="Plain words, like you’d tell a colleague. It can use every file before this step."
-            value={block.text}
-            onChange={text => onChange({...block, text})}
+            description="Plain words, like you’d tell a colleague. It can use everything that flows into this tile."
+            value={step.text}
+            onChange={text => onChange({...step, text})}
             rows={6}
           />
           <HStack gap={1.5} wrap="wrap" vAlign="center">
             <Text type="supporting">Examples:</Text>
-            {INSTRUCTION_PRESETS.map((p, i) => (
-              <Token key={p} size="sm" label={['Convert to USD', 'Total vs target', 'Flag misses'][i]} onClick={() => onChange({...block, text: p})} />
+            {INSTRUCTION_EXAMPLES.map(([label, text]) => (
+              <Token key={label} size="sm" label={label} onClick={() => onChange({...step, text})} />
             ))}
           </HStack>
           <Selector
             label="The AI writes it as"
             description="Leave this on automatic unless you have a reason."
             options={['Let the AI choose', 'Excel formulas', 'Python']}
-            value={block.writtenAs}
-            onChange={writtenAs => onChange({...block, writtenAs})}
+            value={step.writtenAs}
+            onChange={writtenAs => onChange({...step, writtenAs})}
           />
         </>
       )}
 
-      {block.kind === 'output' && (
+      {step.kind === 'output' && (
         <>
-          <TextInput label="Name" description="How people and other workflows will see it." value={block.name} onChange={name => onChange({...block, name})} />
-          <Selector label="Format" options={['Excel sheet', 'CSV file', 'A single number']} value={block.format} onChange={format => onChange({...block, format})} />
+          <TextInput label="Name" description="How people and other workflows will see it." value={step.name} onChange={name => onChange({...step, name})} />
+          <Selector label="Format" options={['Excel sheet', 'CSV file', 'A single number']} value={step.format} onChange={format => onChange({...step, format})} />
           <Divider />
           <Text type="label">Who gets it</Text>
-          <Switch label="Needs an OK before it’s sent" value={block.needsOk} onChange={needsOk => onChange({...block, needsOk})} />
-          {block.needsOk && (
-            <Selector label="Who gives the OK" options={PEOPLE} value={block.approver} onChange={approver => onChange({...block, approver})} />
-          )}
+          <Switch label="Needs an OK before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
+          {step.needsOk && <Selector label="Who gives the OK" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
           <MultiSelector
             label="Send it to"
             placeholder="Pick people, channels or folders"
             options={SEND_OPTIONS}
-            value={block.sendTo}
-            onChange={sendTo => onChange({...block, sendTo})}
+            value={step.sendTo}
+            onChange={sendTo => onChange({...step, sendTo})}
             triggerDisplay="labels"
             hasSearch
             width="100%"
           />
           <Switch
             label="Let other workflows use it"
-            description="Other workflows can pick this output as one of their files."
-            value={block.shareWithWorkflows}
-            onChange={shareWithWorkflows => onChange({...block, shareWithWorkflows})}
+            description="Other workflows can pick this output as an input."
+            value={step.shareWithWorkflows}
+            onChange={shareWithWorkflows => onChange({...step, shareWithWorkflows})}
           />
         </>
       )}
 
       <Divider />
       <HStack>
-        <Button label="Remove block" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
+        <Button label="Remove tile" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
       </HStack>
     </VStack>
   );
+}
+
+/* ---------- Board ---------- */
+
+type BoardNode = {id: string; step: Step; position: {x: number; y: number}; measured?: {width?: number; height?: number}};
+
+let nextId = 1;
+const newId = () => `n${nextId++}`;
+const COL = 310;
+const ROW = 210;
+
+function startingBoard(isEditing: boolean): BoardNode[] {
+  if (!isEditing) return [{id: newId(), step: blankStep('input', 0), position: {x: 0, y: 0}}];
+  return [
+    {id: newId(), step: {kind: 'input', source: 'upload', ...UPLOAD_EXAMPLE, app: '', resource: ''}, position: {x: 0, y: 0}},
+    {id: newId(), step: {kind: 'input', source: 'mcp', fileName: '', sheets: [], app: 'Google Drive', resource: 'FY26 targets.xlsx'}, position: {x: 0, y: ROW}},
+    {id: newId(), step: blankStep('instructions', 0), position: {x: COL, y: ROW / 2}},
+    {id: newId(), step: blankStep('instructions', 1), position: {x: COL * 2, y: ROW / 2}},
+    {id: newId(), step: {...(blankStep('output', 0) as OutputStep), sendTo: ['Slack: #finance-close', 'Google Drive: Finance close pack'], shareWithWorkflows: true}, position: {x: COL * 3, y: ROW / 2}},
+  ];
+}
+
+/**
+ * The flow always reads input → instructions → output, so lines come from the tiles, not by hand:
+ * every input feeds the first instructions tile, each instructions tile feeds the next,
+ * and the last one feeds every output.
+ */
+function edgesFor(board: BoardNode[]): Edge[] {
+  const inputs = board.filter(n => n.step.kind === 'input');
+  const steps = board.filter(n => n.step.kind === 'instructions');
+  const outputs = board.filter(n => n.step.kind === 'output');
+  const e = (a: string, b: string): Edge => ({id: `${a}-${b}`, source: a, target: b});
+  if (!steps.length) return [];
+  return [
+    ...inputs.map(i => e(i.id, steps[0].id)),
+    ...steps.slice(1).map((s, i) => e(steps[i].id, s.id)),
+    ...outputs.map(o => e(steps[steps.length - 1].id, o.id)),
+  ];
+}
+
+/** React Flow's colours, pointed at the Astryx theme tokens. */
+const flowTheme = {
+  '--xy-edge-stroke-default': 'var(--color-text-secondary)',
+  '--xy-edge-stroke-width-default': 1.5,
+  '--xy-handle-background-color-default': 'var(--color-text-secondary)',
+  '--xy-handle-border-color-default': 'var(--color-background-surface)',
+  '--xy-background-color-default': 'transparent',
+  '--xy-background-pattern-dots-color-default': 'var(--color-border)',
+  '--xy-controls-button-background-color-default': 'var(--color-background-surface)',
+  '--xy-controls-button-color-default': 'var(--color-text-primary)',
+  '--xy-controls-button-border-color-default': 'var(--color-border)',
+  '--xy-attribution-background-color-default': 'transparent',
+} as CSSProperties;
+
+/** Keeps every tile in view as tiles are added or removed, without shrinking text past readable. */
+const FIT = {padding: 0.2, maxZoom: 1, minZoom: 0.6, duration: 250};
+function FitOnChange({count}: {count: number}) {
+  const {fitView} = useReactFlow();
+  useEffect(() => {
+    const t = window.setTimeout(() => fitView(FIT), 60);
+    return () => window.clearTimeout(t);
+  }, [count, fitView]);
+  return null;
 }
 
 /* ---------- Page ---------- */
@@ -338,84 +392,112 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const [name, setName] = useState(isEditing ? 'Monthly sales close' : 'Untitled workflow');
-  const [blocks, setBlocks] = useState<Block[]>(() => (isEditing ? exampleBlocks() : []));
+  const [board, setBoard] = useState<BoardNode[]>(() => startingBoard(isEditing));
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dragKind, setDragKind] = useState<BlockKind | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
 
-  const selected = blocks.find(b => b.id === selectedId) ?? null;
-  const has = (k: BlockKind) => blocks.some(b => b.kind === k);
-  const missing = KINDS.filter(k => !has(k.kind)).map(k => k.title.toLowerCase());
-  const isReady = missing.length === 0;
+  const selected = board.find(n => n.id === selectedId) ?? null;
+  const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
+  const allReady = board.every(n => isReady(n.step)) && count('input') > 0 && count('instructions') > 0 && count('output') > 0;
+  const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
+    ? 'Start here: select the Input tile and add your data.'
+    : !count('instructions')
+      ? 'Next: click “Add instructions” on the Input tile.'
+      : !count('output')
+        ? 'Next: click “Add output” on the last Instructions tile.'
+        : 'Finish the tiles marked Needs setup.';
 
-  const add = (kind: BlockKind) => {
-    const b = makeBlock(kind, blocks);
-    setBlocks([...blocks, b]);
-    setSelectedId(b.id);
+  const add = useCallback((fromId: string, kind: StepKind) => {
+    const id = newId();
+    setBoard(prev => {
+      const from = prev.find(n => n.id === fromId);
+      const sameKind = prev.filter(n => n.step.kind === kind).length;
+      const position =
+        kind === 'input'
+          ? {x: 0, y: sameKind * ROW}
+          : {x: (from?.position.x ?? 0) + COL, y: (from?.position.y ?? 0) + (kind === 'output' ? sameKind * ROW : 0)};
+      return [...prev, {id, step: blankStep(kind, sameKind), position}];
+    });
+    setSelectedId(id);
     setTrial('none');
-  };
-  const update = (b: Block) => {
-    setBlocks(prev => prev.map(x => (x.id === b.id ? b : x)));
+  }, []);
+
+  const update = (id: string, step: Step) => {
+    setBoard(prev => prev.map(n => (n.id === id ? {...n, step} : n)));
     setTrial('none');
   };
   const remove = (id: string) => {
-    setBlocks(prev => prev.filter(b => b.id !== id));
+    setBoard(prev => prev.filter(n => n.id !== id));
     setSelectedId(null);
     setTrial('none');
   };
 
-  // Drop anywhere on the canvas: the block lands in its own stage, so the order is always files → instructions → output.
-  const onDragOver = (e: DragEvent<HTMLElement>) => {
-    if (e.dataTransfer.types.includes(DRAG_TYPE)) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-    }
-  };
-  const onDrop = (e: DragEvent<HTMLElement>) => {
-    const kind = e.dataTransfer.getData(DRAG_TYPE) as BlockKind;
-    if (kind) {
-      e.preventDefault();
-      add(kind);
-    }
-    setDragKind(null);
-  };
+  const nodes: TileNode[] = useMemo(() => {
+    const steps = board.filter(n => n.step.kind === 'instructions');
+    const lastStep = steps[steps.length - 1];
+    const hasOutput = board.some(n => n.step.kind === 'output');
+    return board.map(n => {
+      let next: TileData['next'] = [];
+      if (n.step.kind === 'input' && !steps.length) next = [{label: 'Add instructions', kind: 'instructions'}];
+      if (n.step.kind === 'instructions' && n.id === lastStep?.id) {
+        next = [{label: 'Add a step', kind: 'instructions'}, ...(hasOutput ? [] : [{label: 'Add output', kind: 'output' as StepKind}])];
+      }
+      const title =
+        n.step.kind === 'input'
+          ? n.step.source === 'mcp' ? n.step.app || 'Connect an app' : n.step.source === 'upload' ? 'Excel upload' : 'Add your data'
+          : n.step.kind === 'instructions'
+            ? `Step ${steps.findIndex(s => s.id === n.id) + 1}`
+            : n.step.name || 'Output';
+      return {id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, data: {step: n.step, title, isTried: trial === 'done', next, onAdd: add}};
+    });
+  }, [board, selectedId, trial, add]);
+  const edges = useMemo(() => edgesFor(board), [board]);
 
-  const stages = KINDS.map((k, i) => (
-    <Stage
-      key={k.kind}
-      kind={k.kind}
-      index={i + 1}
-      blocks={blocks.filter(b => b.kind === k.kind)}
-      selectedId={selectedId}
-      dragKind={dragKind}
-      trialRun={trial === 'done'}
-      onSelect={setSelectedId}
-      onAdd={() => add(k.kind)}
-    />
-  ));
+  // React Flow reports drags (position) and measured tile sizes (dimensions). We keep both;
+  // selection and content live in our own state.
+  const onNodesChange = (changes: NodeChange<TileNode>[]) => {
+    const kept = changes.filter(c => c.type === 'position' || c.type === 'dimensions');
+    if (!kept.length) return;
+    const next = applyNodeChanges(kept, nodes);
+    setBoard(prev =>
+      prev.map(n => {
+        const m = next.find(x => x.id === n.id);
+        return m ? {...n, position: m.position, measured: m.measured} : n;
+      }),
+    );
+  };
 
   const canvas = (
-    <VStack gap={4} onDragOver={onDragOver} onDrop={onDrop} aria-label="Workflow canvas">
-      {trial === 'done' && (
-        <Banner status="success" title="Tried on September 2026" description="Every block ran. Each one shows what it produced. If it looks right, turn it on." collapsible={false} />
-      )}
-      {!isReady && blocks.length > 0 && (
-        <Text type="supporting">{`Still needed before you can try it: ${missing.join(', ')}.`}</Text>
-      )}
-      {/* Top to bottom: files, then instructions, then output. Reads like the process, at any width. */}
-      <VStack gap={2}>
-        {stages.map((st, i) => (
-          <VStack key={i} gap={2}>
-            {i > 0 && (
-              <HStack hAlign="center">
-                <Icon icon={ArrowDown} color="secondary" />
-              </HStack>
-            )}
-            {st}
-          </VStack>
-        ))}
-      </VStack>
-    </VStack>
+    <ReactFlow<TileNode>
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
+      onNodeClick={(_, node) => setSelectedId(node.id)}
+      onPaneClick={() => setSelectedId(null)}
+      nodesConnectable={false}
+      fitView
+      fitViewOptions={FIT}
+      minZoom={0.3}
+      maxZoom={1.5}
+      colorMode="system"
+      style={flowTheme}
+      aria-label="Workflow board">
+      <FitOnChange count={board.length} />
+      <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
+      <Controls showInteractive={false} />
+      <Panel position="top-left">
+        <VStack gap={2} maxWidth={420}>
+          {trial === 'done' && (
+            <Banner status="success" title="Tried on September 2026" description="Every tile ran. Each shows what it produced. If it looks right, turn it on." collapsible={false} />
+          )}
+          {!allReady && <Text type="supporting" weight="medium">{nextHint}</Text>}
+        </VStack>
+      </Panel>
+      <Panel position="bottom-right">
+        <Button label="Add another input" size="sm" icon={<Icon icon={Plus} />} onClick={() => add('', 'input')} />
+      </Panel>
+    </ReactFlow>
   );
 
   const header = (
@@ -438,8 +520,8 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
             <Button
               label={trial === 'done' ? 'Try again' : 'Try on last month'}
               icon={<Icon icon={Play} />}
-              isDisabled={!isReady}
-              tooltip={isReady ? 'Runs every block on September’s data, without sending anything' : `Add ${missing.join(', ')} first`}
+              isDisabled={!allReady}
+              tooltip={allReady ? 'Runs every tile on September’s data, without sending anything' : 'Finish the tiles first'}
               isLoading={trial === 'running'}
               onClick={() => {
                 setTrial('running');
@@ -463,65 +545,38 @@ export function WorkflowBuilderPage({isEditing, onTurnOn}: {isEditing: boolean; 
     </LayoutHeader>
   );
 
-  if (isNarrow) {
-    // Phones and small windows: the palette sits above the canvas, and the selected block opens in a full-screen dialog.
-    return (
-      <>
-        <Layout
-          height="fill"
-          header={header}
-          content={
-            <LayoutContent padding={4}>
-              <VStack gap={4}>
-                <HStack gap={2} wrap="wrap" vAlign="center">
-                  {KINDS.map(k => (
-                    <Button key={k.kind} label={`Add ${k.title.toLowerCase()}`} size="sm" icon={<Icon icon={k.icon} />} onClick={() => add(k.kind)} />
-                  ))}
-                  <Button label="Fill in an example" variant="ghost" size="sm" onClick={() => { setBlocks(exampleBlocks()); setTrial('none'); }} />
-                </HStack>
-                {canvas}
-              </VStack>
-            </LayoutContent>
-          }
-        />
+  const panel = (
+    <StepPanel step={selected?.step ?? null} onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
+  );
+
+  return (
+    <>
+      <Layout
+        height="fill"
+        header={header}
+        content={
+          <LayoutContent padding={0} isScrollable={false} label="Workflow board">
+            <VStack height="100%">{canvas}</VStack>
+          </LayoutContent>
+        }
+        end={
+          // The side panel only opens for a selected tile, so the board gets the full width otherwise.
+          isNarrow || !selected ? undefined : (
+            <LayoutPanel hasDivider padding={4} width={360} label="Selected tile">
+              {panel}
+            </LayoutPanel>
+          )
+        }
+      />
+      {isNarrow && (
         <Dialog isOpen={!!selected} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
           <Layout
             height="fill"
-            header={<DialogHeader title="Edit block" onOpenChange={open => !open && setSelectedId(null)} />}
-            content={
-              <LayoutContent padding={4}>
-                <Inspector block={selected} onChange={update} onRemove={() => selected && remove(selected.id)} />
-              </LayoutContent>
-            }
+            header={<DialogHeader title="Set up tile" onOpenChange={open => !open && setSelectedId(null)} />}
+            content={<LayoutContent padding={4}>{panel}</LayoutContent>}
           />
         </Dialog>
-      </>
-    );
-  }
-
-  return (
-    <Layout
-      height="fill"
-      header={header}
-      start={
-        <LayoutPanel hasDivider padding={4} width={280} label="Blocks">
-          <Palette
-            onAdd={add}
-            onDragKind={setDragKind}
-            onExample={() => {
-              setBlocks(exampleBlocks());
-              setSelectedId(null);
-              setTrial('none');
-            }}
-          />
-        </LayoutPanel>
-      }
-      content={<LayoutContent padding={6}><VStack maxWidth={760}>{canvas}</VStack></LayoutContent>}
-      end={
-        <LayoutPanel hasDivider padding={4} width={340} label="Selected block">
-          <Inspector block={selected} onChange={update} onRemove={() => selected && remove(selected.id)} />
-        </LayoutPanel>
-      }
-    />
+      )}
+    </>
   );
 }
