@@ -36,7 +36,7 @@ import {PEOPLE} from '../workflow';
 type StepKind = 'input' | 'instructions' | 'output';
 
 type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | null; fileName: string; sheets: string[]; app: string; resource: string};
-type InstructionsStep = {kind: 'instructions'; text: string; writtenAs: string};
+type InstructionsStep = {kind: 'instructions'; text: string};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
@@ -72,7 +72,7 @@ const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Ord
 
 function blankStep(kind: StepKind, n: number): Step {
   if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
-  if (kind === 'instructions') return {kind, text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1], writtenAs: 'Let the AI choose'};
+  if (kind === 'instructions') return {kind, text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1]};
   return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
 }
 
@@ -282,13 +282,6 @@ function StepPanel({step, onChange, onRemove}: {step: Step | null; onChange: (s:
               <Token key={label} size="sm" label={label} onClick={() => onChange({...step, text})} />
             ))}
           </HStack>
-          <Selector
-            label="The AI writes it as"
-            description="Leave this on automatic unless you have a reason."
-            options={['Let the AI choose', 'Excel formulas', 'Python']}
-            value={step.writtenAs}
-            onChange={writtenAs => onChange({...step, writtenAs})}
-          />
         </>
       )}
 

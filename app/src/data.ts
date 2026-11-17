@@ -60,7 +60,6 @@ export type Ticket = {
   instructions: string;
   agentSummary?: string[];
   python: string;
-  excel: string;
   outputs: DataSet[];
   connections: string[];
   sheets: Record<string, Sheet>;
@@ -114,7 +113,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Combine this week's orders with refunds. Subtract each refund from its order using the order number. Keep the currency of each order so the next step can convert it to USD.",
     agentSummary: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Stopped before writing the output: no Currency column to carry forward'],
     python: `orders = read_sheet("Orders this week")\nrefunds = read_sheet("Refunds")\n\nnet = orders.merge(refunds, on="Order ID", how="left")\nnet["Amount"] = net["Amount"] - net["Refund amount"].fillna(0)\nnet = net[["Order ID", "Date", "Region", "Currency", "Amount"]]  # fails: no Currency`,
-    excel: `Net amount (F2):\n=E2 - IFERROR(XLOOKUP(A2, Refunds!A:A, Refunds!C:C), 0)\n\nCurrency (G2):\nnot possible: the orders file has no Currency column`,
     outputs: [{name: 'Net orders', emptyNote: 'Not produced. The run stopped before this step finished.', feedsInto: [['step', 'Convert to USD', '#ticket-2']], sheet: 'Net orders'}],
     connections: ['SharePoint', 'Shopify'],
     sheets: {
@@ -135,7 +133,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Convert every order amount to US dollars using the exchange rate on the order date. If there's no rate for that day, use the most recent earlier rate. Round to 2 decimals.",
     agentSummary: ["Looked up the rate for each order's currency and date", "Used Friday's rate for 37 weekend orders", 'Added one new column: Amount (USD)'],
     python: `orders = read_sheet("Net orders").sort_values("Date")\nrates = read_sheet("Exchange rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency",\n                    direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
-    excel: `Amount (USD) (F2):\n=ROUND(E2 * XLOOKUP(1,\n   ('Exchange rates'!B:B = D2) * ('Exchange rates'!A:A <= B2),\n   'Exchange rates'!C:C, 1, 0, -1), 2)`,
     outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#home'], ['workflow', 'Monthly sales close', '#ticket-3']], sheet: 'Orders in USD'}],
     connections: ['ECB exchange rates', 'SharePoint'],
     sheets: {
@@ -155,7 +152,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
     agentSummary: ['Totaled 5,402 orders into 5 regions', 'Matched each region to its October target', 'Sorted by gap, biggest shortfall first'],
     python: `orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
-    excel: `Sales (B2):  =SUMIFS('Orders in USD'!F:F, 'Orders in USD'!C:C, A2)\nTarget (C2): =XLOOKUP(A2, Targets!A:A, Targets!C:C)\nGap (D2):    =B2 - C2\nGap % (E2):  =D2 / C2`,
     outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Finance close pack', '#home']], sheet: 'October summary'}],
     connections: ['Google Drive', 'Slack'],
     sheets: {
@@ -175,7 +171,6 @@ export const TICKETS: Record<number, Ticket> = {
     ],
     instructions: "Flag customers who haven't ordered in 60 days, or who opened 3 or more support tickets in the last 90 days. Add a column that says which rule they hit.",
     python: '# The agent writes this after the first run.',
-    excel: '# The agent writes this after the first run.',
     outputs: [{name: 'Customers at risk', emptyNote: 'Not produced yet. Run the step to see the result here.', feedsInto: [['step', 'Weekly retention email', '#home']], sheet: 'Customers at risk'}],
     connections: ['Salesforce', 'Zendesk'],
     sheets: {
@@ -192,7 +187,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: 'Take the latest stock file and keep only items where stock on hand is below the reorder point.',
     agentSummary: ['Read the newest stock file', 'Kept 41 items below their reorder point'],
     python: `stock = read_sheet("Warehouse stock")\nlow = stock[stock["On hand"] < stock["Reorder point"]]\nwrite_sheet("Low-stock items", low)`,
-    excel: `=FILTER('Warehouse stock'!A:D, 'Warehouse stock'!C:C < 'Warehouse stock'!D:D)`,
     outputs: [{name: 'Low-stock items', stats: ['41 rows', '4 columns', 'From Nov 11 data'], feedsInto: [['workflow', 'Q1 forecast', '#ticket-6'], ['file', 'Weekly ops report', '#home']], sheet: 'Low-stock items'}],
     connections: ['SharePoint'],
     sheets: {
@@ -210,7 +204,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Project Q1 unit sales per product line from the last 24 months with 4% growth. Flag lines where current stock won't cover the forecast.",
     agentSummary: ['Averaged Q1 sales for 2025 and 2026 per product line', 'Applied 4% growth', 'Flagged 2 product lines short of stock'],
     python: `hist = read_sheet("Sales history")\nq1 = hist[hist["Month"].str[-2:].isin(["01", "02", "03"])]\nbase = q1.groupby("Product line")["Units"].sum() / 2\nforecast = (base * 1.04).round().rename("Q1 forecast")`,
-    excel: `Q1 forecast (B2): =ROUND(SUMIFS(History!C:C, History!B:B, A2, History!D:D, "Q1") / 2 * 1.04, 0)`,
     outputs: [{name: 'Q1 forecast by line', stats: ['18 rows', '4 columns'], feedsInto: [['file', 'Board pack', '#home']], sheet: 'Q1 forecast'}],
     connections: ['Snowflake'],
     sheets: {

@@ -11,7 +11,6 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {List, ListItem} from '@astryxdesign/core/List';
@@ -460,7 +459,6 @@ export function TicketPage({
   const [shownColumns, setShownColumns] = useState<string[]>([]);
   const [isPicking, setIsPicking] = useState(false);
   const [pick, setPick] = useState<Pick | null>(null);
-  const [engine, setEngine] = useState('python');
   const [instructions, setInstructions] = useState(t.instructions);
   const [connections, setConnections] = useState(t.connections);
   const [isApproved, setIsApproved] = useState(t.status === 'done');
@@ -469,8 +467,8 @@ export function TicketPage({
   const [inputsOpen, setInputsOpen] = useState(false);
 
   const preview = (what: string) => toast({body: `Preview only. ${what} comes with the real build.`});
-  // One run button. It turns into "Update and run" once the instructions or the code language change.
-  const hasEdits = instructions !== t.instructions || engine !== 'python';
+  // One run button. It turns into "Update and run" once the instructions change.
+  const hasEdits = instructions !== t.instructions;
   const runLabel = hasEdits ? 'Update and run' : t.isDraft ? 'Run step' : 'Run again';
   const status = isApproved ? 'done' : t.status;
   const myHandoffs = handoffs.filter(h => h.ticketId === id);
@@ -700,7 +698,6 @@ export function TicketPage({
                           size="sm"
                           onClick={() => {
                             setInstructions(t.instructions);
-                            setEngine('python');
                             setIsEditing(false);
                           }}
                         />
@@ -730,23 +727,7 @@ export function TicketPage({
                     defaultIsOpen={false}
                     chevronPosition="start"
                     trigger={<Text type="supporting" weight="medium">Show the code</Text>}>
-                    <VStack gap={2}>
-                      <HStack gap={2} vAlign="center" wrap="wrap">
-                        <Text type="supporting">Written as</Text>
-                        <SegmentedControl
-                          label="Written as"
-                          value={engine}
-                          onChange={v => {
-                            setEngine(v);
-                            setIsEditing(true);
-                          }}
-                          size="sm">
-                          <SegmentedControlItem value="python" label="Python" />
-                          <SegmentedControlItem value="excel" label="Excel formulas" />
-                        </SegmentedControl>
-                      </HStack>
-                      <CodeBlock code={engine === 'python' ? t.python : t.excel} language={engine === 'python' ? 'python' : 'plaintext'} width="100%" size="sm" isWrapped />
-                    </VStack>
+                    <CodeBlock code={t.python} language="python" width="100%" size="sm" isWrapped />
                   </Collapsible>
                   <Divider />
                   <Connections
