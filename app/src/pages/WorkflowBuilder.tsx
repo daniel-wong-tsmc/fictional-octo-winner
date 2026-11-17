@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
-  Background, BackgroundVariant, Handle, Panel, Position, ReactFlow, ReactFlowProvider, applyNodeChanges, useReactFlow, useViewport,
-  type Edge, type Node, type NodeChange, type NodeProps,
+  Background, BackgroundVariant, BaseEdge, EdgeLabelRenderer, Handle, Panel, Position, ReactFlow, ReactFlowProvider,
+  applyNodeChanges, getBezierPath, useReactFlow, useViewport,
+  type Connection, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {Layout, LayoutContent, LayoutFooter, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
@@ -28,7 +29,7 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Database, Eye, Maximize, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
+import {Database, Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
 import {PEOPLE} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
@@ -118,11 +119,11 @@ const TRIAL_SUMMARY: Sheet = TICKETS[3].sheets['October summary'];
 type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
 /** What each tile produced on the trial. The last LLM step and every Pass on to tile end with the summary. */
-function trialFor(node: BoardNode, board: BoardNode[]): TrialResult {
-  const steps = board.filter(n => n.step.kind === 'instructions');
+function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
   if (node.step.kind === 'input') return {line: node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
   if (node.step.kind === 'instructions') {
-    return node.id === steps[steps.length - 1]?.id
+    const feedsOutput = links.some(l => l.source === node.id && board.find(n => n.id === l.target)?.step.kind === 'output');
+    return feedsOutput
       ? {line: '5 rows: sales by region against target', sheet: TRIAL_SUMMARY}
       : {line: '4,988 rows, 1 column added', sheet: TRIAL_ORDERS, rowsShown: `First ${TRIAL_ORDERS.rows!.length} of 4,988 rows`};
   }
@@ -140,6 +141,8 @@ type TileData = {
   step: Step;
   title: string;
   trial: TrialResult | null;
+  /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Pass on to has something coming in. */
+  isLinked: boolean;
   /** Pass on to tile whose trial output nobody has opened yet. */
   isUnchecked: boolean;
   onOpenTrial: (id: string) => void;
@@ -156,12 +159,14 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
     ? {dot: 'info' as const, label: 'Check output'}
     : data.trial
     ? {dot: 'success' as const, label: 'Tried'}
+    : ready && !data.isLinked
+    ? {dot: 'warning' as const, label: 'Not connected'}
     : ready
       ? {dot: 'success' as const, label: 'Ready'}
       : {dot: 'warning' as const, label: 'Needs setup'};
   return (
     <Card padding={3} width={250} elevation={selected ? 'high' : 'low'}>
-      {step.kind !== 'input' && <Handle type="target" position={Position.Left} />}
+      {step.kind !== 'input' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
       <VStack gap={2}>
         <HStack hAlign="between" vAlign="center" gap={2}>
           <HStack gap={1.5} vAlign="center">
@@ -214,11 +219,43 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
           </HStack>
         )}
       </VStack>
-      {step.kind !== 'output' && <Handle type="source" position={Position.Right} />}
+      {step.kind !== 'output' && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </Card>
   );
 }
 const nodeTypes = {tile: Tile};
+/** Dots big enough to grab with a mouse or a finger. */
+const HANDLE_STYLE: CSSProperties = {width: 'var(--spacing-3)', height: 'var(--spacing-3)'};
+
+/* ---------- Connection (a line between tiles) ---------- */
+
+type LinkEdge = Edge<{onRemove: (id: string) => void}, 'link'>;
+
+/** A line that shows a delete button at its middle once it's selected. */
+function LinkLine({id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data, style}: EdgeProps<LinkEdge>) {
+  const [path, midX, midY] = getBezierPath({sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition});
+  return (
+    <>
+      <BaseEdge id={id} path={path} style={style} interactionWidth={24} />
+      {selected && data && (
+        <EdgeLabelRenderer>
+          <IconButton
+            className="nodrag nopan"
+            label="Delete connection"
+            tooltip="Delete connection"
+            size="sm"
+            variant="primary"
+            elevation="med"
+            icon={<Icon icon={X} />}
+            style={{position: 'absolute', transform: `translate(-50%, -50%) translate(${midX}px, ${midY}px)`, pointerEvents: 'all'}}
+            onClick={() => data.onRemove(id)}
+          />
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+const edgeTypes = {link: LinkLine};
 
 /* ---------- Side panel ---------- */
 
@@ -462,28 +499,58 @@ function startingBoard(isEditing: boolean): BoardNode[] {
   ];
 }
 
-/**
- * The flow always reads input → instructions → output, so lines come from the tiles, not by hand:
- * every input feeds the first instructions tile, each instructions tile feeds the next,
- * and the last one feeds every output.
- */
-function edgesFor(board: BoardNode[]): Edge[] {
+/** A line between two tiles. People draw these; the app only draws them for tiles added with a click. */
+type Link = {id: string; source: string; target: string};
+const link = (source: string, target: string): Link => ({id: `${source}-${target}`, source, target});
+
+/** The lines a new or edited workflow starts with: inputs → first LLM step → next … → every Pass on to. */
+function startingLinks(board: BoardNode[]): Link[] {
   const inputs = board.filter(n => n.step.kind === 'input');
   const steps = board.filter(n => n.step.kind === 'instructions');
   const outputs = board.filter(n => n.step.kind === 'output');
-  const e = (a: string, b: string): Edge => ({id: `${a}-${b}`, source: a, target: b});
   if (!steps.length) return [];
   return [
-    ...inputs.map(i => e(i.id, steps[0].id)),
-    ...steps.slice(1).map((s, i) => e(steps[i].id, s.id)),
-    ...outputs.map(o => e(steps[steps.length - 1].id, o.id)),
+    ...inputs.map(i => link(i.id, steps[0].id)),
+    ...steps.slice(1).map((st, i) => link(steps[i].id, st.id)),
+    ...outputs.map(o => link(steps[steps.length - 1].id, o.id)),
   ];
+}
+
+/** Why a line can't be drawn, or null when it can. Keeps the flow input → LLM → Pass on to, with no loops. */
+function linkProblem(board: BoardNode[], links: Link[], source: string | null, target: string | null): string | null {
+  const from = board.find(n => n.id === source);
+  const to = board.find(n => n.id === target);
+  if (!from || !to || from.id === to.id) return 'Pick two different tiles.';
+  if (from.step.kind === 'output') return 'Pass on to is the last stage. Nothing comes after it.';
+  if (to.step.kind === 'input') return 'Inputs are the first stage. Nothing goes into them.';
+  if (from.step.kind === 'input' && to.step.kind === 'output') return 'Data needs an LLM step before it’s passed on.';
+  if (links.some(l => l.source === from.id && l.target === to.id)) return 'These tiles are already connected.';
+  // A loop would mean a tile waits on its own result.
+  const reaches = (a: string, b: string, seen = new Set<string>()): boolean =>
+    a === b || links.some(l => l.source === a && !seen.has(l.target) && (seen.add(l.target), reaches(l.target, b, seen)));
+  if (reaches(to.id, from.id)) return 'That would make a loop.';
+  return null;
+}
+
+function isLinked(n: BoardNode, links: Link[]): boolean {
+  const out = links.some(l => l.source === n.id);
+  const into = links.some(l => l.target === n.id);
+  return n.step.kind === 'input' ? out : n.step.kind === 'output' ? into : into && out;
+}
+
+/** The LLM step at the end of the chain: no line from it to another LLM step. */
+function lastStep(board: BoardNode[], links: Link[]): BoardNode | undefined {
+  const steps = board.filter(n => n.step.kind === 'instructions');
+  const ends = steps.filter(st => !links.some(l => l.source === st.id && board.find(n => n.id === l.target)?.step.kind === 'instructions'));
+  return ends[ends.length - 1] ?? steps[steps.length - 1];
 }
 
 /** React Flow's colours, pointed at the Astryx theme tokens. */
 const flowTheme = {
   '--xy-edge-stroke-default': 'var(--color-text-secondary)',
   '--xy-edge-stroke-width-default': 1.5,
+  '--xy-edge-stroke-selected-default': 'var(--color-text-primary)',
+  '--xy-connectionline-stroke-default': 'var(--color-text-primary)',
   '--xy-handle-background-color-default': 'var(--color-text-secondary)',
   '--xy-handle-border-color-default': 'var(--color-background-surface)',
   '--xy-background-color-default': 'transparent',
@@ -585,7 +652,9 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   const isPhone = useMediaQuery('(max-width: 640px)');
   const [name, setName] = useState(isEditing ? 'Monthly sales close' : 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => startingBoard(isEditing));
+  const [links, setLinks] = useState<Link[]>(() => startingLinks(board));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
   const [fitKey, setFitKey] = useState(0);
@@ -601,26 +670,77 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
   const outputs = board.filter(n => n.step.kind === 'output');
   const allChecked = outputs.every(o => checked.includes(o.id));
-  const allReady = board.every(n => isReady(n.step)) && count('input') > 0 && count('instructions') > 0 && count('output') > 0;
+  const allLinked = board.every(n => isLinked(n, links));
+  const allReady = board.every(n => isReady(n.step)) && allLinked && count('input') > 0 && count('instructions') > 0 && count('output') > 0;
   const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
     ? 'Start here: select the Input tile and add your data.'
     : !count('instructions')
       ? 'Next: drag an LLM node from the toolbar, or click “Add LLM step” on the Input tile.'
       : !count('output')
         ? 'Next: drag a Pass on to node from the toolbar, or click “Add pass on to”.'
-        : 'Finish the tiles marked Needs setup.';
+        : !allLinked
+          ? 'Connect the tiles marked Not connected: drag from the dot on a tile’s right edge to the next tile. Click a line to delete it.'
+          : 'Finish the tiles marked Needs setup.';
 
-  const place = useCallback((kind: StepKind, at?: {x: number; y: number}, fromId?: string) => {
+  /**
+   * Adds a tile. A dropped tile (`at`) lands unconnected where it was dropped. A clicked one is placed
+   * in the flow and wired in: after the tile it came from, or after the last LLM step.
+   */
+  const place = (kind: StepKind, at?: {x: number; y: number}, fromId?: string) => {
     const id = newId();
+    const end = lastStep(board, links);
+    const from = at ? undefined : board.find(n => n.id === fromId) ?? (kind === 'input' ? undefined : end);
+    // A new LLM step slots in after `from` and takes over its lines onward, so nothing gets left behind.
+    const isInsert = kind === 'instructions' && !!from && from.step.kind === 'instructions';
+    const firstStep = board.find(n => n.step.kind === 'instructions');
+    let nextLinks = links;
+    if (!at) {
+      if (kind === 'input') nextLinks = firstStep ? [...links, link(id, firstStep.id)] : links;
+      else if (from) {
+        nextLinks = isInsert
+          ? [...links.map(l => (l.source === from.id ? link(id, l.target) : l)), link(from.id, id)]
+          : [...links, link(from.id, id)];
+      } else if (kind === 'instructions') {
+        nextLinks = [...links, ...board.filter(n => n.step.kind === 'input').map(n => link(n.id, id))];
+      }
+    }
+    const position = at ?? placeFor(board, kind, from?.id);
     setBoard(prev => {
       const sameKind = prev.filter(n => n.step.kind === kind).length;
-      return [...prev, {id, step: blankStep(kind, sameKind), position: at ?? placeFor(prev, kind, fromId)}];
+      // Make room: when a step slots in, everything to its right moves one column over.
+      const shifted = isInsert ? prev.map(n => (n.position.x >= position.x ? {...n, position: {...n.position, x: n.position.x + COL}} : n)) : prev;
+      return [...shifted, {id, step: blankStep(kind, sameKind), position}];
     });
+    setLinks(nextLinks);
     if (!at) setFitKey(k => k + 1);
     setSelectedId(id);
+    setSelectedLinkId(null);
     setTrial('none');
-  }, []);
-  const add = useCallback((fromId: string, kind: StepKind) => place(kind, undefined, fromId), [place]);
+  };
+  const add = (fromId: string, kind: StepKind) => place(kind, undefined, fromId);
+
+  const changeLinks = (next: Link[]) => {
+    setLinks(next);
+    setTrial('none');
+  };
+  const removeLink = (id: string) => {
+    changeLinks(links.filter(l => l.id !== id));
+    setSelectedLinkId(null);
+  };
+  const connect = (c: Connection) => {
+    const problem = linkProblem(board, links, c.source, c.target);
+    if (problem) return toast({body: problem});
+    changeLinks([...links, link(c.source, c.target)]);
+  };
+  // Dragging the end of a line: drop it on another tile to move it, or on empty board to delete it.
+  const reconnected = useRef(false);
+  const reconnect = (old: Edge, c: Connection) => {
+    reconnected.current = true;
+    const rest = links.filter(l => l.id !== old.id);
+    const problem = linkProblem(board, rest, c.source, c.target);
+    if (problem) return toast({body: problem});
+    changeLinks([...rest, link(c.source, c.target)]);
+  };
 
   const update = (id: string, step: Step) => {
     setBoard(prev => prev.map(n => (n.id === id ? {...n, step} : n)));
@@ -637,37 +757,46 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   );
   const remove = (id: string) => {
     setBoard(prev => prev.filter(n => n.id !== id));
+    setLinks(prev => prev.filter(l => l.source !== id && l.target !== id));
     setSelectedId(null);
     setTrial('none');
   };
 
   const nodes: TileNode[] = useMemo(() => {
     const steps = board.filter(n => n.step.kind === 'instructions');
-    const lastStep = steps[steps.length - 1];
-    const hasOutput = board.some(n => n.step.kind === 'output');
     return board.map(n => {
+      // Tiles with nothing after them offer the next stage.
+      const hasNext = links.some(l => l.source === n.id);
       let next: TileData['next'] = [];
-      if (n.step.kind === 'input' && !steps.length) next = [{label: 'Add LLM step', kind: 'instructions'}];
-      if (n.step.kind === 'instructions' && n.id === lastStep?.id) {
-        next = [{label: 'Add LLM step', kind: 'instructions'}, ...(hasOutput ? [] : [{label: 'Add pass on to', kind: 'output' as StepKind}])];
-      }
+      if (!hasNext && n.step.kind === 'input') next = [{label: 'Add LLM step', kind: 'instructions'}];
+      if (!hasNext && n.step.kind === 'instructions') next = [{label: 'Add LLM step', kind: 'instructions'}, {label: 'Add pass on to', kind: 'output'}];
       const title =
         n.step.kind === 'input'
           ? n.step.source === 'mcp' ? n.step.app || 'Connect an app' : n.step.source === 'upload' ? 'Excel upload' : 'Add your data'
           : n.step.kind === 'instructions'
-            ? `Step ${steps.findIndex(s => s.id === n.id) + 1}`
+            ? `Step ${steps.findIndex(st => st.id === n.id) + 1}`
             : n.step.name || 'Output';
-      const result = trial === 'done' ? trialFor(n, board) : null;
+      const result = trial === 'done' ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId,
-        data: {step: n.step, title, trial: result, isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+        data: {step: n.step, title, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
       };
     });
-  }, [board, selectedId, trial, checked, add, openTrial]);
+    // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, links, selectedId, trial, checked, openTrial]);
   const titleOf = (id: string) => nodes.find(n => n.id === id)?.data.title ?? '';
   const viewing = board.find(n => n.id === viewingId) ?? null;
-  const edges = useMemo(() => edgesFor(board), [board]);
+  const edges: LinkEdge[] = links.map(l => ({...l, type: 'link', selected: l.id === selectedLinkId, data: {onRemove: removeLink}}));
+  // Delete or Backspace removes a selected line. Selection itself lives in our own state.
+  const onEdgesChange = (changes: EdgeChange<LinkEdge>[]) => {
+    const gone = changes.filter(c => c.type === 'remove').map(c => c.id);
+    if (gone.length) {
+      changeLinks(links.filter(l => !gone.includes(l.id)));
+      setSelectedLinkId(null);
+    }
+  };
 
   // React Flow reports drags (position) and measured tile sizes (dimensions). We keep both;
   // selection and content live in our own state.
@@ -684,13 +813,36 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   };
 
   const canvas = (
-    <ReactFlow<TileNode>
+    <ReactFlow<TileNode, LinkEdge>
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
-      onNodeClick={(_, node) => setSelectedId(node.id)}
-      onPaneClick={() => setSelectedId(null)}
+      onEdgesChange={onEdgesChange}
+      onNodeClick={(_, node) => {
+        setSelectedId(node.id);
+        setSelectedLinkId(null);
+      }}
+      onEdgeClick={(_, edge) => {
+        setSelectedLinkId(edge.id);
+        setSelectedId(null);
+      }}
+      onPaneClick={() => {
+        setSelectedId(null);
+        setSelectedLinkId(null);
+      }}
+      onConnect={connect}
+      onReconnectStart={() => {
+        reconnected.current = false;
+      }}
+      onReconnect={reconnect}
+      onReconnectEnd={(_, edge) => {
+        if (!reconnected.current) removeLink(edge.id);
+        reconnected.current = false;
+      }}
+      edgesReconnectable
+      deleteKeyCode={['Backspace', 'Delete']}
       onDragOver={e => {
         if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
         e.preventDefault();
@@ -704,7 +856,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
         // Centre the tile on the pointer (tiles are 250 wide, about 130 tall).
         place(kind, {x: p.x - 125, y: p.y - 60});
       }}
-      nodesConnectable={false}
+      connectionRadius={32}
       fitView
       fitViewOptions={FIT}
       minZoom={0.3}
@@ -790,7 +942,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
   const panel = (
     <StepPanel
       step={selected?.step ?? null}
-      trial={selected && isTried ? trialFor(selected, board) : null}
+      trial={selected && isTried ? trialFor(selected, board, links) : null}
       onOpenTrial={() => selected && openTrial(selected.id)}
       onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
   );
@@ -815,7 +967,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: () => voi
         }
       />
       {viewing && isTried && (
-        <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board)} onClose={() => setViewingId(null)} />
+        <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board, links)} onClose={() => setViewingId(null)} />
       )}
       {isNarrow && (
         <Dialog isOpen={!!selected} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
