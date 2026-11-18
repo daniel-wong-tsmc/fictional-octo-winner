@@ -20,6 +20,9 @@ import {FileInput} from '@astryxdesign/core/FileInput';
 import {Selector} from '@astryxdesign/core/Selector';
 import {MultiSelector} from '@astryxdesign/core/MultiSelector';
 import {Switch} from '@astryxdesign/core/Switch';
+import {Slider} from '@astryxdesign/core/Slider';
+import {Collapsible} from '@astryxdesign/core/Collapsible';
+import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
@@ -45,7 +48,15 @@ type StepKind = 'input' | 'instructions' | 'output';
 
 /** source 'workflow' reads a value another workflow hands over: app is that workflow, resource the value. */
 type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | null; fileName: string; sheets: string[]; app: string; resource: string};
-type InstructionsStep = {kind: 'instructions'; name: string; text: string};
+/**
+ * An LLM step. python is the code the AI wrote on its last run (empty until it runs); topP, temperature and
+ * tools are its advanced settings.
+ */
+type InstructionsStep = {kind: 'instructions'; name: string; text: string; python: string; topP: number; temperature: number; tools: string[]};
+/** Tools an LLM step can call while it works. */
+const TOOL_OPTIONS = ['Run Python code', 'Read connected apps', 'Search the web'];
+/** Settings a new LLM step starts with: low temperature, since these steps work on numbers. */
+const LLM_DEFAULTS = {python: '', topP: 1, temperature: 0.2, tools: ['Run Python code', 'Read connected apps']};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
@@ -76,7 +87,7 @@ const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Ord
 
 function blankStep(kind: StepKind, n: number): Step {
   if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
-  if (kind === 'instructions') return {kind, name: '', text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1]};
+  if (kind === 'instructions') return {kind, name: '', text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1], ...LLM_DEFAULTS};
   return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
 }
 
@@ -458,7 +469,7 @@ function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onC
             <HStack gap={1.5} vAlign="center">
               <StatusDot variant={run.tone} label={run.label} />
               <Text weight="medium">{run.label}</Text>
-              <Text type="supporting">{run.ran}</Text>
+              {run.ran && <Text type="supporting">{run.ran}</Text>}
             </HStack>
             {step.kind === 'instructions' && run.summary.length > 0 && (
               <List hasDividers={false} density="compact" edge="outset">
@@ -511,12 +522,39 @@ function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onC
             onChange={text => onChange({...step, text})}
             rows={6}
           />
-          <HStack gap={1.5} wrap="wrap" vAlign="center">
-            <Text type="supporting">Examples:</Text>
-            {INSTRUCTION_EXAMPLES.map(([label, text]) => (
-              <Token key={label} size="sm" label={label} onClick={() => onChange({...step, text})} />
-            ))}
-          </HStack>
+          <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text weight="medium">Advanced settings</Text>}>
+            <VStack gap={4}>
+              <VStack gap={1.5}>
+                <Text type="label">Python code</Text>
+                {step.python ? (
+                  <>
+                    <CodeBlock code={step.python} language="python" width="100%" size="sm" isWrapped />
+                    <Text type="supporting">Written by the AI on the last run. Change the instructions above to change it.</Text>
+                  </>
+                ) : (
+                  <Text type="supporting">No code yet. The AI writes it the first time this step runs.</Text>
+                )}
+              </VStack>
+              <VStack gap={1}>
+                <Slider label="top_p" value={step.topP} min={0} max={1} step={0.05} valueDisplay="text" formatValue={v => v.toFixed(2)} onChange={(topP: number) => onChange({...step, topP})} />
+                <Text type="supporting">How much of the likeliest wording the AI picks from. 1 uses all of it.</Text>
+              </VStack>
+              <VStack gap={1}>
+                <Slider label="Temperature" value={step.temperature} min={0} max={2} step={0.1} valueDisplay="text" formatValue={v => v.toFixed(1)} onChange={(temperature: number) => onChange({...step, temperature})} />
+                <Text type="supporting">Lower gives the same answer each run. Keep it low for numbers.</Text>
+              </VStack>
+              <MultiSelector
+                label="Tool calls"
+                description="Tools the AI can call while it works on this step."
+                placeholder="No tools"
+                options={TOOL_OPTIONS.map(t => ({value: t, label: t}))}
+                value={step.tools}
+                onChange={tools => onChange({...step, tools})}
+                triggerDisplay="labels"
+                width="100%"
+              />
+            </VStack>
+          </Collapsible>
         </>
       )}
 
@@ -547,7 +585,7 @@ function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onC
         </>
       )}
 
-      {step.kind !== 'output' && (
+      {step.kind === 'input' && (
         <LinkedTiles label="Goes to" items={goesTo} emptyText="Nothing yet. Draw a line out of this tile." onSelect={onSelect} />
       )}
 
@@ -648,7 +686,10 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
     }));
   const middle = ((inputs.length - 1) * ROW) / 2;
   const steps: BoardNode[] = w.steps.map((st, i) => ({
-    id: st.id, position: {x: COL * (i + 1), y: middle}, step: {kind: 'instructions', name: st.name, text: st.does},
+    id: st.id,
+    position: {x: COL * (i + 1), y: middle},
+    // The code from the last run: on the step's ticket when it has one, otherwise on the step. Drafts haven't run.
+    step: {kind: 'instructions', name: st.name, text: st.does, ...LLM_DEFAULTS, python: w.isDraft ? '' : (st.ticketId ? TICKETS[st.ticketId]?.python : st.python) ?? ''},
   }));
   const output: BoardNode = {
     id: 'out',

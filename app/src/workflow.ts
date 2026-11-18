@@ -15,6 +15,11 @@ export type WorkflowStep = {
   inputs: StepInput[];
   output: string;
   status: StepRunStatus;
+  /**
+   * The Python the AI wrote on this step's last run. A step with a ticket keeps its code on the ticket instead,
+   * and a step that has never run has none.
+   */
+  python?: string;
   /** What a trial run on last month shows for this step. */
   trialResult: string;
   ticketId?: number;
@@ -70,6 +75,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       output: 'Orders this month',
       status: 'done',
       trialResult: '4,988 orders from September',
+      python: `orders = read_app("Shopify", "Orders, last month")\norders = orders[["Order ID", "Date", "Region", "Currency", "Amount"]]\nwrite_sheet("Orders this month", orders)`,
     },
     {
       id: 's2',
@@ -79,6 +85,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       output: 'Orders in USD',
       status: 'done',
       trialResult: '4,988 orders converted, 112 used Friday’s rate',
+      python: `orders = read_sheet("Orders this month").sort_values("Date")\nrates = read_app("ECB exchange rates", "Daily rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency", direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
     },
     {
       id: 's3',
@@ -135,6 +142,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       output: 'Orders in USD',
       status: 'waiting',
       trialResult: '1,221 orders converted',
+      ticketId: 2,
     },
     {
       id: 'w3',
@@ -144,6 +152,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       output: 'Revenue by region',
       status: 'waiting',
       trialResult: '5 regions',
+      python: `orders = read_sheet("Orders in USD")\nby_region = orders.groupby("Region")["Amount (USD)"].sum().round(2)\nwrite_sheet("Revenue by region", by_region.reset_index())`,
     },
     {
       id: 'w4',
@@ -153,6 +162,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       output: 'Total revenue (USD)',
       status: 'waiting',
       trialResult: '1,482,906.17 USD',
+      python: `by_region = read_sheet("Revenue by region")\ntotal = round(by_region["Amount (USD)"].sum(), 2)\nwrite_value("Total revenue (USD)", total)`,
     },
   ],
   uses: [],

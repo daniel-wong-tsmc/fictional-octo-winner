@@ -190,7 +190,8 @@ export default function App() {
         />
       ) : route === 'workflow-new' || editingPrefilled || editingBuilt ? (
         <WorkflowBuilderPage
-          key={route}
+          // A different ?tile= opens the board fresh with that tile selected.
+          key={`${route}?${query}`}
           editing={
             editingBuilt
               ? {name: editingBuilt.name, href: `#workflow-${editingBuilt.id}`, saved: editingBuilt.saved as SavedBoard}

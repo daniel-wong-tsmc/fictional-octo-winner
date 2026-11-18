@@ -78,6 +78,8 @@ const RUN_STATUS = {
 export function ticketRun(ticketId: number, approved: number[]): TileRun {
   const t = TICKETS[ticketId];
   const isApproved = approved.includes(ticketId);
-  const status = RUN_STATUS[ticketCondition(t, isApproved)];
-  return {ticketId, ...status, ran: isApproved ? 'Approved just now' : t.ran, summary: t.agentSummary ?? []};
+  const condition = ticketCondition(t, isApproved);
+  // A step that hasn't run has no time to add; its label already says so.
+  const ran = isApproved ? 'Approved just now' : condition === 'notRun' ? '' : t.ran;
+  return {ticketId, ...RUN_STATUS[condition], ran, summary: t.agentSummary ?? []};
 }

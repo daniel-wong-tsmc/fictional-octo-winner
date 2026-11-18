@@ -22,6 +22,11 @@ export function dataProblems(): string[] {
         if (!t) problems.push(`${w.name}, ${s.name}: ticket ${s.ticketId} doesn't exist.`);
         else if (t.workflow !== w.name || t.step !== s.name) problems.push(`${w.name}, ${s.name}: ticket ${s.ticketId} is for ${t.workflow}, ${t.step}.`);
       }
+      // Code: every step of a workflow that has run shows the AI's code; a draft's steps have none yet.
+      const code = s.ticketId !== undefined ? TICKETS[s.ticketId]?.python : s.python;
+      if (w.isDraft && s.python) problems.push(`${w.name}, ${s.name}: a draft step has code, but it has never run.`);
+      if (!w.isDraft && !code?.trim()) problems.push(`${w.name}, ${s.name}: has run, but has no code to show.`);
+      if (s.ticketId !== undefined && s.python) problems.push(`${w.name}, ${s.name}: code is on both the step and its ticket; keep it on the ticket.`);
       for (const input of s.inputs) {
         if (input.status === 'handoff') {
           if (!workflows.has(input.source)) problems.push(`${w.name}, ${s.name}: input from workflow "${input.source}", which doesn't exist.`);
