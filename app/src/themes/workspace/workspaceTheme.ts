@@ -3,7 +3,7 @@
  *
  * Source values: design/inspiration/smry (dembrandt 0.39.2 + Playwright measurements).
  * Rule: the shell is grayscale. Colour only carries run status
- * (error = stopped, warning = out of date, info = needs your OK, success = done).
+ * (error = stopped, warning = out of date, info = needs approval, success = done).
  */
 import {defineTheme} from '@astryxdesign/core/theme';
 import {neutralTheme} from '@astryxdesign/theme-neutral';
@@ -56,7 +56,7 @@ export const workspaceTheme = defineTheme({
     '--radius-page': '12px',
   },
   components: {
-    // "Needs your OK" gets its own blue dot, since accent is ink in this theme.
+    // "Needs approval" gets its own blue dot, since accent is ink in this theme.
     'status-dot': {
       'variant:info': {
         backgroundColor: 'var(--color-icon-info)',

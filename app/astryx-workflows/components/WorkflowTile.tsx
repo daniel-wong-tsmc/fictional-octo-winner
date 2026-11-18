@@ -30,7 +30,7 @@ export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow';
  * details in the same order:
  * - Input: title is the source; details From, Reads, Goes to.
  * - LLM: title is "Step N" (plus its name when it has one); details Instructions, Makes.
- * - Pass on to: title is the output's name; details Format, OK from, Sends to.
+ * - Pass on to: title is the output's name; details Format, Approver, Sends to.
  */
 export type WorkflowTileContent =
   | {
@@ -58,7 +58,7 @@ export type WorkflowTileContent =
       kind: 'output';
       name: string;
       format: string;
-      /** Who gives the OK before it goes out. Empty means it goes out without one. */
+      /** Who approves it before it goes out. Empty means it goes out without approval. */
       approver: string;
       sendTo: string[];
     };
@@ -98,7 +98,7 @@ export function tileText(c: WorkflowTileContent): {title: string; details: {labe
     title: c.name || 'Output',
     details: [
       {label: 'Format', value: c.format || NOT_SET},
-      {label: 'OK from', value: c.approver || 'Nobody, it goes straight out'},
+      {label: 'Approver', value: c.approver || 'Nobody, it goes straight out'},
       {label: 'Sends to', value: c.sendTo.length ? c.sendTo.join(', ') : 'Nobody yet'},
     ],
   };

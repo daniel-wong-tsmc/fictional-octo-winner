@@ -19,7 +19,7 @@ export default {
     {name: 'summary', type: 'string', description: 'One sentence on what the workflow does.', required: true},
     {name: 'schedule', type: 'string', description: 'When it starts, such as "First business day of each month, 8:00".', required: true},
     {name: 'nextRun', type: 'string', description: 'Date and time of the next run.', required: true},
-    {name: 'approvers', type: 'string[]', description: 'People who must give an OK before results go out. Empty shows "Nobody".', required: true},
+    {name: 'approvers', type: 'string[]', description: 'People who must approve results before they go out. Empty shows "Nobody".', required: true},
     {name: 'sendTo', type: 'string[]', description: 'Where results go. Empty shows "Nobody yet".', required: true},
     {
       name: 'columns',

@@ -7,7 +7,8 @@
   "exports": {
     "./components/WorkflowOverview": "./components/WorkflowOverview.tsx",
     "./components/WorkflowTaskList": "./components/WorkflowTaskList.tsx",
-    "./components/WorkflowTile": "./components/WorkflowTile.tsx"
+    "./components/WorkflowTile": "./components/WorkflowTile.tsx",
+    "./components/WorkflowSheetTable": "./components/WorkflowSheetTable.tsx"
   },
   "peerDependencies": {
     "@astryxdesign/core": "^0.7.15",

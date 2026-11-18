@@ -7,7 +7,7 @@ export default {
   keywords: ['workflow node', 'workflow step', 'node card', 'flow tile', 'input tile', 'llm step', 'pass on to'],
   usage: {
     description:
-      'One tile of a workflow: an Input, an LLM step or a Pass on to. The header shows the kind and an optional status. The body is a title plus labeled details, and each kind always shows the same details in the same order, each read from one setting of the tile: Input shows its source as the title, then From, Reads and Goes to. LLM shows "Step N" (plus its name) as the title, then Instructions and Makes. Pass on to shows the output name as the title, then Format, OK from and Sends to. Use it everywhere a workflow tile appears, on the board and on workflow pages. Kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too.',
+      'One tile of a workflow: an Input, an LLM step or a Pass on to. The header shows the kind and an optional status. The body is a title plus labeled details, and each kind always shows the same details in the same order, each read from one setting of the tile: Input shows its source as the title, then From, Reads and Goes to. LLM shows "Step N" (plus its name) as the title, then Instructions and Makes. Pass on to shows the output name as the title, then Format, Approver and Sends to. Use it everywhere a workflow tile appears, on the board and on workflow pages. Kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too.',
     bestPractices: [
       {guidance: true, description: 'Build content from the tile’s own settings and lines, with one function shared by every screen that shows the tile.'},
       {guidance: true, description: 'Put actions such as See output in the footer.'},
@@ -17,7 +17,7 @@ export default {
   },
   props: [
     {name: 'content', type: 'WorkflowTileContent', description: 'What the tile says. Its kind (input, step or output) sets the title and which labeled details show.', required: true},
-    {name: 'status', type: '{tone: WorkflowTileTone; label: string}', description: 'Status dot and label in the header, such as Ready or Needs your OK.'},
+    {name: 'status', type: '{tone: WorkflowTileTone; label: string}', description: 'Status dot and label in the header, such as Ready or Needs approval.'},
     {name: 'footer', type: 'ReactNode', description: 'Actions or results at the bottom, such as a See output button.'},
     {name: 'detailMaxLines', type: 'number', description: 'Cuts each detail to this many lines, for small tiles such as those on a board.'},
     {name: 'detailLayout', type: "'inline' | 'stacked'", description: 'inline puts each label beside its value, for wide tiles such as those on a board; stacked puts it above, for narrow ones. Labels and order stay the same.', default: "'stacked'"},

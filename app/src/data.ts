@@ -6,7 +6,7 @@ export type RefKind = 'workflow' | 'step' | 'dataset' | 'file' | 'connection';
 
 export const STATUS: Record<Status, {dot: 'error' | 'warning' | 'info' | 'neutral' | 'success'; label: string}> = {
   failed: {dot: 'error', label: 'Stopped'},
-  review: {dot: 'info', label: 'Needs your OK'},
+  review: {dot: 'info', label: 'Needs approval'},
   stale: {dot: 'warning', label: 'Out of date'},
   draft: {dot: 'neutral', label: 'Draft'},
   done: {dot: 'success', label: 'Approved'},
@@ -143,7 +143,7 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
     agentSummary: ['Totaled 5,402 orders into 5 regions', 'Matched each region to its October target', 'Sorted by gap, biggest shortfall first'],
     python: `orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
-    outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Finance close pack', '#home']], sheet: 'October summary'}],
+    outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Google Drive: Finance close pack', '#home']], sheet: 'October summary'}],
     connections: ['Google Drive', 'Slack'],
     sheets: {
       'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
@@ -214,7 +214,7 @@ export type TicketCondition = WorkflowTaskCondition;
 /**
  * Reads a ticket's condition from its own contents, in this order:
  * an input with a warning, a missing column or no rows means missing data; an approved step ran completely;
- * a step waiting on an OK needs approval; anything else has not run yet.
+ * a step waiting for approval needs approval; anything else has not run yet.
  */
 export function ticketCondition(t: Ticket, isApproved: boolean): TicketCondition {
   const inputGap = t.inputs.some(i => {

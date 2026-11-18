@@ -88,7 +88,7 @@ export function WorkflowTaskList({tasks, title = 'To do'}: WorkflowTaskListProps
           {open.map(t => <TaskRow key={t.id} task={t} />)}
         </List>
       ) : (
-        <EmptyState isCompact title="Nothing needs you right now" description="New tasks show up here when a workflow needs your OK or runs into a problem." />
+        <EmptyState isCompact title="Nothing needs you right now" description="New tasks show up here when a workflow needs approval or runs into a problem." />
       )}
       {done.length > 0 && (
         <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text type="label" color="secondary">{`Done · ${done.length}`}</Text>}>

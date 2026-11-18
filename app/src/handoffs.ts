@@ -152,7 +152,7 @@ export const SEED_HANDOFFS: Handoff[] = [
   {
     id: 'h-gap', name: 'October gap to target', ticketId: 3, workflow: 'Monthly sales close',
     rule: {kind: 'sum', column: 'Gap'}, value: '-137,200', check: 'notEmpty',
-    usedBy: ['Finance close pack'],
+    usedBy: ['Google Drive: Finance close pack'],
   },
   {
     id: 'h-low-stock', name: 'Low-stock item count', ticketId: 5, workflow: 'Inventory snapshot',

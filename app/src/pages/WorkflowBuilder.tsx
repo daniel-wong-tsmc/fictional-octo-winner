@@ -33,7 +33,7 @@ import {useToast} from '@astryxdesign/core/Toast';
 import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Save, Trash2, Upload} from 'lucide-react';
 import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
-import {SheetTable} from './TicketPage';
+import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
 /* ---------- Steps ---------- */
@@ -126,9 +126,12 @@ function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResu
   return {line: `${node.step.name || 'Output'}, 5 rows`, sheet: TRIAL_SUMMARY};
 }
 
+/** The button that opens a tile's trial output. Same words on the tile and in the side panel. */
+const trialButtonLabel = (step: Step) => (step.kind === 'output' ? 'See output' : 'See result');
+
 function sendSentence(s: OutputStep): string {
   const to = s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet (pick who gets it in the tile)';
-  return s.needsOk ? `On a real run this waits for an OK from ${s.approver}, then goes to ${to}.` : `On a real run this goes straight to ${to}.`;
+  return s.needsOk ? `On a real run this waits for approval from ${s.approver}, then goes to ${to}.` : `On a real run this goes straight to ${to}.`;
 }
 
 /* ---------- Tile (a node on the board) ---------- */
@@ -167,7 +170,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         <HStack>
           <Button
             className="nodrag"
-            label={step.kind === 'output' ? 'See output' : 'See result'}
+            label={trialButtonLabel(step)}
             size="sm"
             variant={data.isUnchecked ? 'primary' : 'secondary'}
             icon={<Icon icon={Eye} />}
@@ -253,6 +256,21 @@ const edgeTypes = {link: LinkLine};
 
 /* ---------- Side panel ---------- */
 
+/** One way to give an Input its data: an icon, a title and a line of help, as a button. Used twice in the input panel. */
+function SourceChoice({icon, label, title, description, onClick}: {icon: typeof Upload; label: string; title: string; description: string; onClick: () => void}) {
+  return (
+    <ClickableCard label={label} padding={3} onClick={onClick}>
+      <VStack gap={1}>
+        <HStack gap={2} vAlign="center">
+          <Icon icon={icon} size="sm" />
+          <Text weight="semibold">{title}</Text>
+        </HStack>
+        <Text type="supporting">{description}</Text>
+      </VStack>
+    </ClickableCard>
+  );
+}
+
 function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep) => void}) {
   const toast = useToast();
   const chooseUpload = () => onChange({...step, source: 'upload', ...UPLOAD_EXAMPLE});
@@ -262,24 +280,8 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
     return (
       <VStack gap={3}>
         <Text>Where does the data come from?</Text>
-        <ClickableCard label="Upload Excel" padding={3} onClick={chooseUpload}>
-          <VStack gap={1}>
-            <HStack gap={2} vAlign="center">
-              <Icon icon={Upload} size="sm" />
-              <Text weight="semibold">Upload Excel</Text>
-            </HStack>
-            <Text type="supporting">Drop an Excel or CSV file. You can upload a new one each run.</Text>
-          </VStack>
-        </ClickableCard>
-        <ClickableCard label="Connect an app through MCP" padding={3} onClick={chooseApp}>
-          <VStack gap={1}>
-            <HStack gap={2} vAlign="center">
-              <Icon icon={Plug} size="sm" />
-              <Text weight="semibold">Connect an app (MCP)</Text>
-            </HStack>
-            <Text type="supporting">Read straight from Google Drive, SharePoint, Shopify and other apps your admin connected.</Text>
-          </VStack>
-        </ClickableCard>
+        <SourceChoice icon={Upload} label="Upload Excel" title="Upload Excel" description="Drop an Excel or CSV file. You can upload a new one each run." onClick={chooseUpload} />
+        <SourceChoice icon={Plug} label="Connect an app through MCP" title="Connect an app (MCP)" description="Read straight from Google Drive, SharePoint, Shopify and other apps your admin connected." onClick={chooseApp} />
       </VStack>
     );
   }
@@ -336,15 +338,15 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
       <Selector
         label="App"
         description="Apps your workspace admin connected through MCP."
-        options={MCP_APPS.map(a => ({value: a.name, label: a.name, description: a.isConnected ? 'Connected' : 'Not connected yet'}))}
+        options={MCP_APPS.map(a => ({value: a.name, label: a.name, description: a.isConnected ? 'Connected' : 'App not connected yet'}))}
         value={step.app}
         onChange={appName => onChange({...step, app: appName, resource: appInfo(appName)?.reads[0] ?? ''})}
       />
       {app && (
         <HStack gap={1.5} vAlign="center" hAlign="between" wrap="wrap">
           <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={app.isConnected ? 'success' : 'warning'} label={app.isConnected ? 'Connected' : 'Not connected'} />
-            <Text type="supporting">{app.isConnected ? 'Connected through MCP. Read only.' : 'Not connected yet. The step waits until it is.'}</Text>
+            <StatusDot variant={app.isConnected ? 'success' : 'warning'} label={app.isConnected ? 'Connected' : 'App not connected'} />
+            <Text type="supporting">{app.isConnected ? 'Connected through MCP. Read only.' : 'This app isn’t connected yet. The step waits until it is.'}</Text>
           </HStack>
           {!app.isConnected && (
             <Button label="Request access" size="sm" onClick={() => toast({body: `Asked your workspace admin to connect ${app.name}. You can keep building meanwhile.`})} />
@@ -385,7 +387,7 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
             {step.kind === 'output' && <Text type="supporting">{`Not sent. ${sendSentence(step)}`}</Text>}
             {trial.sheet && (
               <HStack>
-                <Button label={step.kind === 'output' ? 'See output' : 'See result'} icon={<Icon icon={Eye} />} onClick={onOpenTrial} />
+                <Button label={trialButtonLabel(step)} icon={<Icon icon={Eye} />} onClick={onOpenTrial} />
               </HStack>
             )}
           </VStack>
@@ -425,8 +427,8 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
           <Selector label="Format" options={['Excel sheet', 'CSV file', 'A single number']} value={step.format} onChange={format => onChange({...step, format})} />
           <Divider />
           <Text type="label">Who gets it</Text>
-          <Switch label="Needs an OK before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
-          {step.needsOk && <Selector label="Who gives the OK" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
+          <Switch label="Needs approval before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
+          {step.needsOk && <Selector label="Who approves it" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
           <MultiSelector
             label="Send it to"
             placeholder="Pick people, channels or folders"
@@ -478,7 +480,7 @@ function TrialDialog({title, step, trial, onClose}: {title: string; step: Step; 
               {!isOutput && (
                 <Text type="supporting">What this step hands to the next one. Columns marked with a dot were added by the AI.</Text>
               )}
-              <Card padding={0}>{trial.sheet && <SheetTable sheet={trial.sheet} />}</Card>
+              <Card padding={0}>{trial.sheet && <WorkflowSheetTable sheet={trial.sheet} />}</Card>
             </VStack>
           </LayoutContent>
         }
@@ -681,10 +683,6 @@ function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
 /* ---------- Saving ---------- */
 
 /**
- * Turns the board into run order. A tile's column is how many tiles come before it on its longest
- * path from an input, so the saved workflow reads left to right the way the board does.
- */
-/**
  * The board in run order. A tile's column is how many tiles come before it on its longest path from an
  * input; tiles in a column are ordered top to bottom.
  */
@@ -781,6 +779,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
   const isTried = trial === 'done';
+  const finalName = name.trim() || 'Untitled workflow';
   useEffect(() => {
     if (trial !== 'done') setChecked([]);
   }, [trial]);
@@ -1042,8 +1041,8 @@ function Builder({editing, onTurnOn}: BuilderProps) {
           isDisabled={!isDirty || !allReady}
           tooltip={!isDirty ? 'Nothing has changed yet' : !allReady ? 'Finish the tiles first' : undefined}
           onClick={() => {
-            onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
-            toast({body: `Changes to ${name.trim() || 'Untitled workflow'} are saved.`});
+            onTurnOn(finalName, toColumns(board, links), {board, links});
+            toast({body: `Changes to ${finalName} are saved.`});
           }}
         />
       ) : (
@@ -1054,8 +1053,8 @@ function Builder({editing, onTurnOn}: BuilderProps) {
           isDisabled={!isTried || !allChecked}
           tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
           onClick={() => {
-            onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
-            toast({body: `${name.trim() || 'Untitled workflow'} is on. It runs on the first business day of each month.`});
+            onTurnOn(finalName, toColumns(board, links), {board, links});
+            toast({body: `${finalName} is on. It runs on the first business day of each month.`});
           }}
         />
       )}

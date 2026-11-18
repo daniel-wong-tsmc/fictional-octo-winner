@@ -91,7 +91,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   uses: ['h-total-usd'],
   shares: ['h-gap'],
   runs: [
-    {period: 'October 2026', result: 'review', detail: 'Waiting for your OK', finished: 'Nov 2, 08:30'},
+    {period: 'October 2026', result: 'review', detail: 'Waiting for approval', finished: 'Nov 2, 08:30'},
     {period: 'September 2026', result: 'approved', detail: 'Approved by Daniel', finished: 'Oct 1, 09:12'},
     {period: 'August 2026', result: 'rerun', detail: 'Rerun after targets were fixed, then approved', finished: 'Sep 2, 14:40'},
   ],

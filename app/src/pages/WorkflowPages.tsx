@@ -13,14 +13,14 @@ import type {Handoff} from '../handoffs';
 
 const STEP_STATUS: Record<StepRunStatus, {tone: WorkflowTone; label: string}> = {
   done: {tone: 'success', label: 'Done'},
-  review: {tone: 'info', label: 'Needs your OK'},
+  review: {tone: 'info', label: 'Needs approval'},
   waiting: {tone: 'warning', label: 'Waiting'},
   draft: {tone: 'neutral', label: 'Draft'},
 };
 const NOT_RUN = {tone: 'neutral' as const, label: 'Not run yet'};
 const SOURCE_TONE = {
   connected: {tone: 'success', label: 'Connected'},
-  needsConnection: {tone: 'warning', label: 'Not connected'},
+  needsConnection: {tone: 'warning', label: 'App not connected'},
   handoff: {tone: 'info', label: 'From a workflow'},
   upload: {tone: 'neutral', label: 'Uploaded'},
 } as const;
@@ -46,7 +46,7 @@ export function LiveWorkflowPage({name, saved, handoffs, isStep3Approved, onDele
   const statusOf = (id: string) =>
     inputStatus.get(id) ??
     (steps.find(s => s.id === id) ? STEP_STATUS[steps.find(s => s.id === id)!.status] : undefined) ??
-    (id === 'out' ? (isStep3Approved ? {tone: 'success' as const, label: 'Sent'} : {tone: 'info' as const, label: 'Waiting for OK'}) : NOT_RUN);
+    (id === 'out' ? (isStep3Approved ? {tone: 'success' as const, label: 'Sent'} : {tone: 'info' as const, label: 'Waiting for approval'}) : NOT_RUN);
   const columns: WorkflowStage[][] = toColumns(saved.board, saved.links).map(col => col.map(st => ({...st, status: statusOf(st.id)})));
   const outputs = columns.flat().flatMap(st => (st.content.kind === 'output' ? [st.content] : []));
   const runs = w.runs.map(r =>
@@ -90,7 +90,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
   return (
     <WorkflowOverview
       name={w.name}
-      summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('step'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'pass on to', 'pass on tos')}. Turned on ${w.createdOn}.`}
+      summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('step'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'Pass on to', 'Pass on to tiles')}. Turned on ${w.createdOn}.`}
       schedule={w.schedule}
       nextRun={w.nextRun}
       approvers={[...new Set(outputs.map(o => o.approver).filter(Boolean))]}
