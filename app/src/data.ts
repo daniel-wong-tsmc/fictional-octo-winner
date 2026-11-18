@@ -11,14 +11,22 @@ export const STATUS: Record<Status, {dot: 'error' | 'warning' | 'info' | 'neutra
   done: {dot: 'success', label: 'Approved'},
 };
 
+/** What a task tells the person about one step of a workflow. */
+export type TaskState = 'needsApproval' | 'complete' | 'missingData';
+
+/**
+ * Something a workflow notified the person about. Everything shown on Home comes from these fields:
+ * the workflow's name, where the step sits in that workflow, its state, and when the person was told.
+ */
 export type Task = {
   id: number;
-  group: 'today' | 'later' | 'done';
-  title: string;
-  status?: Status;
-  ref?: [RefKind, string];
-  when: string;
-  isOverdue?: boolean;
+  /** Name of the workflow, as in the workflow list. */
+  workflow: string;
+  /** Name of the step, as in that workflow's steps. Its position is counted from the workflow. */
+  step: string;
+  state: TaskState;
+  /** When the workflow notified the person, as an ISO date and time. */
+  notifiedAt: string;
   ticketId?: number;
 };
 
@@ -72,7 +80,7 @@ export const AVAILABLE_CONNECTIONS: [string, string][] = [
 ];
 
 export const TASKS: Task[] = [
-  {id: 3, group: 'today', title: 'Approve October sales numbers before they go to Finance', status: 'review', ref: ['workflow', 'Monthly sales close'], when: 'Today', ticketId: 3},
+  {id: 3, workflow: 'Monthly sales close', step: 'Sales summary for Finance', state: 'needsApproval', notifiedAt: '2026-11-02T08:30', ticketId: 3},
 ];
 
 const ORDERS_USD: Sheet = {
@@ -215,24 +223,3 @@ export const TICKETS: Record<number, Ticket> = {
 };
 TICKETS[8] = {...TICKETS[3], step: 'Sales summary for Finance (September)', status: 'done', ran: 'Approved Mon by Daniel', canApprove: false};
 
-const toNumber = (v: string) => Number(v.replace(/[^0-9.-]/g, ''));
-
-/**
- * One line on what the agent produced, worked out from the ticket's first output sheet.
- * A sheet with sales and target columns gives the total gap; anything else gives its size.
- */
-export function resultLine(t: Ticket): string | null {
-  const out = t.outputs[0];
-  if (!out) return null;
-  const sheet = t.sheets[out.sheet];
-  const cols = sheet?.columns ?? [];
-  const sales = cols.findIndex(c => c.startsWith('Sales'));
-  const target = cols.findIndex(c => c.startsWith('Target'));
-  if (sheet?.rows && sales >= 0 && target >= 0) {
-    const sum = (i: number) => sheet.rows!.reduce((total, r) => total + toNumber(r[i]), 0);
-    const gap = (sum(sales) - sum(target)) / sum(target);
-    const pct = `${Math.abs(gap * 100).toFixed(1)}%`;
-    return gap < 0 ? `Sales ${pct} below target` : `Sales ${pct} above target`;
-  }
-  return out.stats?.length ? `${out.name}: ${out.stats.join(', ')}` : null;
-}

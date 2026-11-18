@@ -92,6 +92,16 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   ],
 };
 
+/** Workflows with steps on record. Home counts a task's step position from here. */
+export const WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE];
+
+/** "Step 3 of 3", counted from the workflow's own steps. Null when the workflow or step isn't on record. */
+export function stepPosition(workflow: string, step: string): string | null {
+  const steps = WORKFLOWS.find(w => w.name === workflow)?.steps ?? [];
+  const i = steps.findIndex(s => s.name === step);
+  return i < 0 ? null : `Step ${i + 1} of ${steps.length}`;
+}
+
 /* ---------- Workflows built on the board ---------- */
 
 export type BuiltStage = {

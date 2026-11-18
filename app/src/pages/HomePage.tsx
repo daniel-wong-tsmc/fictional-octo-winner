@@ -8,46 +8,48 @@ import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {Icon} from '@astryxdesign/core/Icon';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
-import {Link} from '@astryxdesign/core/Link';
 import {ChevronRight, Plus, Sparkles} from 'lucide-react';
 import {useState} from 'react';
-import {STATUS, TICKETS, resultLine, type Task} from '../data';
-import {RefLabel} from './shared';
+import type {Task, TaskState} from '../data';
+import {stepPosition} from '../workflow';
 
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-function TaskRow({task, hideWorkflow}: {task: Task; hideWorkflow?: boolean}) {
-  const s = task.status ? STATUS[task.status] : STATUS.draft;
-  // Where the task sits in its workflow, and what the agent produced, both from the task's ticket.
-  const ticket = task.ticketId ? TICKETS[task.ticketId] : undefined;
-  const result = ticket ? resultLine(ticket) : null;
+const STATE: Record<TaskState, {dot: 'info' | 'success' | 'warning'; label: string}> = {
+  needsApproval: {dot: 'info', label: 'needs approval'},
+  complete: {dot: 'success', label: 'ran completely'},
+  missingData: {dot: 'warning', label: 'is missing data'},
+};
+
+/** "Nov 2, 08:30": when the workflow notified the person. */
+function notifiedLabel(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+  const time = d.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+  return `${date}, ${time}`;
+}
+
+/**
+ * One task: the workflow's name, then which step it is about and its state, then when the person was told.
+ * Every part comes from the task's fields; the step position is counted from the workflow.
+ */
+function TaskRow({task}: {task: Task}) {
+  const s = STATE[task.state];
+  const position = stepPosition(task.workflow, task.step) ?? task.step;
   return (
     <ListItem
       itemKey={task.id}
       href={task.ticketId ? `#ticket-${task.ticketId}` : undefined}
       align="first-line"
-      startContent={<StatusDot variant={s.dot} label={s.label} />}
-      label={
-        <Text weight="medium" hasStrikethrough={task.group === 'done'} color={task.group === 'done' ? 'secondary' : 'primary'}>
-          {task.title}
-        </Text>
-      }
-      description={
-        <HStack gap={3} wrap="wrap" vAlign="center">
-          {task.ref && !(hideWorkflow && task.ref[0] === 'workflow') && <RefLabel kind={task.ref[0]} label={task.ref[1]} />}
-          <Text type="supporting">
-            {[task.status && task.group !== 'done' ? s.label : null, ticket ? `${ticket.position}: ${ticket.step}` : null, result]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
-        </HStack>
-      }
+      startContent={<StatusDot variant={s.dot} label={`${position} ${s.label}`} />}
+      label={<Text weight="medium">{task.workflow}</Text>}
+      description={`${position} ${s.label}`}
       endContent={
         <HStack gap={2} vAlign="center">
-          <Text type="supporting" hasTabularNumbers>{task.when}</Text>
+          <Text type="supporting" hasTabularNumbers>{notifiedLabel(task.notifiedAt)}</Text>
           {task.ticketId && <Icon icon={ChevronRight} size="sm" color="secondary" />}
         </HStack>
       }
@@ -55,40 +57,13 @@ function TaskRow({task, hideWorkflow}: {task: Task; hideWorkflow?: boolean}) {
   );
 }
 
-/** Workflow pages that exist in the prototype. */
-const WORKFLOW_HREF: Record<string, string> = {'Monthly sales close': '#workflow-1'};
-
-const workflowOf = (t: Task) => (t.ref?.[0] === 'workflow' ? t.ref[1] : 'Other');
-
-/** Tasks for one workflow, under the workflow's name. The name opens the workflow page. */
-function WorkflowGroup({name, tasks}: {name: string; tasks: Task[]}) {
-  const href = WORKFLOW_HREF[name];
-  return (
-    <List
-      density="balanced"
-      edge="outset"
-      header={
-        <HStack gap={2} vAlign="center" hAlign="between">
-          {href ? (
-            <Link href={href} tooltip={`Open ${name}`}>
-              <Text type="label">{name}</Text>
-            </Link>
-          ) : (
-            <Text type="label">{name}</Text>
-          )}
-          <Text type="supporting">{`${tasks.length} ${tasks.length === 1 ? 'needs' : 'need'} you`}</Text>
-        </HStack>
-      }>
-      {tasks.map(t => <TaskRow key={t.id} task={t} hideWorkflow />)}
-    </List>
-  );
-}
-
 export function HomePage({tasks}: {tasks: Task[]}) {
   const [ask, setAsk] = useState('');
   const today = new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
-  const done = tasks.filter(t => t.group === 'done');
-  const open = tasks.filter(t => t.group !== 'done');
+  // Newest first. Steps that ran completely move to Done.
+  const sorted = [...tasks].sort((x, y) => y.notifiedAt.localeCompare(x.notifiedAt));
+  const done = sorted.filter(t => t.state === 'complete');
+  const open = sorted.filter(t => t.state !== 'complete');
 
   return (
     <Layout
@@ -124,9 +99,11 @@ export function HomePage({tasks}: {tasks: Task[]}) {
               {open.length === 0 && (
                 <EmptyState isCompact title="Nothing needs you right now" description="New tasks show up here when a workflow needs your OK or runs into a problem." />
               )}
-              {[...new Set(open.map(workflowOf))].map(name => (
-                <WorkflowGroup key={name} name={name} tasks={open.filter(t => workflowOf(t) === name)} />
-              ))}
+              {open.length > 0 && (
+                <List density="balanced" edge="outset">
+                  {open.map(t => <TaskRow key={t.id} task={t} />)}
+                </List>
+              )}
               {done.length > 0 && (
                 <Collapsible
                   defaultIsOpen={false}

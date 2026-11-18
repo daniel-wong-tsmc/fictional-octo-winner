@@ -58,19 +58,19 @@ export default function App() {
   };
   const deleteSalesClose = () => {
     setHasSalesClose(false);
-    setTasks(prev => prev.filter(t => !(t.ref?.[0] === 'workflow' && t.ref[1] === MONTHLY_SALES_CLOSE.name)));
+    setTasks(prev => prev.filter(t => t.workflow !== MONTHLY_SALES_CLOSE.name));
     window.location.hash = 'home';
     toast({body: `${MONTHLY_SALES_CLOSE.name} is deleted.`});
   };
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
-  const openCount = tasks.filter(t => t.group !== 'done').length;
+  const openCount = tasks.filter(t => t.state !== 'complete').length;
   const isHome = route === 'home';
-  const isStep3Approved = tasks.some(t => t.ticketId === 3 && t.group === 'done');
+  const isStep3Approved = tasks.some(t => t.ticketId === 3 && t.state === 'complete');
 
   const markApproved = (id: number) =>
-    setTasks(prev => prev.map(t => (t.ticketId === id ? {...t, group: 'done', status: 'done'} : t)));
+    setTasks(prev => prev.map(t => (t.ticketId === id ? {...t, state: 'complete' as const} : t)));
 
   return (
     <AppShell
