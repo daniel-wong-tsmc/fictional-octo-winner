@@ -6,29 +6,26 @@ import {Heading, Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Card} from '@astryxdesign/core/Card';
-import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
-import {Divider} from '@astryxdesign/core/Divider';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {
-  ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Database, Pencil, Play, Send, Trash2, UserCheck, WandSparkles,
+  ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Pencil, Play, Send, Trash2, UserCheck,
 } from 'lucide-react';
+import {WorkflowTile, type WorkflowTileKind, type WorkflowTileTone} from './WorkflowTile';
 
-export type WorkflowTone = 'success' | 'info' | 'warning' | 'error' | 'neutral';
+export type WorkflowTone = WorkflowTileTone;
 
-/** One tile of the workflow: where data comes from, an LLM step, or who the result is passed on to. */
+/** One tile of the workflow, drawn with WorkflowTile: where data comes from, an LLM step, or who the result is passed on to. */
 export type WorkflowStage = {
   id: string;
-  kind: 'input' | 'step' | 'output';
-  /** Short position label, such as "Input 1", "Step 2" or "Pass on to". */
-  label: string;
-  /** Name of the source, step or output. Hidden for LLM steps, whose label already names them. */
+  kind: WorkflowTileKind;
+  /** Name of the source, step or output. */
   title: string;
   /** Where the data comes from, the AI's instructions, or the output format. */
   detail: string;
@@ -65,44 +62,19 @@ export type WorkflowOverviewProps = {
   homeHref?: string;
 };
 
-const STAGE_ICON = {input: Database, step: WandSparkles, output: Send} as const;
 /** Each column takes an equal share of the row, down to a readable minimum, then the row scrolls. */
 const STAGE_COLUMN: CSSProperties = {flex: '1 1 0', minWidth: 180, maxWidth: 280};
 
-function StageBody({stage}: {stage: WorkflowStage}) {
-  return (
-    <VStack gap={2}>
-      <HStack gap={1.5} vAlign="center">
-        <Icon icon={STAGE_ICON[stage.kind]} size="sm" color="secondary" />
-        <Text type="supporting">{stage.label}</Text>
-      </HStack>
-      {stage.status && (
-        <HStack gap={1} vAlign="center">
-          <StatusDot variant={stage.status.tone} label={stage.status.label} />
-          <Text type="supporting" weight="medium">{stage.status.label}</Text>
-        </HStack>
-      )}
-      {stage.kind !== 'step' && <Text weight="semibold">{stage.title}</Text>}
-      <Text type={stage.kind === 'step' ? 'body' : 'supporting'}>{stage.detail}</Text>
-      {!!stage.notes?.length && (
-        <>
-          <Divider />
-          {stage.notes.map(n => <Text key={n} type="supporting">{n}</Text>)}
-        </>
-      )}
-    </VStack>
-  );
-}
-
 function StageCard({stage, onOpen}: {stage: WorkflowStage; onOpen?: (s: WorkflowStage) => void}) {
-  return onOpen ? (
-    <ClickableCard label={`Open ${stage.label}: ${stage.title}`} onClick={() => onOpen(stage)} padding={3} width="100%">
-      <StageBody stage={stage} />
-    </ClickableCard>
-  ) : (
-    <Card padding={3} width="100%">
-      <StageBody stage={stage} />
-    </Card>
+  return (
+    <WorkflowTile
+      kind={stage.kind}
+      title={stage.title}
+      detail={stage.detail}
+      status={stage.status}
+      notes={stage.notes}
+      onClick={onOpen ? () => onOpen(stage) : undefined}
+    />
   );
 }
 

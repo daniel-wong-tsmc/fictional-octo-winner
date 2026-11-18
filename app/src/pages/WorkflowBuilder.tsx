@@ -29,10 +29,11 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Database, Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Send, Trash2, Upload, WandSparkles} from 'lucide-react';
+import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Trash2, Upload} from 'lucide-react';
 import {PEOPLE, type BuiltStage} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
+import {WORKFLOW_TILE_KINDS, WorkflowTile, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
 /* ---------- Steps ---------- */
 
@@ -43,10 +44,12 @@ type InstructionsStep = {kind: 'instructions'; text: string};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
-const KIND_INFO: Record<StepKind, {label: string; icon: typeof Send; hint: string}> = {
-  input: {label: 'Input', icon: Database, hint: 'Excel upload or an app through MCP'},
-  instructions: {label: 'LLM', icon: WandSparkles, hint: 'Tell the AI what to do with the data'},
-  output: {label: 'Pass on to', icon: Send, hint: 'Who gets the result, and who OKs it'},
+/** The board's step kinds as tile kinds. Names and icons come from the shared WORKFLOW_TILE_KINDS. */
+const TILE_KIND: Record<StepKind, WorkflowTileKind> = {input: 'input', instructions: 'step', output: 'output'};
+const KIND_INFO: Record<StepKind, (typeof WORKFLOW_TILE_KINDS)[WorkflowTileKind]> = {
+  input: WORKFLOW_TILE_KINDS.input,
+  instructions: WORKFLOW_TILE_KINDS.step,
+  output: WORKFLOW_TILE_KINDS.output,
 };
 const KINDS: StepKind[] = ['input', 'instructions', 'output'];
 /** Drag type used when a node is dragged from the toolbar onto the board. */
@@ -85,12 +88,18 @@ function isReady(s: Step): boolean {
   return !!s.name.trim();
 }
 
+/**
+ * The name and line an Input tile shows. The board and the saved workflow page both use it, so an input reads
+ * the same in both places.
+ */
+function inputText(s: InputStep): {title: string; detail: string} {
+  if (s.source === 'upload') return s.fileName ? {title: s.fileName, detail: `Excel upload: ${s.sheets.join(', ')}`} : {title: 'Excel upload', detail: 'Upload an Excel file'};
+  if (s.source === 'mcp') return s.app ? {title: s.app, detail: s.resource ? `${s.resource}, through MCP` : 'Pick what to read'} : {title: 'Connect an app', detail: 'Pick an app'};
+  return {title: 'Add your data', detail: 'Select this tile to add your data: upload Excel or connect an app.'};
+}
+
 function summary(s: Step): string {
-  if (s.kind === 'input') {
-    if (s.source === 'upload') return s.fileName ? `${s.fileName} · ${s.sheets.join(', ')}` : 'Upload an Excel file';
-    if (s.source === 'mcp') return s.app ? `${s.app}${s.resource ? `: ${s.resource}` : ''} (via MCP)` : 'Pick an app';
-    return 'Select this tile to add your data: upload Excel or connect an app.';
-  }
+  if (s.kind === 'input') return inputText(s).detail;
   if (s.kind === 'instructions') return s.text;
   return `${s.format}${s.needsOk ? `, after an OK from ${s.approver.replace(' (you)', '')}` : ''} → ${s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet'}`;
 }
@@ -151,76 +160,71 @@ type TileData = {
 };
 type TileNode = Node<TileData, 'tile'>;
 
+/** A tile on the board: the shared WorkflowTile, plus the dots that lines attach to. */
 function Tile({id, data, selected}: NodeProps<TileNode>) {
   const {step} = data;
-  const info = KIND_INFO[step.kind];
   const ready = isReady(step);
   const status = data.isUnchecked
-    ? {dot: 'info' as const, label: 'Check output'}
+    ? {tone: 'info' as const, label: 'Check output'}
     : data.trial
-    ? {dot: 'success' as const, label: 'Tried'}
+    ? {tone: 'success' as const, label: 'Tried'}
     : ready && !data.isLinked
-    ? {dot: 'warning' as const, label: 'Not connected'}
+    ? {tone: 'warning' as const, label: 'Not connected'}
     : ready
-      ? {dot: 'success' as const, label: 'Ready'}
-      : {dot: 'warning' as const, label: 'Needs setup'};
-  return (
-    <Card padding={3} width={250} elevation={selected ? 'high' : 'low'}>
-      {step.kind !== 'input' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
-      <VStack gap={2}>
-        <HStack hAlign="between" vAlign="center" gap={2}>
-          <HStack gap={1.5} vAlign="center">
-            <Icon icon={info.icon} size="sm" color="secondary" />
-            <Text type="supporting" weight="medium">{info.label}</Text>
-          </HStack>
-          <HStack gap={1} vAlign="center">
-            <StatusDot variant={status.dot} label={status.label} />
-            <Text type="supporting">{status.label}</Text>
-          </HStack>
+      ? {tone: 'success' as const, label: 'Ready'}
+      : {tone: 'warning' as const, label: 'Needs setup'};
+  const footer = data.trial ? (
+    <VStack gap={1}>
+      <Text weight="medium">{data.trial.line}</Text>
+      {data.trial.sheet && (
+        <HStack>
+          <Button
+            className="nodrag"
+            label={step.kind === 'output' ? 'See output' : 'See result'}
+            size="sm"
+            variant={data.isUnchecked ? 'primary' : 'secondary'}
+            icon={<Icon icon={Eye} />}
+            onClick={e => {
+              e.stopPropagation();
+              data.onOpenTrial(id);
+            }}
+          />
         </HStack>
-        <Text weight="semibold">{data.title}</Text>
-        <Text type="supporting" maxLines={3}>{summary(step)}</Text>
-        {data.trial && (
-          <VStack gap={1}>
-            <Text weight="medium">{data.trial.line}</Text>
-            {data.trial.sheet && (
-              <HStack>
-                <Button
-                  className="nodrag"
-                  label={step.kind === 'output' ? 'See output' : 'See result'}
-                  size="sm"
-                  variant={data.isUnchecked ? 'primary' : 'secondary'}
-                  icon={<Icon icon={Eye} />}
-                  onClick={e => {
-                    e.stopPropagation();
-                    data.onOpenTrial(id);
-                  }}
-                />
-              </HStack>
-            )}
-          </VStack>
-        )}
-        {!data.trial && ready && data.next.length > 0 && (
-          <HStack gap={1} wrap="wrap">
-            {data.next.map(n => (
-              <Button
-                key={n.kind}
-                className="nodrag"
-                label={n.label}
-                size="sm"
-                variant="ghost"
-                icon={<Icon icon={Plus} />}
-                onClick={e => {
-                  e.stopPropagation();
-                  data.onAdd(id, n.kind);
-                }}
-              />
-            ))}
-          </HStack>
-        )}
-      </VStack>
+      )}
+    </VStack>
+  ) : ready && data.next.length > 0 ? (
+    <HStack gap={1} wrap="wrap">
+      {data.next.map(n => (
+        <Button
+          key={n.kind}
+          className="nodrag"
+          label={n.label}
+          size="sm"
+          variant="ghost"
+          icon={<Icon icon={Plus} />}
+          onClick={e => {
+            e.stopPropagation();
+            data.onAdd(id, n.kind);
+          }}
+        />
+      ))}
+    </HStack>
+  ) : undefined;
+  return (
+    <>
+      {step.kind !== 'input' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
+      <WorkflowTile
+        kind={TILE_KIND[step.kind]}
+        title={data.title}
+        detail={summary(step)}
+        detailMaxLines={3}
+        status={status}
+        footer={footer}
+        width={250}
+        elevation={selected ? 'high' : 'low'}
+      />
       {step.kind !== 'output' && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
-    </Card>
+    </>
   );
 }
 const nodeTypes = {tile: Tile};
@@ -667,11 +671,7 @@ function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
         .map((n): BuiltStage => {
           const s = n.step;
           const k = ++count[s.kind];
-          if (s.kind === 'input') {
-            return s.source === 'mcp'
-              ? {id: n.id, kind: 'input', label: `Input ${k}`, title: s.app, detail: `${s.resource}, through MCP`}
-              : {id: n.id, kind: 'input', label: `Input ${k}`, title: s.fileName, detail: `Excel upload: ${s.sheets.join(', ')}`};
-          }
+          if (s.kind === 'input') return {id: n.id, kind: 'input', label: `Input ${k}`, ...inputText(s)};
           if (s.kind === 'instructions') return {id: n.id, kind: 'instructions', label: `Step ${k}`, title: `Step ${k}`, detail: s.text};
           return {
             id: n.id, kind: 'output', label: 'Pass on to', title: s.name, detail: s.format,
@@ -834,7 +834,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
       if (!hasNext && n.step.kind === 'input') next = [{label: 'Add LLM step', kind: 'instructions'}];
       const title =
         n.step.kind === 'input'
-          ? n.step.source === 'mcp' ? n.step.app || 'Connect an app' : n.step.source === 'upload' ? 'Excel upload' : 'Add your data'
+          ? inputText(n.step).title
           : n.step.kind === 'instructions'
             ? `Step ${steps.findIndex(st => st.id === n.id) + 1}`
             : n.step.name || 'Output';

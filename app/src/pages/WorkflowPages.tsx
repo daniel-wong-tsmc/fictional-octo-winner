@@ -135,17 +135,17 @@ export function LiveWorkflowPage({handoffs, isStep3Approved, onDelete}: {handoff
   // Inputs first, then each step, then where the result goes: the same order a board-built workflow uses.
   const inputs: WorkflowStage[] = steps.flatMap((s, i) =>
     s.inputs.map((input, k) => ({
-      id: `${s.id}-in-${k}`, kind: 'input' as const, label: '', title: input.label, detail: input.detail,
-      notes: [`Goes to Step ${i + 1}`],
+      id: `${s.id}-in-${k}`, kind: 'input' as const, title: input.label, detail: input.detail,
+      notes: [`Goes to Step ${i + 1}: ${s.name}`],
       status: input.status === 'handoff' ? {tone: 'info' as const, label: 'From a workflow'} : input.status === 'needsConnection' ? {tone: 'warning' as const, label: 'Not connected'} : {tone: 'success' as const, label: 'Connected'},
     })),
-  ).map((st, i) => ({...st, label: `Input ${i + 1}`}));
+  );
   const stepStages: WorkflowStage[][] = steps.map((s, i) => [
-    {id: s.id, kind: 'step', label: `Step ${i + 1}`, title: s.name, detail: s.does, notes: [`Makes: ${s.output}`], status: STEP_STATUS[s.status]},
+    {id: s.id, kind: 'step', title: `Step ${i + 1}: ${s.name}`, detail: s.does, notes: [`Makes: ${s.output}`], status: STEP_STATUS[s.status]},
   ]);
   const last = steps[steps.length - 1];
   const output: WorkflowStage = {
-    id: 'out', kind: 'output', label: 'Pass on to', title: last.output, detail: 'Excel sheet',
+    id: 'out', kind: 'output', title: last.output, detail: 'Excel sheet',
     notes: [`Waits for an OK from ${w.approver}`, `Goes to ${w.destinations.join(', ')}`],
     status: isStep3Approved ? {tone: 'success', label: 'Sent'} : {tone: 'info', label: 'Waiting for OK'},
   };
@@ -195,7 +195,6 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
     col.map(st => ({
       id: st.id,
       kind: st.kind === 'instructions' ? 'step' : st.kind,
-      label: st.label,
       title: st.title,
       detail: st.detail,
       notes:
