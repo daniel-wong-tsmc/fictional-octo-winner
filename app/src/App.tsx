@@ -135,7 +135,6 @@ export default function App() {
           handoffs={handoffs}
           onApprove={markApproved}
           onUndoApprove={tid => setApproved(prev => prev.filter(x => x !== tid))}
-          onAddHandoff={h => setHandoffs(prev => [...prev, h])}
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />
       ) : route === 'workflow-new' || route === 'workflow-edit' || editingBuilt ? (

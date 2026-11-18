@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {FileInput} from '@astryxdesign/core/FileInput';
-import {Layout, LayoutContent, LayoutFooter, LayoutHeader} from '@astryxdesign/core/Layout';
+import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Grid} from '@astryxdesign/core/Grid';
 import {Heading, Text} from '@astryxdesign/core/Text';
@@ -10,16 +10,10 @@ import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
 import {TextArea} from '@astryxdesign/core/TextArea';
-import {TextInput} from '@astryxdesign/core/TextInput';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {Token} from '@astryxdesign/core/Token';
-import {MultiSelector} from '@astryxdesign/core/MultiSelector';
-import {Selector} from '@astryxdesign/core/Selector';
-import {RadioList, RadioListItem} from '@astryxdesign/core/RadioList';
-import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
-import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Divider} from '@astryxdesign/core/Divider';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
@@ -27,17 +21,12 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
-  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plus, RotateCcw, Sparkles, Trash2,
+  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Pencil, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
 import {TICKETS, type DataSet, type Sheet} from '../data';
-import {
-  CHECK_LABEL, checksFor, describeRule, previewValue, rulesForPick, shapeOf,
-  type CheckKind, type Handoff, type Pick,
-} from '../handoffs';
+import {CHECK_LABEL, describeRule, shapeOf, type Handoff} from '../handoffs';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {RefLabel, StatusLabel} from './shared';
-
-const letter = (i: number) => String.fromCharCode(65 + i);
 
 /* ---------- Inputs, result and handoffs as list rows ---------- */
 
@@ -96,15 +85,17 @@ function HandoffInputRow({handoff, onRemove}: {handoff: Handoff; onRemove: () =>
 }
 
 /** A page region on the ticket. One card per region; what sits inside is rows, never more cards. */
-function Region({title, count, endContent, variant = 'section', children}: {
+function Region({title, count, endContent, variant = 'section', isFullHeight, children}: {
   title: string;
   count?: number;
   endContent?: React.ReactNode;
   variant?: 'section' | 'muted';
+  /** Fills its grid cell, so boxes side by side are the same height. */
+  isFullHeight?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <Card variant={variant === 'muted' ? 'muted' : 'default'} padding={4}>
+    <Card variant={variant === 'muted' ? 'muted' : 'default'} padding={4} height={isFullHeight ? '100%' : undefined}>
       <VStack gap={3}>
         <HStack hAlign="between" vAlign="center" gap={2}>
           <Text type="label" color="secondary">{count !== undefined ? `${title} · ${count}` : title}</Text>
@@ -156,105 +147,12 @@ function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void
   );
 }
 
-function AddHandoffDialog({
-  pick, sheet, existing, onClose, onAdd,
-}: {
-  existing: Handoff[];
-  pick: Pick | null;
-  sheet: Sheet;
-  onClose: () => void;
-  onAdd: (h: Omit<Handoff, 'id' | 'ticketId' | 'workflow' | 'usedBy'>) => void;
-}) {
-  const options = pick ? rulesForPick(pick, sheet) : [];
-  const [choice, setChoice] = useState('0');
-  const [name, setName] = useState(options[0]?.suggestedName ?? '');
-  const chosen = options[Number(choice)] ?? options[0];
-  const checks = chosen ? checksFor(chosen.rule) : [];
-  const [check, setCheck] = useState<CheckKind>(checks[0] ?? 'none');
-  if (!pick || !chosen) return null;
-  const duplicate = existing.find(h => JSON.stringify(h.rule) === JSON.stringify(chosen.rule));
-  const valueNote = (r: Parameters<typeof previewValue>[0]) =>
-    r.kind === 'cell' || r.kind === 'row' ? `now ${previewValue(r, sheet)}` : 'worked out from all rows on the next run';
-
-  const clicked =
-    pick.kind === 'column' ? `column ${letter(pick.col)}` : pick.kind === 'row' ? `row ${pick.row}` : `cell ${letter(pick.col)}${pick.row}`;
-
-  return (
-    <Dialog isOpen onOpenChange={open => !open && onClose()} width={520} purpose="form">
-      <Layout
-        height="auto"
-        header={<DialogHeader title="Add a shared value" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />}
-        content={
-          <LayoutContent padding={4}>
-      <VStack gap={4}>
-        <RadioList
-          label="Save it as"
-          description="We find it by its name or ID, not its cell position, so it stays right when rows move or new rows arrive."
-          value={choice}
-          onChange={v => {
-            setChoice(v);
-            const o = options[Number(v)];
-            setName(o.suggestedName);
-            setCheck(checksFor(o.rule)[0]);
-          }}>
-          {options.map((o, i) => (
-            <RadioListItem
-              key={i}
-              value={String(i)}
-              label={describeRule(o.rule)}
-              description={`${shapeOf(o.rule)} · ${valueNote(o.rule)}${i === 0 ? ' · recommended' : ''}`}
-            />
-          ))}
-        </RadioList>
-        <Text type="supporting">{`We won't save ${clicked} itself. After the next run it may hold different data.`}</Text>
-        {duplicate && (
-          <Banner
-            status="warning"
-            title={`Already handed off as "${duplicate.name}"`}
-            description="Other workflows can already pick it. Use that one so there is only one name for this value."
-            collapsible={false}
-          />
-        )}
-        <TextInput label="Name" description="How other workflows will see it." value={name} onChange={setName} />
-        <Selector
-          label="Check before passing it on"
-          description="If the check fails, workflows that use it wait and you get a task on Home."
-          value={check}
-          onChange={v => setCheck(v as CheckKind)}
-          options={checks.map(c => ({value: c, label: CHECK_LABEL[c]}))}
-        />
-      </VStack>
-          </LayoutContent>
-        }
-        footer={
-          <LayoutFooter padding={4}>
-        <HStack gap={2} hAlign="end">
-          <Button label="Cancel" variant="ghost" onClick={onClose} />
-          <Button
-            label="Add shared value"
-            variant="primary"
-            isDisabled={!name.trim() || !!duplicate}
-            onClick={() => onAdd({
-              name: name.trim(),
-              rule: chosen.rule,
-              value: chosen.rule.kind === 'cell' || chosen.rule.kind === 'row' ? previewValue(chosen.rule, sheet) : 'Worked out on the next run',
-              check,
-            })}
-          />
-        </HStack>
-          </LayoutFooter>
-        }
-      />
-    </Dialog>
-  );
-}
-
 /* ---------- Sheets ---------- */
 
 /** The workflow builder's trial dialog imports the sheet table from here. */
 
 function Workbook({
-  title, description, sheets, selected, onSelect, actions, banner, shownColumns, onPick, anchorId, rowTotals, isOpen = true, onToggle,
+  title, description, sheets, selected, onSelect, actions, banner, anchorId, rowTotals, isOpen = true, onToggle,
 }: {
   anchorId: string;
   rowTotals: Record<string, string>;
@@ -267,12 +165,9 @@ function Workbook({
   onSelect: (name: string) => void;
   actions: React.ReactNode;
   banner?: React.ReactNode;
-  shownColumns?: string[];
-  onPick?: (p: Pick) => void;
 }) {
   const current = sheets.find(([n]) => n === selected)?.[1] ?? sheets[0][1];
   const currentName = sheets.find(([n]) => n === selected)?.[0] ?? sheets[0][0];
-  const hidden = shownColumns?.length && current.columns ? current.columns.length - shownColumns.length : 0;
   return (
     <Card padding={0}>
       <VStack>
@@ -320,12 +215,12 @@ function Workbook({
                 </Text>
               </HStack>
             )}
-            <WorkflowSheetTable sheet={current} shownColumns={shownColumns} onPick={onPick} />
+            <WorkflowSheetTable sheet={current} />
             </VStack>
             <HStack gap={4} padding={3} wrap="wrap">
-              <Text type="supporting">
-                {current.fromFile ? `From ${current.fromFile}` : current.rows ? (hidden ? `${hidden} columns hidden` : 'All columns shown') : 'No rows yet'}
-              </Text>
+              {(current.fromFile || !current.rows) && (
+                <Text type="supporting">{current.fromFile ? `From ${current.fromFile}` : 'No rows yet'}</Text>
+              )}
               {!!current.addedColumns?.length && (
                 <HStack gap={1.5} vAlign="center">
                   <StatusDot variant="info" label="Added by the agent" />
@@ -343,13 +238,12 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, handoffs, onApprove, onUndoApprove, onAddHandoff, onRemoveHandoff,
+  id, handoffs, onApprove, onUndoApprove, onRemoveHandoff,
 }: {
   id: number;
   handoffs: Handoff[];
   onApprove: (id: number) => void;
   onUndoApprove: (id: number) => void;
-  onAddHandoff: (h: Handoff) => void;
   onRemoveHandoff: (handoffId: string) => void;
 }) {
   const t = TICKETS[id];
@@ -358,9 +252,6 @@ export function TicketPage({
   const [outputSheet, setOutputSheet] = useState(t.outputs[0].sheet);
   const [uploadedSheets, setUploadedSheets] = useState<[string, Sheet][]>([]);
   const [linkedInputs, setLinkedInputs] = useState<string[]>(t.inputs.filter(d => d.handoffId).map(d => d.handoffId!));
-  const [shownColumns, setShownColumns] = useState<string[]>([]);
-  const [isPicking, setIsPicking] = useState(false);
-  const [pick, setPick] = useState<Pick | null>(null);
   const [instructions, setInstructions] = useState(t.instructions);
   const [isApproved, setIsApproved] = useState(t.status === 'done');
   const [upload, setUpload] = useState<File | null>(null);
@@ -373,7 +264,6 @@ export function TicketPage({
   const runLabel = hasEdits ? 'Update and run' : t.isDraft ? 'Run step' : 'Run again';
   const status = isApproved ? 'done' : t.status;
   const myHandoffs = handoffs.filter(h => h.ticketId === id);
-  const otherHandoffs = handoffs.filter(h => h.ticketId !== id && !linkedInputs.includes(h.id));
   const result = t.outputs[0];
   const resultSheet = t.sheets[result.sheet];
   const hasResult = !resultSheet.isEmpty;
@@ -557,30 +447,11 @@ export function TicketPage({
                   </Collapsible>
                 </VStack>
               </Region>
-            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
+            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="stretch">
               <Region
                 title="Inputs"
                 count={inputCount}
-                endContent={
-                  <DropdownMenu
-                    button={{label: 'Add input', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
-                    header={<Text type="supporting">From another workflow</Text>}
-                    alignment="end"
-                    items={
-                      otherHandoffs.length
-                        ? otherHandoffs.map(h => ({
-                            label: h.name,
-                            description: `${h.workflow} · ${shapeOf(h.rule)} · ${h.value ?? ''}`,
-                            icon: <Icon icon={ArrowRightLeft} />,
-                            onClick: () => {
-                              setLinkedInputs(prev => [...prev, h.id]);
-                              toast({body: `${h.name} from ${h.workflow} is now an input. It fills in on every run.`});
-                            },
-                          }))
-                        : [{label: 'No other shared values yet', isDisabled: true}]
-                    }
-                  />
-                }>
+                isFullHeight>
                 <List hasDividers edge="outset">
                   {fileInputs.map(d => <DataRow key={d.name} data={d} onSelect={() => goToInput(d.sheet)} />)}
                 </List>
@@ -593,7 +464,7 @@ export function TicketPage({
                   </List>
                 )}
               </Region>
-              <Region title="Outputs">
+              <Region title="Outputs" isFullHeight>
                 {/* Step 1: the result, always passed on */}
                 <VStack gap={1.5}>
                   <Text type="label">Result</Text>
@@ -610,7 +481,7 @@ export function TicketPage({
                   <Text type="label">{`Shared values · ${myHandoffs.length}`}</Text>
                   <Text type="supporting">
                     {hasResult
-                      ? 'Values from the result that other workflows can use as inputs. Add one from the output results below.'
+                      ? 'Values from the result that other workflows can use as inputs.'
                       : 'Values other workflows can use as inputs. Available after the agent has run.'}
                   </Text>
                 </VStack>
@@ -639,48 +510,8 @@ export function TicketPage({
               onSelect={setOutputSheet}
               anchorId="output-sheets"
               rowTotals={rowTotals}
-              shownColumns={isPicking ? [] : shownColumns}
-              onPick={isPicking ? p => setPick(p) : undefined}
-              banner={
-                isPicking && (
-                  <Banner
-                    status="info"
-                    container="section"
-                    title="Click what you want to hand off"
-                    description="A column name, a row number, or a single cell."
-                    endContent={<Button label="Cancel" size="sm" onClick={() => setIsPicking(false)} />}
-                    collapsible={false}
-                  />
-                )
-              }
               actions={
                 <>
-                  {!!t.sheets[outputSheet]?.columns && (
-                    <MultiSelector
-                      label="Columns shown"
-                      isLabelHidden
-                      placeholder="All columns shown"
-                      variant="secondary"
-                      size="sm"
-                      options={t.sheets[outputSheet].columns!.map((c, i) => ({value: c, label: `${letter(i)}  ${c}`}))}
-                      value={shownColumns}
-                      onChange={setShownColumns}
-                      formatValue={items => `${items.length} columns shown`}
-                      hasSelectAll
-                      isDisabled={isPicking}
-                    />
-                  )}
-                  <Button
-                    label={isPicking ? 'Picking…' : 'Add shared value'}
-                    icon={<Icon icon={MousePointerClick} />}
-                    isDisabled={!hasResult || isPicking}
-                    tooltip={hasResult ? 'Click a column, row or cell in this sheet' : 'Available after the agent has run'}
-                    onClick={() => {
-                      setOutputSheet(result.sheet);
-                      setShownColumns([]);
-                      setIsPicking(true);
-                    }}
-                  />
                   <Button label="Download output" icon={<Icon icon={Download} />} onClick={() => preview('Download')} />
                 </>
               }
@@ -717,21 +548,6 @@ export function TicketPage({
             )}
             <Text type="supporting" justify="center">Design prototype. Example data. Runs, uploads and downloads are not connected yet.</Text>
           </VStack>
-          {pick && (
-            <AddHandoffDialog
-              key={JSON.stringify(pick)}
-              pick={pick}
-              sheet={t.sheets[outputSheet]}
-              existing={myHandoffs}
-              onClose={() => setPick(null)}
-              onAdd={h => {
-                onAddHandoff({...h, id: `h-${Date.now()}`, ticketId: id, workflow: t.workflow, usedBy: []});
-                setPick(null);
-                setIsPicking(false);
-                toast({body: `Added shared value "${h.name}". Other workflows can now pick it as an input.`});
-              }}
-            />
-          )}
         </LayoutContent>
       }
     />
