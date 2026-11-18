@@ -1,9 +1,11 @@
+import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 // Example workflow for the UI prototype. Nothing here runs.
 
 export type SourceStatus = 'connected' | 'needsConnection' | 'handoff' | 'upload';
 export type StepRunStatus = 'done' | 'review' | 'waiting' | 'draft';
 
-export type StepInput = {label: string; detail: string; status: SourceStatus};
+/** Where a step's data comes from: the file, app or workflow (source), and what it reads there. */
+export type StepInput = {source: string; reads: string; status: SourceStatus};
 
 export type WorkflowStep = {
   id: string;
@@ -26,6 +28,8 @@ export type Workflow = {
   nextRun: string;
   approver: string;
   destinations: string[];
+  /** File type of what the last step passes on, such as Excel sheet. */
+  outputFormat: string;
   steps: WorkflowStep[];
   /** Handoff ids this workflow uses from other workflows. */
   uses: string[];
@@ -50,12 +54,13 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   nextRun: 'Tuesday, December 1, 8:00',
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close', 'Finance close pack'],
+  outputFormat: 'Excel sheet',
   steps: [
     {
       id: 's1',
       name: 'Collect last month’s orders',
       does: 'Pull every order placed last month, with its region and currency.',
-      inputs: [{label: 'Shopify', detail: 'Orders, last month', status: 'connected'}],
+      inputs: [{source: 'Shopify', reads: 'Orders, last month', status: 'connected'}],
       output: 'Orders this month',
       status: 'done',
       trialResult: '4,988 orders from September',
@@ -64,7 +69,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       id: 's2',
       name: 'Convert to USD',
       does: 'Convert each order to US dollars using the exchange rate on its order date.',
-      inputs: [{label: 'ECB exchange rates', detail: 'Daily rates', status: 'connected'}],
+      inputs: [{source: 'ECB exchange rates', reads: 'Daily rates', status: 'connected'}],
       output: 'Orders in USD',
       status: 'done',
       trialResult: '4,988 orders converted, 112 used Friday’s rate',
@@ -74,8 +79,8 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       name: 'Sales summary for Finance',
       does: 'Total sales by region, compare with each region’s target, biggest miss first.',
       inputs: [
-        {label: 'Sales targets', detail: 'Google Drive, FY26 targets.xlsx', status: 'connected'},
-        {label: 'Total revenue (USD)', detail: 'Handoff from Weekly revenue report', status: 'handoff'},
+        {source: 'Google Drive', reads: 'FY26 targets.xlsx', status: 'connected'},
+        {source: 'Weekly revenue report', reads: 'Total revenue (USD)', status: 'handoff'},
       ],
       output: 'October summary',
       status: 'review',
@@ -113,19 +118,8 @@ export function stepPosition(workflow: string, step: string): {number: number; c
 
 /* ---------- Workflows built on the board ---------- */
 
-export type BuiltStage = {
-  id: string;
-  kind: 'input' | 'instructions' | 'output';
-  /** "Input 1", "Step 2", "Pass on to". */
-  label: string;
-  title: string;
-  /** Where the data comes from, the AI instructions, or who gets the result. */
-  detail: string;
-  approver?: string;
-  sendTo?: string[];
-  /** For inputs: the steps this input feeds. */
-  feeds?: string[];
-};
+/** One tile of a workflow built on the board, saved with the same content its tile shows. */
+export type BuiltStage = {id: string; content: WorkflowTileContent};
 
 export type BuiltWorkflow = {
   id: number;

@@ -33,7 +33,7 @@ import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Trash2, Upload} from '
 import {PEOPLE, type BuiltStage} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
-import {WORKFLOW_TILE_KINDS, WorkflowTile, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
+import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
 /* ---------- Steps ---------- */
 
@@ -44,8 +44,7 @@ type InstructionsStep = {kind: 'instructions'; text: string};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
-/** The board's step kinds as tile kinds. Names and icons come from the shared WORKFLOW_TILE_KINDS. */
-const TILE_KIND: Record<StepKind, WorkflowTileKind> = {input: 'input', instructions: 'step', output: 'output'};
+/** The board's step kinds, named and drawn from the shared WORKFLOW_TILE_KINDS. */
 const KIND_INFO: Record<StepKind, (typeof WORKFLOW_TILE_KINDS)[WorkflowTileKind]> = {
   input: WORKFLOW_TILE_KINDS.input,
   instructions: WORKFLOW_TILE_KINDS.step,
@@ -86,22 +85,6 @@ function isReady(s: Step): boolean {
   if (s.kind === 'input') return s.source === 'upload' ? !!s.fileName : s.source === 'mcp' ? !!s.app && !!s.resource : false;
   if (s.kind === 'instructions') return !!s.text.trim();
   return !!s.name.trim();
-}
-
-/**
- * The name and line an Input tile shows. The board and the saved workflow page both use it, so an input reads
- * the same in both places.
- */
-function inputText(s: InputStep): {title: string; detail: string} {
-  if (s.source === 'upload') return s.fileName ? {title: s.fileName, detail: `Excel upload: ${s.sheets.join(', ')}`} : {title: 'Excel upload', detail: 'Upload an Excel file'};
-  if (s.source === 'mcp') return s.app ? {title: s.app, detail: s.resource ? `${s.resource}, through MCP` : 'Pick what to read'} : {title: 'Connect an app', detail: 'Pick an app'};
-  return {title: 'Add your data', detail: 'Select this tile to add your data: upload Excel or connect an app.'};
-}
-
-function summary(s: Step): string {
-  if (s.kind === 'input') return inputText(s).detail;
-  if (s.kind === 'instructions') return s.text;
-  return `${s.format}${s.needsOk ? `, after an OK from ${s.approver.replace(' (you)', '')}` : ''} → ${s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet'}`;
 }
 
 /* ---------- Trial run (prefilled) ---------- */
@@ -148,7 +131,7 @@ function sendSentence(s: OutputStep): string {
 
 type TileData = {
   step: Step;
-  title: string;
+  content: WorkflowTileContent;
   trial: TrialResult | null;
   /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Pass on to has something coming in. */
   isLinked: boolean;
@@ -214,10 +197,9 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
     <>
       {step.kind !== 'input' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
       <WorkflowTile
-        kind={TILE_KIND[step.kind]}
-        title={data.title}
-        detail={summary(step)}
-        detailMaxLines={3}
+        content={data.content}
+        detailMaxLines={2}
+        detailLayout="inline"
         status={status}
         footer={footer}
         width={250}
@@ -494,7 +476,7 @@ type BoardNode = {id: string; step: Step; position: {x: number; y: number}; meas
 let nextId = 1;
 const newId = () => `n${nextId++}`;
 const COL = 360;
-const ROW = 210;
+const ROW = 260;
 
 function startingBoard(isEditing: boolean): BoardNode[] {
   if (!isEditing) return [{id: newId(), step: blankStep('input', 0), position: {x: 0, y: 0}}];
@@ -649,7 +631,11 @@ function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
  * Turns the board into run order. A tile's column is how many tiles come before it on its longest
  * path from an input, so the saved workflow reads left to right the way the board does.
  */
-function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
+/**
+ * The board in run order. A tile's column is how many tiles come before it on its longest path from an
+ * input; tiles in a column are ordered top to bottom.
+ */
+function runOrder(board: BoardNode[], links: Link[]): BoardNode[][] {
   const depth = new Map<string, number>();
   const depthOf = (id: string): number => {
     const known = depth.get(id);
@@ -662,31 +648,43 @@ function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
   board.forEach(n => depthOf(n.id));
   const columns: BoardNode[][] = [];
   board.forEach(n => (columns[depth.get(n.id)!] ??= []).push(n));
-  const count = {input: 0, instructions: 0, output: 0};
-  const stages = columns
-    .filter(Boolean)
-    .map(col =>
-      [...col]
-        .sort((a, b) => a.position.y - b.position.y)
-        .map((n): BuiltStage => {
-          const s = n.step;
-          const k = ++count[s.kind];
-          if (s.kind === 'input') return {id: n.id, kind: 'input', label: `Input ${k}`, ...inputText(s)};
-          if (s.kind === 'instructions') return {id: n.id, kind: 'instructions', label: `Step ${k}`, title: `Step ${k}`, detail: s.text};
-          return {
-            id: n.id, kind: 'output', label: 'Pass on to', title: s.name, detail: s.format,
-            approver: s.needsOk ? s.approver : undefined, sendTo: s.sendTo,
-          };
-        }),
-    );
-  // Say which step each input feeds, now that every tile has its label.
-  const labelOf = new Map(stages.flat().map(st => [st.id, st.label]));
-  return stages.map(col =>
-    col.map(st => {
-      const feeds = links.filter(l => l.source === st.id).map(l => labelOf.get(l.target)).filter(Boolean);
-      return st.kind === 'input' && feeds.length ? {...st, feeds: feeds as string[]} : st;
-    }),
-  );
+  return columns.filter(Boolean).map(col => [...col].sort((a, b) => a.position.y - b.position.y));
+}
+
+/**
+ * What every tile says, read from its own settings and its lines. The board tiles and the saved workflow
+ * page both use this, so a tile reads the same in both places. LLM steps are numbered in run order.
+ */
+function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTileContent> {
+  const number = new Map<string, number>();
+  runOrder(board, links).flat().filter(n => n.step.kind === 'instructions').forEach((n, i) => number.set(n.id, i + 1));
+  const targets = (id: string) => links.filter(l => l.source === id).map(l => board.find(n => n.id === l.target)).filter((n): n is BoardNode => !!n);
+  const contents = new Map<string, WorkflowTileContent>();
+  for (const n of board) {
+    const s = n.step;
+    if (s.kind === 'input') {
+      contents.set(n.id, {
+        kind: 'input',
+        source: s.source === 'upload' ? s.fileName : s.source === 'mcp' ? s.app : '',
+        via: s.source,
+        reads: s.source === 'upload' ? s.sheets.join(', ') : s.source === 'mcp' ? s.resource : '',
+        goesTo: targets(n.id).map(t => `Step ${number.get(t.id)}`),
+      });
+    } else if (s.kind === 'instructions') {
+      // An LLM step makes the output it feeds, or the data the next LLM step works on.
+      const makes = targets(n.id).map(t => (t.step.kind === 'output' ? t.step.name || 'Output' : `Data for Step ${number.get(t.id)}`));
+      contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, instructions: s.text, makes: makes.join(', ')});
+    } else {
+      contents.set(n.id, {kind: 'output', name: s.name, format: s.format, approver: s.needsOk ? s.approver : '', sendTo: s.sendTo});
+    }
+  }
+  return contents;
+}
+
+/** The board as saved workflow columns: each tile with the same content the board shows. */
+function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
+  const contents = tileContents(board, links);
+  return runOrder(board, links).map(col => col.map(n => ({id: n.id, content: contents.get(n.id)!})));
 }
 
 /* ---------- Page ---------- */
@@ -826,29 +824,26 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   };
 
   const nodes: TileNode[] = useMemo(() => {
-    const steps = board.filter(n => n.step.kind === 'instructions');
+    const contents = tileContents(board, links);
     return board.map(n => {
       // An Input tile with nothing after it offers an LLM step. LLM tiles add nothing; use the toolbar.
       const hasNext = links.some(l => l.source === n.id);
       let next: TileData['next'] = [];
       if (!hasNext && n.step.kind === 'input') next = [{label: 'Add LLM step', kind: 'instructions'}];
-      const title =
-        n.step.kind === 'input'
-          ? inputText(n.step).title
-          : n.step.kind === 'instructions'
-            ? `Step ${steps.findIndex(st => st.id === n.id) + 1}`
-            : n.step.name || 'Output';
       const result = trial === 'done' ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId,
-        data: {step: n.step, title, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+        data: {step: n.step, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board, links, selectedId, trial, checked, openTrial]);
-  const titleOf = (id: string) => nodes.find(n => n.id === id)?.data.title ?? '';
+  const titleOf = (id: string) => {
+    const content = nodes.find(n => n.id === id)?.data.content;
+    return content ? tileText(content).title : '';
+  };
   const viewing = board.find(n => n.id === viewingId) ?? null;
   const edges: LinkEdge[] = links.map(l => ({...l, type: 'link', selected: l.id === selectedLinkId, data: {onRemove: removeLink}}));
   // Delete or Backspace removes a selected line. Selection itself lives in our own state.

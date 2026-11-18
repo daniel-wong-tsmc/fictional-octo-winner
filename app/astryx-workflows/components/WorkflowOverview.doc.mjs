@@ -47,9 +47,9 @@ export default {
   approvers={['Daniel (you)']}
   sendTo={['Slack: #finance-close']}
   columns={[
-    [{id: 'a', kind: 'input', title: 'Snowflake', detail: 'sales_history, through MCP'}],
-    [{id: 'b', kind: 'step', title: 'Step 1', detail: 'Total sales by region.'}],
-    [{id: 'c', kind: 'output', title: 'October summary', detail: 'Excel sheet'}],
+    [{id: 'a', content: {kind: 'input', source: 'Snowflake', via: 'mcp', reads: 'sales_history', goesTo: ['Step 1']}}],
+    [{id: 'b', content: {kind: 'step', number: 1, instructions: 'Total sales by region.', makes: 'October summary'}}],
+    [{id: 'c', content: {kind: 'output', name: 'October summary', format: 'Excel sheet', approver: 'Daniel (you)', sendTo: ['Slack: #finance-close']}}],
   ]}
   uses={[]}
   shares={[]}

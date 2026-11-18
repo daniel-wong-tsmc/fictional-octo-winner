@@ -17,20 +17,15 @@ import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {
   ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Pencil, Play, Send, Trash2, UserCheck,
 } from 'lucide-react';
-import {WorkflowTile, type WorkflowTileKind, type WorkflowTileTone} from './WorkflowTile';
+import {WorkflowTile, type WorkflowTileContent, type WorkflowTileTone} from './WorkflowTile';
 
 export type WorkflowTone = WorkflowTileTone;
 
 /** One tile of the workflow, drawn with WorkflowTile: where data comes from, an LLM step, or who the result is passed on to. */
 export type WorkflowStage = {
   id: string;
-  kind: WorkflowTileKind;
-  /** Name of the source, step or output. */
-  title: string;
-  /** Where the data comes from, the AI's instructions, or the output format. */
-  detail: string;
-  /** Extra facts shown under a divider, such as who gives the OK or which step an input feeds. */
-  notes?: string[];
+  /** What the tile says. Its kind sets which details it shows. */
+  content: WorkflowTileContent;
   status?: {tone: WorkflowTone; label: string};
 };
 
@@ -67,14 +62,7 @@ const STAGE_COLUMN: CSSProperties = {flex: '1 1 0', minWidth: 180, maxWidth: 280
 
 function StageCard({stage, onOpen}: {stage: WorkflowStage; onOpen?: (s: WorkflowStage) => void}) {
   return (
-    <WorkflowTile
-      kind={stage.kind}
-      title={stage.title}
-      detail={stage.detail}
-      status={stage.status}
-      notes={stage.notes}
-      onClick={onOpen ? () => onOpen(stage) : undefined}
-    />
+    <WorkflowTile content={stage.content} status={stage.status} onClick={onOpen ? () => onOpen(stage) : undefined} />
   );
 }
 

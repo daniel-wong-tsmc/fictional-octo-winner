@@ -7,35 +7,30 @@ export default {
   keywords: ['workflow node', 'workflow step', 'node card', 'flow tile', 'input tile', 'llm step', 'pass on to'],
   usage: {
     description:
-      'One tile of a workflow: an Input, an LLM step or a Pass on to. Shows the kind’s icon and name, an optional status, the tile’s name, its detail, optional notes and an optional footer. Use it everywhere a workflow tile appears, on the board and on workflow pages, so tiles look the same. Its kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too. For a whole workflow page use WorkflowOverview, which is built from these tiles.',
+      'One tile of a workflow: an Input, an LLM step or a Pass on to. The header shows the kind and an optional status. The body is a title plus labeled details, and each kind always shows the same details in the same order, each read from one setting of the tile: Input shows its source as the title, then From, Reads and Goes to. LLM shows "Step N" (plus its name) as the title, then Instructions and Makes. Pass on to shows the output name as the title, then Format, OK from and Sends to. Use it everywhere a workflow tile appears, on the board and on workflow pages. Kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too.',
     bestPractices: [
-      {guidance: true, description: 'Read kind names and icons from WORKFLOW_TILE_KINDS instead of writing them again.'},
-      {guidance: true, description: 'Put actions such as See output in the footer, not in the detail text.'},
+      {guidance: true, description: 'Build content from the tile’s own settings and lines, with one function shared by every screen that shows the tile.'},
+      {guidance: true, description: 'Put actions such as See output in the footer.'},
+      {guidance: false, description: 'Write free text into a detail. Add a field to WorkflowTileContent instead, so every tile of that kind gets it.'},
       {guidance: false, description: 'Pass onClick when the tile sits on a board that already handles clicks; it would make the tile a second button.'},
     ],
   },
   props: [
-    {name: 'kind', type: 'WorkflowTileKind', description: 'input, step (an LLM step) or output (a Pass on to).', required: true},
-    {name: 'title', type: 'string', description: 'Name of the source, step or output.', required: true},
-    {name: 'detail', type: 'string', description: 'Where the data comes from, the AI’s instructions, or where the result goes.', required: true},
+    {name: 'content', type: 'WorkflowTileContent', description: 'What the tile says. Its kind (input, step or output) sets the title and which labeled details show.', required: true},
     {name: 'status', type: '{tone: WorkflowTileTone; label: string}', description: 'Status dot and label in the header, such as Ready or Needs your OK.'},
-    {name: 'notes', type: 'string[]', description: 'Extra facts under a divider, such as who gives the OK.'},
     {name: 'footer', type: 'ReactNode', description: 'Actions or results at the bottom, such as a See output button.'},
-    {name: 'detailMaxLines', type: 'number', description: 'Cuts the detail to this many lines.'},
+    {name: 'detailMaxLines', type: 'number', description: 'Cuts each detail to this many lines, for small tiles such as those on a board.'},
+    {name: 'detailLayout', type: "'inline' | 'stacked'", description: 'inline puts each label beside its value, for wide tiles such as those on a board; stacked puts it above, for narrow ones. Labels and order stay the same.', default: "'stacked'"},
     {name: 'width', type: 'number | string', description: 'Tile width.', default: "'100%'"},
     {name: 'elevation', type: "'none' | 'low' | 'high'", description: 'Raised for a tile that is selected or needs attention.', default: "'none'"},
     {name: 'onClick', type: '() => void', description: 'Makes the whole tile a button.'},
   ],
   examples: [
     {
-      label: 'An LLM step on a workflow page',
-      code: `<WorkflowTile
-  kind="step"
-  title="Convert to USD"
-  detail="Convert each order to US dollars using the exchange rate on its order date."
-  status={{tone: 'success', label: 'Done'}}
-  notes={['Makes: Orders in USD']}
-/>`,
+      label: 'One tile of each kind',
+      code: `<WorkflowTile content={{kind: 'input', source: 'Shopify', via: 'mcp', reads: 'Orders, last month', goesTo: ['Step 1']}} />
+<WorkflowTile content={{kind: 'step', number: 2, name: 'Convert to USD', instructions: 'Convert each order to US dollars.', makes: 'Orders in USD'}} />
+<WorkflowTile content={{kind: 'output', name: 'October summary', format: 'Excel sheet', approver: 'Daniel (you)', sendTo: ['Slack: #finance-close']}} />`,
     },
   ],
 };
