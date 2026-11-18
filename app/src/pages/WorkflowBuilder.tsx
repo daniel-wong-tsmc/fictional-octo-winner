@@ -740,7 +740,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
     : !count('instructions')
       ? 'Next: drag an LLM node from the toolbar, or click “Add LLM step” on the Input tile.'
       : !count('output')
-        ? 'Next: drag a Pass on to node from the toolbar, or click “Add pass on to”.'
+        ? 'Next: drag a Pass on to node from the toolbar, or click it there to add one after the last LLM step.'
         : !allLinked
           ? 'Connect the tiles marked Not connected: drag from the dot on a tile’s right edge to the next tile. Click a line to delete it.'
           : 'Finish the tiles marked Needs setup.';
@@ -828,11 +828,10 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const nodes: TileNode[] = useMemo(() => {
     const steps = board.filter(n => n.step.kind === 'instructions');
     return board.map(n => {
-      // Tiles with nothing after them offer the next stage.
+      // An Input tile with nothing after it offers an LLM step. LLM tiles add nothing; use the toolbar.
       const hasNext = links.some(l => l.source === n.id);
       let next: TileData['next'] = [];
       if (!hasNext && n.step.kind === 'input') next = [{label: 'Add LLM step', kind: 'instructions'}];
-      if (!hasNext && n.step.kind === 'instructions') next = [{label: 'Add LLM step', kind: 'instructions'}, {label: 'Add pass on to', kind: 'output'}];
       const title =
         n.step.kind === 'input'
           ? n.step.source === 'mcp' ? n.step.app || 'Connect an app' : n.step.source === 'upload' ? 'Excel upload' : 'Add your data'
