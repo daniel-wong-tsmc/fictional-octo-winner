@@ -90,7 +90,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
   return (
     <WorkflowOverview
       name={w.name}
-      summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('step'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'Pass on to', 'Pass on to tiles')}. Turned on ${w.createdOn}.`}
+      summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('step'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'handoff', 'handoffs')}. Turned on ${w.createdOn}.`}
       schedule={w.schedule}
       nextRun={w.nextRun}
       approvers={[...new Set(outputs.map(o => o.approver).filter(Boolean))]}

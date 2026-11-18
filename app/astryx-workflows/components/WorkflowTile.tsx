@@ -19,7 +19,7 @@ export type WorkflowTileTone = 'success' | 'info' | 'warning' | 'error' | 'neutr
 export const WORKFLOW_TILE_KINDS: Record<WorkflowTileKind, {label: string; icon: typeof Send; hint: string}> = {
   input: {label: 'Input', icon: Database, hint: 'Excel upload or an app through MCP'},
   step: {label: 'LLM', icon: WandSparkles, hint: 'Tell the AI what to do with the data'},
-  output: {label: 'Pass on to', icon: Send, hint: 'Who gets the result, and who OKs it'},
+  output: {label: 'Handoff', icon: Send, hint: 'Who gets the result, and who approves it'},
 };
 
 /** How an input gets its data. */
@@ -30,7 +30,7 @@ export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow';
  * details in the same order:
  * - Input: title is the source; details From, Reads, Goes to.
  * - LLM: title is "Step N" (plus its name when it has one); details Instructions, Makes.
- * - Pass on to: title is the output's name; details Format, Approver, Sends to.
+ * - Handoff: title is the output's name; details Format, Approver, Sends to.
  */
 export type WorkflowTileContent =
   | {
@@ -122,7 +122,7 @@ export type WorkflowTileProps = {
 };
 
 /**
- * One tile of a workflow: an Input, an LLM step or a Pass on to. Used on the workflow board and on every
+ * One tile of a workflow: an Input, an LLM step or a Handoff. Used on the workflow board and on every
  * workflow page, so a tile looks and reads the same wherever it appears.
  */
 export function WorkflowTile({content, status, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', onClick}: WorkflowTileProps) {

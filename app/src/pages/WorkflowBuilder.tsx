@@ -114,7 +114,7 @@ const TRIAL_SUMMARY: Sheet = TICKETS[3].sheets['October summary'];
 
 type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
-/** What each tile produced on the trial. The last LLM step and every Pass on to tile end with the summary. */
+/** What each tile produced on the trial. The last LLM step and every Handoff tile end with the summary. */
 function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
   if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
   if (node.step.kind === 'instructions') {
@@ -140,9 +140,9 @@ type TileData = {
   step: Step;
   content: WorkflowTileContent;
   trial: TrialResult | null;
-  /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Pass on to has something coming in. */
+  /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Handoff has something coming in. */
   isLinked: boolean;
-  /** Pass on to tile whose trial output nobody has opened yet. */
+  /** Handoff tile whose trial output nobody has opened yet. */
   isUnchecked: boolean;
   onOpenTrial: (id: string) => void;
   next: {label: string; kind: StepKind}[];
@@ -511,7 +511,7 @@ function startingBoard(): BoardNode[] {
 
 /**
  * A workflow's steps laid out as a board: its inputs in the first column, each step in its own column, then
- * the Pass on to. Its page and its Edit board both read this, so they always show the same tiles.
+ * the Handoff. Its page and its Edit board both read this, so they always show the same tiles.
  */
 export function boardFromWorkflow(w: Workflow): SavedBoard {
   const inputs: BoardNode[] = w.steps.flatMap(st => st.inputs.map((input, k) => ({id: `${st.id}-in-${k}`, input})))
@@ -548,7 +548,7 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
 type Link = {id: string; source: string; target: string};
 const link = (source: string, target: string): Link => ({id: `${source}-${target}`, source, target});
 
-/** The lines a new or edited workflow starts with: inputs → first LLM step → next … → every Pass on to. */
+/** The lines a new or edited workflow starts with: inputs → first LLM step → next … → every Handoff. */
 function startingLinks(board: BoardNode[]): Link[] {
   const inputs = board.filter(n => n.step.kind === 'input');
   const steps = board.filter(n => n.step.kind === 'instructions');
@@ -561,12 +561,12 @@ function startingLinks(board: BoardNode[]): Link[] {
   ];
 }
 
-/** Why a line can't be drawn, or null when it can. Keeps the flow input → LLM → Pass on to, with no loops. */
+/** Why a line can't be drawn, or null when it can. Keeps the flow input → LLM → Handoff, with no loops. */
 function linkProblem(board: BoardNode[], links: Link[], source: string | null, target: string | null): string | null {
   const from = board.find(n => n.id === source);
   const to = board.find(n => n.id === target);
   if (!from || !to || from.id === to.id) return 'Pick two different tiles.';
-  if (from.step.kind === 'output') return 'Pass on to is the last stage. Nothing comes after it.';
+  if (from.step.kind === 'output') return 'Handoff is the last stage. Nothing comes after it.';
   if (to.step.kind === 'input') return 'Inputs are the first stage. Nothing goes into them.';
   if (from.step.kind === 'input' && to.step.kind === 'output') return 'Data needs an LLM step before it’s passed on.';
   if (links.some(l => l.source === from.id && l.target === to.id)) return 'These tiles are already connected.';
@@ -775,7 +775,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
   const [fitKey, setFitKey] = useState(0);
-  // Trial output the user is looking at, and the Pass on to tiles they've opened since the last trial.
+  // Trial output the user is looking at, and the Handoff tiles they've opened since the last trial.
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
   const isTried = trial === 'done';
@@ -795,7 +795,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
     : !count('instructions')
       ? 'Next: drag an LLM node from the toolbar, or click “Add LLM step” on the Input tile.'
       : !count('output')
-        ? 'Next: drag a Pass on to node from the toolbar, or click it there to add one after the last LLM step.'
+        ? 'Next: drag a Handoff node from the toolbar, or click it there to add one after the last LLM step.'
         : !allLinked
           ? 'Connect the tiles marked Not connected: drag from the dot on a tile’s right edge to the next tile. Click a line to delete it.'
           : 'Finish the tiles marked Needs setup.';
@@ -989,7 +989,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
               description={
                 allChecked
                   ? 'You checked the output. Nothing was sent. If it looks right, turn it on.'
-                  : 'Nothing was sent. Click “See output” on the Pass on to tile and check it before you turn this on.'
+                  : 'Nothing was sent. Click “See output” on the Handoff tile and check it before you turn this on.'
               }
               collapsible={false}
             />

@@ -77,7 +77,7 @@ function HandoffInputRow({handoff, onRemove}: {handoff: Handoff; onRemove: () =>
       label={<Text weight="medium">{handoff.name}</Text>}
       description={
         <VStack gap={1}>
-          <RefLabel kind="workflow" label={`Handoff from ${handoff.workflow}`} />
+          <RefLabel kind="workflow" label={`Shared value from ${handoff.workflow}`} />
           <HStack gap={2} vAlign="center" wrap="wrap">
             <Token size="sm" label={shapeOf(handoff.rule)} />
             <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
@@ -183,7 +183,7 @@ function AddHandoffDialog({
     <Dialog isOpen onOpenChange={open => !open && onClose()} width={520} purpose="form">
       <Layout
         height="auto"
-        header={<DialogHeader title="Add a handoff" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />}
+        header={<DialogHeader title="Add a shared value" subtitle={`You clicked ${clicked}. Choose what to pass on.`} onOpenChange={open => !open && onClose()} />}
         content={
           <LayoutContent padding={4}>
       <VStack gap={4}>
@@ -231,7 +231,7 @@ function AddHandoffDialog({
         <HStack gap={2} hAlign="end">
           <Button label="Cancel" variant="ghost" onClick={onClose} />
           <Button
-            label="Add handoff"
+            label="Add shared value"
             variant="primary"
             isDisabled={!name.trim() || !!duplicate}
             onClick={() => onAdd({
@@ -476,7 +476,7 @@ export function TicketPage({
                 </HStack>
                 <Heading level={1} textWrap="balance">{t.step}</Heading>
                 <Text type="supporting">
-                  {isApproved && t.status !== 'done' ? 'Approved just now. The next step and any handoffs use this output.' : t.ran}
+                  {isApproved && t.status !== 'done' ? 'Approved just now. The next step and any shared values use this output.' : t.ran}
                 </Text>
               </VStack>
               <VStack gap={1.5} hAlign="end">
@@ -529,7 +529,7 @@ export function TicketPage({
             {failedChecks.length > 0 && (
               <Banner
                 status="error"
-                title={`${failedChecks.length === 1 ? 'A handoff check failed' : `${failedChecks.length} handoff checks failed`}.`}
+                title={`${failedChecks.length === 1 ? 'A shared value check failed' : `${failedChecks.length} shared value checks failed`}.`}
                 description={`${failedChecks.map(h => `${h.name}: ${h.checkFailure}`).join(' ')} Workflows that use it are waiting.`}
                 collapsible={false}
               />
@@ -557,7 +557,7 @@ export function TicketPage({
                                 toast({body: `${h.name} from ${h.workflow} is now an input. It fills in on every run.`});
                               },
                             }))
-                          : [{label: 'No other handoffs yet', isDisabled: true}]
+                          : [{label: 'No other shared values yet', isDisabled: true}]
                       }
                     />
                   }>
@@ -588,7 +588,7 @@ export function TicketPage({
 
                   {/* Step 2: handoffs, with step 3: checks */}
                   <VStack gap={0.5}>
-                    <Text type="label">{`Handoffs · ${myHandoffs.length}`}</Text>
+                    <Text type="label">{`Shared values · ${myHandoffs.length}`}</Text>
                     <Text type="supporting">
                       {hasResult
                         ? 'Values from the result that other workflows can use as inputs. Add one from the output sheet below.'
@@ -715,7 +715,7 @@ export function TicketPage({
                     />
                   )}
                   <Button
-                    label={isPicking ? 'Picking…' : 'Add handoff'}
+                    label={isPicking ? 'Picking…' : 'Add shared value'}
                     icon={<Icon icon={MousePointerClick} />}
                     isDisabled={!hasResult || isPicking}
                     tooltip={hasResult ? 'Click a column, row or cell in this sheet' : 'Available after the agent has run'}
@@ -772,7 +772,7 @@ export function TicketPage({
                 onAddHandoff({...h, id: `h-${Date.now()}`, ticketId: id, workflow: t.workflow, usedBy: []});
                 setPick(null);
                 setIsPicking(false);
-                toast({body: `Added handoff "${h.name}". Other workflows can now pick it as an input.`});
+                toast({body: `Added shared value "${h.name}". Other workflows can now pick it as an input.`});
               }}
             />
           )}

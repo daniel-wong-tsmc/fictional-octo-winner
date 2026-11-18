@@ -4,7 +4,7 @@ export default {
   name: 'WorkflowSheetTable',
   displayName: 'Workflow Sheet Table',
   import: '@workspace/astryx-workflows/components/WorkflowSheetTable',
-  keywords: ['sheet', 'spreadsheet', 'data table', 'rows and columns', 'preview rows', 'pick cell', 'handoff'],
+  keywords: ['sheet', 'spreadsheet', 'data table', 'rows and columns', 'preview rows', 'pick cell', 'shared value'],
   usage: {
     description:
       'A sheet of data shown like a spreadsheet: lettered columns, numbered rows and compact grid lines. Columns the agent added get a dot, missing columns say Missing, and an empty sheet shows an empty state with its note. With onPick, the row numbers, column names and cells become buttons that report what was clicked. Use it everywhere a sheet is shown, on the ticket page and in the trial dialog of the builder, so a sheet looks the same on every screen.',
