@@ -13,6 +13,8 @@ import {ticketRun, toWorkflowTask, type TileRun} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
+import {ChatPage} from './pages/ChatPage';
+import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
 import {SCHEDULES, MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
@@ -29,10 +31,14 @@ function useHashRoute(): string {
   return route;
 }
 
+/** "Nov 17": the date of a chat's last message, for the sidebar. */
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+
 export default function App() {
   // A route can carry ?tile=<id>, which opens the board with that tile selected.
   const [route, query = ''] = useHashRoute().split('?');
   const selectTile = new URLSearchParams(query).get('tile') ?? undefined;
+  const openChat = CHATS.find(c => route === `chat-${c.id}`) ?? null;
   const [tasks, setTasks] = useState<Task[]>(TASKS);
   // Tickets the person approved here. A ticket's condition is read from the ticket plus this.
   const [approved, setApproved] = useState<number[]>([]);
@@ -126,6 +132,18 @@ export default function App() {
               ))}
             </SideNavItem>
           </SideNavSection>
+          {/* The lower part of the sidebar: past conversations with the agent, newest first. */}
+          <SideNavSection title="Chat history">
+            {CHATS.map(c => (
+              <SideNavItem
+                key={c.id}
+                label={c.title}
+                href={`#chat-${c.id}`}
+                isSelected={route === `chat-${c.id}`}
+                endContent={<Text type="supporting" hasTabularNumbers>{shortDate(c.updatedAt)}</Text>}
+              />
+            ))}
+          </SideNavSection>
         </SideNav>
       }>
       {ticketId !== null ? (
@@ -157,7 +175,7 @@ export default function App() {
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (
-        <HomePage tasks={tasks} approved={approved} />
+        openChat ? <ChatPage key={openChat.id} chat={openChat} /> : <HomePage tasks={tasks} approved={approved} />
       )}
     </AppShell>
   );
