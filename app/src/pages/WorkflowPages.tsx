@@ -74,6 +74,7 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}:
       editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}
       onDelete={onDelete}
+      isDraft={w.isDraft}
     />
   );
 }

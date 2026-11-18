@@ -9,7 +9,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, CircleAlert, CircleCheck, Clock, LoaderCircle} from 'lucide-react';
 
 /** Where a workflow run stands. The board picks the lane and the wording from this. */
-export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'running' | 'needsApproval' | 'missingData' | 'complete';
+export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'draft' | 'running' | 'needsApproval' | 'missingData' | 'complete';
 
 /** One card on the board: a workflow's next run, its current run, or a run that needs you or has finished. */
 export type WorkflowBoardItem = {
@@ -35,6 +35,7 @@ export type WorkflowBoardProps = {
 const STATE: Record<WorkflowBoardState, {dot: 'info' | 'success' | 'warning' | 'neutral'; step: string; when: string}> = {
   scheduled: {dot: 'neutral', step: '', when: 'Next run'},
   unscheduled: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
+  draft: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
   running: {dot: 'info', step: 'is running', when: 'Started'},
   needsApproval: {dot: 'info', step: 'needs approval', when: 'Notified'},
   missingData: {dot: 'warning', step: 'is missing data', when: 'Notified'},
@@ -49,7 +50,7 @@ const LANES: {title: string; icon: typeof Clock; empty: string; groups: {title?:
     empty: 'No workflows are waiting to run.',
     groups: [
       {title: 'Scheduled', states: ['scheduled']},
-      {title: 'Unscheduled', states: ['unscheduled']},
+      {title: 'Unscheduled', states: ['unscheduled', 'draft']},
     ],
   },
   {title: 'Running', icon: LoaderCircle, empty: 'Nothing is running right now.', groups: [{states: ['running']}]},
@@ -62,6 +63,7 @@ export function boardLine(item: WorkflowBoardItem): string {
   if (item.state === 'scheduled') return item.schedule ?? '';
   const s = STATE[item.state];
   if (item.stepNumber && item.stepCount) return `Step ${item.stepNumber} of ${item.stepCount} ${s.step}`;
+  if (item.state === 'draft') return 'Draft, not turned on yet';
   return item.state === 'unscheduled' ? 'Runs when you start it' : item.state === 'complete' ? 'Ran completely' : s.step;
 }
 

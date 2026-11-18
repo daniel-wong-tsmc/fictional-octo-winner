@@ -33,7 +33,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
 import {Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
-import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
+import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
@@ -61,16 +61,6 @@ const DRAG_TYPE = 'application/x-workflow-node';
 /** Drag type used when a saved workflow is dragged from the Library onto the board. */
 const DRAG_WORKFLOW = 'application/x-saved-workflow';
 
-/** Apps the workspace admin has connected through MCP. */
-const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
-  {name: 'Google Drive', isConnected: true, reads: ['FY26 targets.xlsx', 'Finance close pack (folder)']},
-  {name: 'SharePoint', isConnected: true, reads: ['stock_levels.xlsx', 'Close archive (folder)']},
-  {name: 'Shopify', isConnected: true, reads: ['Orders, last month', 'Refunds, last month']},
-  {name: 'ECB exchange rates', isConnected: true, reads: ['Daily rates']},
-  {name: 'HubSpot', isConnected: false, reads: ['Contacts', 'Deals']},
-  {name: 'Salesforce', isConnected: true, reads: ['Active customers', 'Open opportunities']},
-  {name: 'Snowflake', isConnected: true, reads: ['sales_history', 'inventory_daily']},
-];
 const appInfo = (name: string) => MCP_APPS.find(a => a.name === name);
 
 const INSTRUCTION_EXAMPLES: [string, string][] = [

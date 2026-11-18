@@ -50,6 +50,8 @@ export type WorkflowOverviewProps = {
   /** Called after the person confirms the delete. */
   onDelete: () => void;
   homeHref?: string;
+  /** A draft hasn't been turned on: the page says Draft and shows no next run. */
+  isDraft?: boolean;
 };
 
 /** Each column takes an equal share of the row, up to this width. Narrow screens stack the columns instead. */
@@ -70,6 +72,7 @@ type RunRow = WorkflowRun & Record<string, unknown>;
 export function WorkflowOverview({
   name, summary, schedule, nextRun, approvers, sendTo, columns, onOpenStage, runs, editHref, onRunNow, onDelete,
   homeHref = '#home',
+  isDraft = false,
 }: WorkflowOverviewProps) {
   const isVertical = useMediaQuery('(max-width: 900px)');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -107,10 +110,10 @@ export function WorkflowOverview({
               <VStack gap={1.5}>
                 <HStack gap={3} vAlign="center" wrap="wrap">
                   <HStack gap={1.5} vAlign="center">
-                    <StatusDot variant="success" label="On" />
-                    <Text type="supporting" weight="medium">On</Text>
+                    <StatusDot variant={isDraft ? 'neutral' : 'success'} label={isDraft ? 'Draft' : 'On'} />
+                    <Text type="supporting" weight="medium">{isDraft ? 'Draft' : 'On'}</Text>
                   </HStack>
-                  <Text type="supporting">{`Next run: ${nextRun}`}</Text>
+                  <Text type="supporting">{isDraft ? 'Not turned on yet' : `Next run: ${nextRun}`}</Text>
                 </HStack>
                 <Heading level={1}>{name}</Heading>
                 <Text type="supporting">{summary}</Text>
@@ -136,7 +139,7 @@ export function WorkflowOverview({
                 {runs.length ? (
                   <Table data={runs as RunRow[]} columns={runColumns} idKey="period" density="balanced" />
                 ) : (
-                  <EmptyState isCompact title="No runs yet" description={`The first run is ${nextRun}.`} />
+                  <EmptyState isCompact title="No runs yet" description={isDraft ? 'It runs once it’s turned on.' : `The first run is ${nextRun}.`} />
                 )}
               </VStack>
             </Card>

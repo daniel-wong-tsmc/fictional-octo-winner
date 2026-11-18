@@ -9,7 +9,7 @@ export function shortDateTime(iso: string): string {
 }
 
 /** A workflow as Home's board needs it: its schedule, next run, page, and its last finished run. */
-export type BoardWorkflow = {key: string; name: string; schedule: string; nextRunAt: string; href: string; lastFinished?: string};
+export type BoardWorkflow = {key: string; name: string; schedule: string; nextRunAt: string; href: string; lastFinished?: string; isDraft?: boolean};
 
 const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
   needsApproval: 'needsApproval',
@@ -27,7 +27,9 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
   const next: WorkflowBoardItem[] = [...workflows]
     .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt))
     .map(w =>
-      w.schedule === SCHEDULES[3]
+      w.isDraft
+        ? {id: `next-${w.key}`, workflow: w.name, state: 'draft', href: w.href}
+        : w.schedule === SCHEDULES[3]
         ? {id: `next-${w.key}`, workflow: w.name, state: 'unscheduled', href: w.href}
         : {id: `next-${w.key}`, workflow: w.name, state: 'scheduled', schedule: w.schedule, at: shortDateTime(w.nextRunAt), href: w.href},
     );

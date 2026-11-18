@@ -7,7 +7,7 @@ export default {
   keywords: ['board', 'kanban', 'swimlanes', 'lanes', 'home board', 'to do', 'todo', 'runs', 'workflow runs', 'needs attention'],
   usage: {
     description:
-      'Home’s board of workflow runs in four lanes: To-run (with Scheduled and Unscheduled groups), Running, Needs attention and Done. Each lane shows its name and count; each card shows a status dot, the workflow name, one line ("Step 3 of 3 needs approval", or the schedule) and one time line ("Notified Nov 2, 08:30"). The board picks the lane and the wording from each card’s state, so runs from any workflow look the same. Needs attention holds everything that needs the person: approvals and missing data. Lanes sit side by side and stack on narrow screens; an empty lane says so.',
+      'Home’s board of workflow runs in four lanes: To-run (with Scheduled and Unscheduled groups; drafts that aren’t turned on sit in Unscheduled), Running, Needs attention and Done. Each lane shows its name and count; each card shows a status dot, the workflow name, one line ("Step 3 of 3 needs approval", or the schedule) and one time line ("Notified Nov 2, 08:30"). The board picks the lane and the wording from each card’s state, so runs from any workflow look the same. Needs attention holds everything that needs the person: approvals and missing data. Lanes sit side by side and stack on narrow screens; an empty lane says so.',
     bestPractices: [
       {guidance: true, description: 'Work out each item’s state, step and time from its ticket or workflow, not from typed text.'},
       {guidance: true, description: 'Link each card with href: a ticket for runs that need the person, the workflow page otherwise.'},

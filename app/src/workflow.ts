@@ -28,6 +28,8 @@ export type Workflow = {
   nextRun: string;
   /** The next run as an ISO date and time, for Home's board. */
   nextRunAt: string;
+  /** A draft hasn't been turned on: it has a schedule but doesn't run yet. */
+  isDraft?: boolean;
   approver: string;
   destinations: string[];
   /** File type of what the last step passes on, such as Excel sheet. */
@@ -117,8 +119,8 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       name: 'Combine orders and refunds',
       does: 'Combine this week’s orders with this week’s refunds into net orders, keeping each order’s currency.',
       inputs: [
-        {source: 'Weekly orders import', reads: 'Orders this week', status: 'handoff'},
-        {source: 'Shopify', reads: 'Refunds, last month', status: 'connected'},
+        {source: 'SharePoint', reads: 'Orders this week.xlsx', status: 'connected'},
+        {source: 'Shopify', reads: 'Refunds this week', status: 'connected'},
       ],
       output: 'Net orders',
       status: 'stopped',
@@ -162,18 +164,85 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   ],
 };
 
+export const CUSTOMER_CHURN_LIST: Workflow = {
+  id: 3,
+  name: 'Customer churn list',
+  description: 'Flags customers who may leave, groups them by account owner, and sends each owner their list. A draft: it runs once you try it and turn it on.',
+  schedule: SCHEDULES[1],
+  nextRun: 'Not turned on yet',
+  nextRunAt: '',
+  isDraft: true,
+  approver: PEOPLE[2],
+  destinations: ['Email: Marco Ruiz'],
+  outputFormat: 'Excel sheet',
+  steps: [
+    {
+      id: 'c1',
+      name: 'Collect customer activity',
+      does: 'Pull every active customer with their account owner, last order date and plan.',
+      inputs: [{source: 'Salesforce', reads: 'Active customers', status: 'connected'}],
+      output: 'Active customers',
+      status: 'draft',
+      trialResult: '2,310 customers',
+    },
+    {
+      id: 'c2',
+      name: 'Flag customers at risk',
+      does: 'Flag customers with no order in 60 days, or 3 or more support tickets in 90 days, and say which rule they hit.',
+      inputs: [{source: 'Zendesk', reads: 'Support tickets, 90 days', status: 'connected'}],
+      output: 'Customers at risk',
+      status: 'draft',
+      trialResult: '148 customers flagged',
+      ticketId: 4,
+    },
+    {
+      id: 'c3',
+      name: 'Group by account owner',
+      does: 'Split the flagged customers into one list per account owner.',
+      inputs: [],
+      output: 'Lists by owner',
+      status: 'draft',
+      trialResult: '6 owners',
+    },
+    {
+      id: 'c4',
+      name: 'Send to account owners',
+      does: 'Write each owner a short summary of their at-risk customers with the list attached.',
+      inputs: [],
+      output: 'Owner emails',
+      status: 'draft',
+      trialResult: '6 emails drafted',
+    },
+  ],
+  uses: [],
+  shares: [],
+  runs: [],
+};
+
 /** Workflows that come with the prototype, in sidebar order. Built workflows are numbered after these. */
-export const PREFILLED_WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE, WEEKLY_REVENUE_REPORT];
+export const PREFILLED_WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE, WEEKLY_REVENUE_REPORT, CUSTOMER_CHURN_LIST];
+
+/**
+ * Apps the workspace admin has connected through MCP. Workflow inputs, tickets and the board's Input tiles
+ * all read from this list, so an app is named and shown connected the same way everywhere.
+ */
+export const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
+  {name: 'Google Drive', isConnected: true, reads: ['FY26 targets.xlsx', 'Finance close pack (folder)']},
+  {name: 'SharePoint', isConnected: true, reads: ['Orders this week.xlsx', 'stock_levels.xlsx', 'Close archive (folder)']},
+  {name: 'Shopify', isConnected: true, reads: ['Orders, last month', 'Refunds this week']},
+  {name: 'ECB exchange rates', isConnected: true, reads: ['Daily rates']},
+  {name: 'Salesforce', isConnected: true, reads: ['Active customers', 'Open opportunities']},
+  {name: 'Zendesk', isConnected: true, reads: ['Support tickets, 90 days']},
+  {name: 'Snowflake', isConnected: true, reads: ['sales_history', 'inventory_daily']},
+  {name: 'HubSpot', isConnected: false, reads: ['Contacts', 'Deals']},
+];
 
 /**
  * The steps of every workflow, in order. A task's "Step X of Y" is counted from here, so no ticket
- * carries a typed position. Prefilled workflows read their own steps; the others are example workflows.
+ * carries a typed position. Only real workflows are listed; a ticket for any other workflow is a data problem.
  */
 export const STEP_LISTS: Record<string, string[]> = {
   ...Object.fromEntries(PREFILLED_WORKFLOWS.map(w => [w.name, w.steps.map(s => s.name)])),
-  'Customer churn list': ['Collect customer activity', 'Flag customers at risk', 'Group by account owner', 'Send to account owners'],
-  'Inventory snapshot': ['Find low-stock items', 'Share low-stock list'],
-  'Q1 forecast': ['Collect sales history', 'Forecast assumptions', 'Build the Q1 forecast'],
 };
 
 /** Where a step sits in its workflow, or null when the workflow or step isn't on record. */

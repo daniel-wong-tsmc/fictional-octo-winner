@@ -110,6 +110,7 @@ export default function App() {
       nextRunAt: p.workflow.nextRunAt,
       href: `#workflow-${p.workflow.id}`,
       lastFinished: p.workflow.runs.find(r => r.result === 'approved' || r.result === 'rerun')?.finished,
+      isDraft: p.workflow.isDraft,
     })),
     ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`})),
   ];

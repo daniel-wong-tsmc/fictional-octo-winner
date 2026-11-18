@@ -154,10 +154,4 @@ export const SEED_HANDOFFS: Handoff[] = [
     rule: {kind: 'sum', column: 'Gap'}, value: '-137,200', check: 'notEmpty',
     usedBy: ['Google Drive: Finance close pack'],
   },
-  {
-    id: 'h-low-stock', name: 'Low-stock item count', ticketId: 5, workflow: 'Inventory snapshot',
-    rule: {kind: 'count'}, value: '41', check: 'fresh',
-    checkFailure: 'The stock data is 3 days old.',
-    usedBy: ['Q1 forecast'],
-  },
 ];

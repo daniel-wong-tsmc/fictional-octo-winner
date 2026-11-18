@@ -58,7 +58,7 @@ export type Ticket = {
   isDraft?: boolean;
 };
 
-export const TASKS: Task[] = [{id: 3, ticketId: 3}, {id: 1, ticketId: 1}, {id: 4, ticketId: 4}];
+export const TASKS: Task[] = [{id: 3, ticketId: 3}, {id: 1, ticketId: 1}];
 
 const ORDERS_USD: Sheet = {
   kind: 'Output',
@@ -80,19 +80,14 @@ const NET_ORDERS: Sheet = {
   columns: ORDERS_USD.columns!.slice(0, 5),
   rows: ORDERS_USD.rows!.map(r => r.slice(0, 5)),
 };
-const LOW_STOCK: Sheet = {
-  kind: 'Output',
-  columns: ['SKU', 'Item', 'On hand', 'Reorder point'],
-  rows: [['SKU-1107', 'Hinge set, matte', '140', '300'], ['SKU-1301', 'Wall anchors, M6', '90', '250']],
-};
 
 export const TICKETS: Record<number, Ticket> = {
   1: {
     workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Stopped Nov 16 at 09:12', finishedAt: '2026-11-16T09:12',
     banner: {status: 'error', title: 'The run stopped.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
     inputs: [
-      {name: 'Orders this week', source: ['workflow', 'From workflow: Weekly orders import'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
-      {name: 'Refunds this week', source: ['file', 'Uploaded: refunds_wk46.xlsx'], stats: ['63 rows', '3 columns', 'Uploaded Mon'], sheet: 'Refunds'},
+      {name: 'Orders this week', source: ['connection', 'From connection: SharePoint, Orders this week.xlsx'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
+      {name: 'Refunds this week', source: ['connection', 'From connection: Shopify, Refunds this week'], stats: ['63 rows', '3 columns', 'Synced Mon'], sheet: 'Refunds'},
     ],
     instructions: "Combine this week's orders with refunds. Subtract each refund from its order using the order number. Keep the currency of each order so the next step can convert it to USD.",
     agentSummary: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Stopped before writing the output: no Currency column to carry forward'],
@@ -108,7 +103,7 @@ export const TICKETS: Record<number, Ticket> = {
     },
   },
   2: {
-    workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'review', ran: 'Agent finished 40 min ago',
+    workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'done', ran: 'Approved Nov 9 by Daniel', finishedAt: '2026-11-09T10:05',
     inputs: [
       {name: 'Net orders', source: ['step', 'From step: Combine orders and refunds'], stats: ['1,221 rows', '5 columns', "Last week's run"], sheet: 'Net orders'},
       {name: 'Exchange rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['Daily rates', 'Updated today 06:00'], sheet: 'Exchange rates'},
@@ -116,13 +111,12 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Convert every order amount to US dollars using the exchange rate on the order date. If there's no rate for that day, use the most recent earlier rate. Round to 2 decimals.",
     agentSummary: ["Looked up the rate for each order's currency and date", "Used Friday's rate for 37 weekend orders", 'Added one new column: Amount (USD)'],
     python: `orders = read_sheet("Net orders").sort_values("Date")\nrates = read_sheet("Exchange rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency",\n                    direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
-    outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#home'], ['workflow', 'Monthly sales close', '#ticket-3']], sheet: 'Orders in USD'}],
+    outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#workflow-2'], ['workflow', 'Monthly sales close', '#workflow-1']], sheet: 'Orders in USD'}],
     sheets: {
       'Net orders': NET_ORDERS,
       'Exchange rates': {kind: 'Input', columns: ['Date', 'Currency', 'Rate to USD'], rows: [['2026-11-06', 'EUR', '1.0832'], ['2026-11-06', 'GBP', '1.2915'], ['2026-11-09', 'EUR', '1.0841'], ['2026-11-09', 'JPY', '0.00662'], ['2026-11-10', 'CAD', '0.7271'], ['2026-11-11', 'GBP', '1.2930'], ['2026-11-12', 'EUR', '1.0866']]},
       'Orders in USD': ORDERS_USD,
     },
-    canApprove: true,
   },
   3: {
     workflow: 'Monthly sales close', step: 'Sales summary for Finance', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
@@ -152,7 +146,7 @@ export const TICKETS: Record<number, Ticket> = {
     ],
     instructions: "Flag customers who haven't ordered in 60 days, or who opened 3 or more support tickets in the last 90 days. Add a column that says which rule they hit.",
     python: '# The agent writes this after the first run.',
-    outputs: [{name: 'Customers at risk', emptyNote: 'Not produced yet. Run the step to see the result here.', feedsInto: [['step', 'Weekly retention email', '#home']], sheet: 'Customers at risk'}],
+    outputs: [{name: 'Customers at risk', emptyNote: 'Not produced yet. Run the step to see the result here.', feedsInto: [['step', 'Group by account owner', '#workflow-3']], sheet: 'Customers at risk'}],
     sheets: {
       'Active customers': {kind: 'Input', columns: ['Customer', 'Account owner', 'Last order', 'Plan'], rows: [['Lindqvist AB', 'M. Okafor', '2026-11-02', 'Pro'], ['Tanaka Trading', 'J. Weiss', '2026-08-21', 'Team'], ['Harper & Cole', 'M. Okafor', '2026-10-30', 'Pro'], ['Maison Ferrand', 'A. Dubois', '2026-07-14', 'Starter'], ['Northpeak Ltd', 'J. Weiss', '2026-11-10', 'Team']]},
       'Support tickets': {kind: 'Input', columns: ['Ticket', 'Customer', 'Opened', 'Topic'], rows: [['ZD-9921', 'Tanaka Trading', '2026-10-03', 'Billing'], ['ZD-9988', 'Tanaka Trading', '2026-10-19', 'Login'], ['ZD-10102', 'Tanaka Trading', '2026-11-04', 'Billing'], ['ZD-10140', 'Harper & Cole', '2026-11-06', 'Export']]},
@@ -160,39 +154,7 @@ export const TICKETS: Record<number, Ticket> = {
     },
     isDraft: true,
   },
-  5: {
-    workflow: 'Inventory snapshot', step: 'Find low-stock items', status: 'stale', ran: 'Last ran Nov 11',
-    banner: {status: 'warning', title: 'Inventory data is 3 days old.', description: "The stock file in SharePoint hasn't changed since Nov 11. Two of your reports use this output."},
-    inputs: [{name: 'Warehouse stock', source: ['connection', 'From connection: SharePoint, stock_levels.xlsx'], stats: ['1,940 rows', '4 columns'], warning: 'Last updated Nov 11', isWarningStale: true, sheet: 'Warehouse stock'}],
-    instructions: 'Take the latest stock file and keep only items where stock on hand is below the reorder point.',
-    agentSummary: ['Read the newest stock file', 'Kept 41 items below their reorder point'],
-    python: `stock = read_sheet("Warehouse stock")\nlow = stock[stock["On hand"] < stock["Reorder point"]]\nwrite_sheet("Low-stock items", low)`,
-    outputs: [{name: 'Low-stock items', stats: ['41 rows', '4 columns', 'From Nov 11 data'], feedsInto: [['workflow', 'Q1 forecast', '#ticket-6'], ['file', 'Weekly ops report', '#home']], sheet: 'Low-stock items'}],
-    sheets: {
-      'Warehouse stock': {kind: 'Input', columns: ['SKU', 'Item', 'On hand', 'Reorder point'], rows: [['SKU-1102', 'Steel brackets, 40mm', '1,200', '800'], ['SKU-1107', 'Hinge set, matte', '140', '300'], ['SKU-1220', 'Cable ties, 200pk', '2,850', '1,000'], ['SKU-1301', 'Wall anchors, M6', '90', '250'], ['SKU-1315', 'Shelf pins', '4,400', '2,000']]},
-      'Low-stock items': LOW_STOCK,
-    },
-  },
-  6: {
-    workflow: 'Q1 forecast', step: 'Forecast assumptions', status: 'review', ran: 'Agent finished yesterday',
-    inputs: [
-      {name: 'Sales history, 24 months', source: ['connection', 'From connection: Snowflake'], stats: ['432 rows', '3 columns'], sheet: 'Sales history'},
-      {name: 'Low-stock items', source: ['workflow', 'From workflow: Inventory snapshot'], stats: ['41 rows'], warning: 'Upstream data is 3 days old', isWarningStale: true, sheet: 'Low-stock items'},
-      {name: 'Low-stock item count', sheet: '', handoffId: 'h-low-stock'},
-    ],
-    instructions: "Project Q1 unit sales per product line from the last 24 months with 4% growth. Flag lines where current stock won't cover the forecast.",
-    agentSummary: ['Averaged Q1 sales for 2025 and 2026 per product line', 'Applied 4% growth', 'Flagged 2 product lines short of stock'],
-    python: `hist = read_sheet("Sales history")\nq1 = hist[hist["Month"].str[-2:].isin(["01", "02", "03"])]\nbase = q1.groupby("Product line")["Units"].sum() / 2\nforecast = (base * 1.04).round().rename("Q1 forecast")`,
-    outputs: [{name: 'Q1 forecast by line', stats: ['18 rows', '4 columns'], feedsInto: [['file', 'Board pack', '#home']], sheet: 'Q1 forecast'}],
-    sheets: {
-      'Sales history': {kind: 'Input', columns: ['Month', 'Product line', 'Units'], rows: [['2026-01', 'Hardware', '18,420'], ['2026-02', 'Hardware', '16,980'], ['2026-03', 'Hardware', '19,310'], ['2026-01', 'Fasteners', '42,100'], ['2026-02', 'Fasteners', '39,870']]},
-      'Low-stock items': {...LOW_STOCK, kind: 'Input'},
-      'Q1 forecast': {kind: 'Output', columns: ['Product line', 'Q1 forecast', 'Stock on hand', 'Covered'], addedColumns: [1, 3], rows: [['Hardware', '56,330', '61,200', 'Yes'], ['Fasteners', '128,760', '104,500', 'No'], ['Anchors', '22,410', '18,900', 'No'], ['Shelving', '9,870', '14,300', 'Yes']]},
-    },
-    canApprove: true,
-  },
 };
-TICKETS[8] = {...TICKETS[3], step: 'Sales summary for Finance (September)', status: 'done', ran: 'Approved Mon by Daniel', canApprove: false};
 
 
 /** The condition of a ticket. Home's board turns it into a lane and wording. */
