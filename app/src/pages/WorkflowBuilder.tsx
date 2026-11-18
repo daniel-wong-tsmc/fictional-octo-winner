@@ -35,7 +35,7 @@ import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -49,14 +49,12 @@ type StepKind = 'input' | 'instructions' | 'output';
 /** source 'workflow' reads a value another workflow hands over: app is that workflow, resource the value. */
 type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | null; fileName: string; sheets: string[]; app: string; resource: string};
 /**
- * An LLM step. python is the code the AI wrote on its last run (empty until it runs); topP, temperature and
- * tools are its advanced settings.
+ * An LLM step. python is the code it runs: written by the AI on its last run (empty until it runs), or by the
+ * person when isCodeEdited. topP and temperature are its advanced settings.
  */
-type InstructionsStep = {kind: 'instructions'; name: string; text: string; python: string; topP: number; temperature: number; tools: string[]};
-/** Tools an LLM step can call while it works. */
-const TOOL_OPTIONS = ['Run Python code', 'Read connected apps', 'Search the web'];
-/** Settings a new LLM step starts with: low temperature, since these steps work on numbers. */
-const LLM_DEFAULTS = {python: '', topP: 1, temperature: 0.2, tools: ['Run Python code', 'Read connected apps']};
+type InstructionsStep = {kind: 'instructions'; name: string; text: string; python: string; isCodeEdited: boolean; topP: number; temperature: number};
+/** Settings a new LLM step starts with: no code yet, and low temperature, since these steps work on numbers. */
+const LLM_DEFAULTS = {python: '', isCodeEdited: false, topP: 1, temperature: 0.2};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
@@ -385,6 +383,60 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
   );
 }
 
+/**
+ * An LLM step's Python. It shows the code with an Edit button; editing swaps in a text box with Save code and
+ * Cancel. A step with no code yet can have code written by hand. Saved code is marked as edited by you.
+ */
+function PythonCode({code, isEdited, onSave}: {code: string; isEdited: boolean; onSave: (code: string) => void}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft !== null) {
+    return (
+      <VStack gap={2}>
+        <TextArea label="Python code" value={draft} onChange={setDraft} rows={12} hasSpellCheck={false} hasAutoFocus />
+        <HStack gap={2}>
+          <Button
+            label="Save code"
+            variant="primary"
+            size="sm"
+            isDisabled={draft === code}
+            onClick={() => {
+              onSave(draft);
+              setDraft(null);
+            }}
+          />
+          <Button label="Cancel" variant="ghost" size="sm" onClick={() => setDraft(null)} />
+        </HStack>
+        <Text type="supporting">Saved code runs instead of the AI’s on the next run.</Text>
+      </VStack>
+    );
+  }
+  return (
+    <VStack gap={1.5}>
+      <Text type="label">Python code</Text>
+      {code ? (
+        <>
+          <CodeBlock
+            code={code}
+            language="python"
+            width="100%"
+            size="sm"
+            isWrapped
+            endContent={<Button label="Edit" variant="ghost" size="sm" icon={<Icon icon={Pencil} />} onClick={() => setDraft(code)} />}
+          />
+          <Text type="supporting">{isEdited ? 'Edited by you. It runs instead of the AI’s code.' : 'Written by the AI on the last run.'}</Text>
+        </>
+      ) : (
+        <>
+          <Text type="supporting">No code yet. The AI writes it the first time this step runs.</Text>
+          <HStack>
+            <Button label="Write code yourself" variant="ghost" size="sm" icon={<Icon icon={Pencil} />} onClick={() => setDraft('')} />
+          </HStack>
+        </>
+      )}
+    </VStack>
+  );
+}
+
 /** The side panel for a selected section: which workflow it is, and how to open or remove it. */
 function SectionPanel({section, openHref, onOpen, onRemove}: {section: Section; openHref?: string; onOpen: (href: string) => void; onRemove: () => void}) {
   return (
@@ -436,7 +488,9 @@ function LinkedTiles({label, items, emptyText, onSelect}: {label: string; items:
  * The side panel for the selected tile: what flows in, its settings (for an LLM step, the agent's
  * instructions), what flows out, and its last run when it has a ticket.
  */
-function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onChange, onRemove, onSelect}: {
+function StepPanel({tileId, step, title, comesFrom, goesTo, run, trial, onOpenTrial, onChange, onRemove, onSelect}: {
+  /** The selected tile, so per-tile state such as a code edit in progress resets when the selection moves. */
+  tileId: string;
   step: Step | null;
   title: string;
   comesFrom: PanelLink[];
@@ -524,17 +578,12 @@ function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onC
           />
           <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text weight="medium">Advanced settings</Text>}>
             <VStack gap={4}>
-              <VStack gap={1.5}>
-                <Text type="label">Python code</Text>
-                {step.python ? (
-                  <>
-                    <CodeBlock code={step.python} language="python" width="100%" size="sm" isWrapped />
-                    <Text type="supporting">Written by the AI on the last run. Change the instructions above to change it.</Text>
-                  </>
-                ) : (
-                  <Text type="supporting">No code yet. The AI writes it the first time this step runs.</Text>
-                )}
-              </VStack>
+              <PythonCode
+                key={tileId}
+                code={step.python}
+                isEdited={step.isCodeEdited}
+                onSave={python => onChange({...step, python, isCodeEdited: true})}
+              />
               <VStack gap={1}>
                 <Slider label="top_p" value={step.topP} min={0} max={1} step={0.05} valueDisplay="text" formatValue={v => v.toFixed(2)} onChange={(topP: number) => onChange({...step, topP})} />
                 <Text type="supporting">How much of the likeliest wording the AI picks from. 1 uses all of it.</Text>
@@ -543,16 +592,6 @@ function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onC
                 <Slider label="Temperature" value={step.temperature} min={0} max={2} step={0.1} valueDisplay="text" formatValue={v => v.toFixed(1)} onChange={(temperature: number) => onChange({...step, temperature})} />
                 <Text type="supporting">Lower gives the same answer each run. Keep it low for numbers.</Text>
               </VStack>
-              <MultiSelector
-                label="Tool calls"
-                description="Tools the AI can call while it works on this step."
-                placeholder="No tools"
-                options={TOOL_OPTIONS.map(t => ({value: t, label: t}))}
-                value={step.tools}
-                onChange={tools => onChange({...step, tools})}
-                triggerDisplay="labels"
-                width="100%"
-              />
             </VStack>
           </Collapsible>
         </>
@@ -1450,6 +1489,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
     <SectionPanel section={selectedSection} openHref={sectionItem?.href} onOpen={leaveTo} onRemove={() => removeSection(selectedSection.id)} />
   ) : (
     <StepPanel
+      tileId={selectedId ?? ''}
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
       comesFrom={linkedTo(links.filter(l => l.target === selectedId).map(l => l.source))}

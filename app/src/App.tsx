@@ -99,6 +99,16 @@ export default function App() {
     ...built.map(w => ({key: `workflow-${w.id}`, name: w.name, href: `#workflow-edit-${w.id}`, saved: w.saved as SavedBoard, isCurrent: route === `workflow-edit-${w.id}`})),
   ];
 
+  // Each ticket's code as its workflow's saved board has it, so an edit on the board shows on the ticket too.
+  const ticketCode = new Map(
+    prefilled.flatMap(p =>
+      p.workflow.steps.flatMap(st => {
+        const node = p.saved.board.find(n => n.id === st.id);
+        return st.ticketId !== undefined && node?.step.kind === 'instructions' && node.step.python ? [[st.ticketId, node.step.python] as const] : [];
+      }),
+    ),
+  );
+
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
   // Home's board: every workflow's next and last run, and every task read from its ticket.
@@ -183,6 +193,7 @@ export default function App() {
         <TicketPage
           key={ticketId}
           id={ticketId}
+          code={ticketCode.get(ticketId)}
           handoffs={handoffs}
           onApprove={markApproved}
           onUndoApprove={tid => setApproved(prev => prev.filter(x => x !== tid))}

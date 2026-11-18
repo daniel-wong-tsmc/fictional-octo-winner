@@ -238,9 +238,11 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, handoffs, onApprove, onUndoApprove, onRemoveHandoff,
+  id, code, handoffs, onApprove, onUndoApprove, onRemoveHandoff,
 }: {
   id: number;
+  /** The step's current code from its workflow's saved board, so code edited on the board shows here too. */
+  code?: string;
   handoffs: Handoff[];
   onApprove: (id: number) => void;
   onUndoApprove: (id: number) => void;
@@ -443,7 +445,7 @@ export function TicketPage({
                     defaultIsOpen={false}
                     chevronPosition="start"
                     trigger={<Text type="supporting" weight="medium">Show the code</Text>}>
-                    <CodeBlock code={t.python} language="python" width="100%" size="sm" isWrapped />
+                    <CodeBlock code={code ?? t.python} language="python" width="100%" size="sm" isWrapped />
                   </Collapsible>
                 </VStack>
               </Region>
