@@ -26,10 +26,11 @@ import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
+import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Trash2, Upload} from 'lucide-react';
+import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Save, Trash2, Upload} from 'lucide-react';
 import {PEOPLE, type BuiltStage} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
@@ -714,6 +715,11 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(isEditing));
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
+  // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
+  const snapshot = (n: string, b: BoardNode[], l: Link[]) => JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l]);
+  const [original] = useState(() => snapshot(name, board, links));
+  const isDirty = snapshot(name, board, links) !== original;
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
@@ -958,6 +964,13 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   );
   const actions = (
     <HStack gap={2} wrap="wrap">
+      {editing && (
+        <Button
+          label="Cancel"
+          variant="ghost"
+          onClick={() => (isDirty ? setIsDiscarding(true) : (window.location.hash = editing.href.slice(1)))}
+        />
+      )}
       <Button
         label={trial === 'done' ? 'Try again' : 'Try on last month'}
         icon={<Icon icon={Play} />}
@@ -969,17 +982,31 @@ function Builder({editing, onTurnOn}: BuilderProps) {
           window.setTimeout(() => setTrial('done'), 1400);
         }}
       />
-      <Button
-        label="Turn on"
-        variant="primary"
-        icon={<Icon icon={Power} />}
-        isDisabled={!isTried || !allChecked}
-        tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
-        onClick={() => {
-          onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
-          toast({body: `${name.trim() || 'Untitled workflow'} is on. It runs on the first business day of each month.`});
-        }}
-      />
+      {isEditing ? (
+        <Button
+          label="Save changes"
+          variant="primary"
+          icon={<Icon icon={Save} />}
+          isDisabled={!isDirty || !allReady}
+          tooltip={!isDirty ? 'Nothing has changed yet' : !allReady ? 'Finish the tiles first' : undefined}
+          onClick={() => {
+            onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
+            toast({body: `Changes to ${name.trim() || 'Untitled workflow'} are saved.`});
+          }}
+        />
+      ) : (
+        <Button
+          label="Turn on"
+          variant="primary"
+          icon={<Icon icon={Power} />}
+          isDisabled={!isTried || !allChecked}
+          tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
+          onClick={() => {
+            onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
+            toast({body: `${name.trim() || 'Untitled workflow'} is on. It runs on the first business day of each month.`});
+          }}
+        />
+      )}
     </HStack>
   );
   // On a phone the name and the buttons stack, so neither gets cut off.
@@ -1023,6 +1050,20 @@ function Builder({editing, onTurnOn}: BuilderProps) {
           )
         }
       />
+      {editing && (
+        <AlertDialog
+          isOpen={isDiscarding}
+          onOpenChange={setIsDiscarding}
+          title="Discard your changes?"
+          description={`Your changes to ${editing.name} won’t be saved. The workflow stays as it was.`}
+          actionLabel="Discard changes"
+          cancelLabel="Keep editing"
+          onAction={() => {
+            setIsDiscarding(false);
+            window.location.hash = editing.href.slice(1);
+          }}
+        />
+      )}
       {viewing && isTried && (
         <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board, links)} onClose={() => setViewingId(null)} />
       )}
