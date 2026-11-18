@@ -104,6 +104,8 @@ export type BuiltStage = {
   detail: string;
   approver?: string;
   sendTo?: string[];
+  /** For inputs: the steps this input feeds. */
+  feeds?: string[];
 };
 
 export type BuiltWorkflow = {
@@ -114,4 +116,6 @@ export type BuiltWorkflow = {
   createdOn: string;
   /** Stages in run order. Each column runs after the one before it; stages in a column run side by side. */
   columns: BuiltStage[][];
+  /** The board it was built on, kept so Edit can reopen it. Opaque outside the builder. */
+  saved: unknown;
 };

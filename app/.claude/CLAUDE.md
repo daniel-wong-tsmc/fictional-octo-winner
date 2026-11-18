@@ -33,3 +33,7 @@ RULES:
   docs authoring     build an integration package, and every field it holds
   upgrade --from <old version> --apply   run after a dependency bump
 <!-- ASTRYX:END -->
+
+APP COMPONENTS (app/astryx-workflows, an Astryx integration installed as @workspace/astryx-workflows):
+- Every workflow page renders `WorkflowOverview` (`npx astryx component WorkflowOverview`). Map the workflow's data into its props; never build a workflow page by hand. Change the page for all workflows there, then update its .doc.mjs.
+- After changing it, run `cd astryx-workflows && ../node_modules/.bin/astryx integration check --strict` and `npx astryx doctor integration components @workspace/astryx-workflows`.

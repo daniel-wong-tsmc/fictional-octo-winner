@@ -659,7 +659,7 @@ function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
   const columns: BoardNode[][] = [];
   board.forEach(n => (columns[depth.get(n.id)!] ??= []).push(n));
   const count = {input: 0, instructions: 0, output: 0};
-  return columns
+  const stages = columns
     .filter(Boolean)
     .map(col =>
       [...col]
@@ -679,13 +679,27 @@ function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
           };
         }),
     );
+  // Say which step each input feeds, now that every tile has its label.
+  const labelOf = new Map(stages.flat().map(st => [st.id, st.label]));
+  return stages.map(col =>
+    col.map(st => {
+      const feeds = links.filter(l => l.source === st.id).map(l => labelOf.get(l.target)).filter(Boolean);
+      return st.kind === 'input' && feeds.length ? {...st, feeds: feeds as string[]} : st;
+    }),
+  );
 }
 
 /* ---------- Page ---------- */
 
-type TurnOn = (name: string, columns: BuiltStage[][]) => void;
+/** The board as it was when the workflow was turned on, so Edit can reopen it. */
+export type SavedBoard = {board: BoardNode[]; links: Link[]};
 
-export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: TurnOn}) {
+type TurnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => void;
+/** The workflow being edited: its name, its page, and its saved board when it was built here. */
+export type Editing = {name: string; href: string; saved?: SavedBoard};
+type BuilderProps = {editing?: Editing; onTurnOn: TurnOn};
+
+export function WorkflowBuilderPage(props: BuilderProps) {
   return (
     <ReactFlowProvider>
       <Builder {...props} />
@@ -693,14 +707,15 @@ export function WorkflowBuilderPage(props: {isEditing: boolean; onTurnOn: TurnOn
   );
 }
 
-function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: TurnOn}) {
+function Builder({editing, onTurnOn}: BuilderProps) {
+  const isEditing = !!editing;
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const isPhone = useMediaQuery('(max-width: 640px)');
-  const [name, setName] = useState(isEditing ? 'Monthly sales close' : 'Untitled workflow');
-  const [board, setBoard] = useState<BoardNode[]>(() => startingBoard(isEditing));
-  const [links, setLinks] = useState<Link[]>(() => startingLinks(board));
+  const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
+  const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(isEditing));
+  const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
@@ -941,7 +956,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: TurnOn}) 
     <VStack gap={1}>
       <Breadcrumbs>
         <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-        {isEditing && <BreadcrumbItem href="#workflow-1">Monthly sales close</BreadcrumbItem>}
+        {editing && <BreadcrumbItem href={editing.href}>{editing.name}</BreadcrumbItem>}
         <BreadcrumbItem isCurrent>{isEditing ? 'Edit' : 'New workflow'}</BreadcrumbItem>
       </Breadcrumbs>
       <TextInput label="Workflow name" isLabelHidden value={name} onChange={setName} width={isPhone ? '100%' : 320} />
@@ -967,7 +982,7 @@ function Builder({isEditing, onTurnOn}: {isEditing: boolean; onTurnOn: TurnOn}) 
         isDisabled={!isTried || !allChecked}
         tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
         onClick={() => {
-          onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links));
+          onTurnOn(name.trim() || 'Untitled workflow', toColumns(board, links), {board, links});
           toast({body: `${name.trim() || 'Untitled workflow'} is on. It runs on the first business day of each month.`});
         }}
       />

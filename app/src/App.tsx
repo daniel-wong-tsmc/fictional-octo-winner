@@ -14,7 +14,7 @@ import {TicketPage} from './pages/TicketPage';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
 import {SCHEDULES, MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
-import {WorkflowBuilderPage} from './pages/WorkflowBuilder';
+import {WorkflowBuilderPage, type SavedBoard} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
   const read = () => window.location.hash.slice(1) || 'home';
@@ -37,10 +37,18 @@ export default function App() {
   const toast = useToast();
   const builtMatch = route.match(/^workflow-(\d+)$/);
   const openBuilt = builtMatch ? built.find(w => w.id === Number(builtMatch[1])) ?? null : null;
+  const editMatch = route.match(/^workflow-edit-(\d+)$/);
+  const editingBuilt = editMatch ? built.find(w => w.id === Number(editMatch[1])) ?? null : null;
 
-  const turnOn = (name: string, columns: BuiltStage[][]) => {
+  const turnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => {
+    if (editingBuilt) {
+      setBuilt(prev => prev.map(w => (w.id === editingBuilt.id ? {...w, name, columns, saved} : w)));
+      window.location.hash = `workflow-${editingBuilt.id}`;
+      return;
+    }
     const id = Math.max(1, ...built.map(w => w.id)) + 1;
-    setBuilt(prev => [...prev, {id, name, columns, schedule: SCHEDULES[0], nextRun: MONTHLY_SALES_CLOSE.nextRun, createdOn: 'November 17'}]);
+    const createdOn = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric'});
+    setBuilt(prev => [...prev, {id, name, columns, saved, schedule: SCHEDULES[0], nextRun: MONTHLY_SALES_CLOSE.nextRun, createdOn}]);
     window.location.hash = `workflow-${id}`;
   };
   const deleteBuilt = (w: BuiltWorkflow) => {
@@ -96,7 +104,7 @@ export default function App() {
                 <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
               )}
               {built.map(w => (
-                <SideNavItem key={w.id} label={w.name} href={`#workflow-${w.id}`} isSelected={route === `workflow-${w.id}`} />
+                <SideNavItem key={w.id} label={w.name} href={`#workflow-${w.id}`} isSelected={route === `workflow-${w.id}` || route === `workflow-edit-${w.id}`} />
               ))}
               <SideNavItem label="New workflow" icon={Plus} href="#workflow-new" isSelected={route === 'workflow-new'} />
             </SideNavItem>
@@ -113,11 +121,15 @@ export default function App() {
           onAddHandoff={h => setHandoffs(prev => [...prev, h])}
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />
-      ) : route === 'workflow-new' || route === 'workflow-edit' ? (
+      ) : route === 'workflow-new' || route === 'workflow-edit' || editingBuilt ? (
         <WorkflowBuilderPage
           key={route}
-          isEditing={route === 'workflow-edit'}
-          onTurnOn={(name, columns) => (route === 'workflow-edit' ? (window.location.hash = 'workflow-1') : turnOn(name, columns))}
+          editing={
+            editingBuilt
+              ? {name: editingBuilt.name, href: `#workflow-${editingBuilt.id}`, saved: editingBuilt.saved as SavedBoard}
+              : route === 'workflow-edit' ? {name: MONTHLY_SALES_CLOSE.name, href: '#workflow-1'} : undefined
+          }
+          onTurnOn={(name, columns, saved) => (route === 'workflow-edit' ? (window.location.hash = 'workflow-1') : turnOn(name, columns, saved))}
         />
       ) : route === 'workflow-1' && hasSalesClose ? (
         <LiveWorkflowPage handoffs={handoffs} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />

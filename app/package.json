@@ -14,6 +14,7 @@
     "@astryxdesign/core": "^0.7.15",
     "@astryxdesign/theme-neutral": "^0.7.15",
     "@stylexjs/stylex": "^0.19.2",
+    "@workspace/astryx-workflows": "file:astryx-workflows",
     "@xyflow/react": "^12.3.6",
     "lucide-react": "^1.72.0",
     "react": "^19.3.1",

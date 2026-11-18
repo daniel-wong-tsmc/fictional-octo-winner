@@ -1,0 +1,15 @@
+{
+  "name": "@workspace/astryx-workflows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Workflow components for this app, added to Astryx as an integration.",
+  "exports": {
+    "./components/WorkflowOverview": "./components/WorkflowOverview.tsx"
+  },
+  "peerDependencies": {
+    "@astryxdesign/core": "^0.7.15",
+    "react": "^19.0.0",
+    "lucide-react": "^1.0.0"
+  }
+}

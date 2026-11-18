@@ -1,28 +1,21 @@
 import {useState} from 'react';
-import {Layout, LayoutContent, LayoutFooter, LayoutHeader} from '@astryxdesign/core/Layout';
+import {Layout, LayoutContent, LayoutFooter} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
-import {Grid} from '@astryxdesign/core/Grid';
-import {Heading, Text} from '@astryxdesign/core/Text';
+import {Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
-import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
-import {Card} from '@astryxdesign/core/Card';
 import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
-import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
-import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
-import {AlertDialog} from '@astryxdesign/core/AlertDialog';
-import {EmptyState} from '@astryxdesign/core/EmptyState';
-import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {Icon} from '@astryxdesign/core/Icon';
-import {Divider} from '@astryxdesign/core/Divider';
 import {useToast} from '@astryxdesign/core/Toast';
-import {ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Database, Pencil, Play, Send, Trash2, UserCheck, WandSparkles} from 'lucide-react';
-import {MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow, type WorkflowStep} from '../workflow';
+import {ArrowRight} from 'lucide-react';
+import {
+  WorkflowOverview, type WorkflowStage, type WorkflowTone,
+} from '@workspace/astryx-workflows/components/WorkflowOverview';
+import {MONTHLY_SALES_CLOSE, type BuiltWorkflow, type StepRunStatus, type WorkflowStep} from '../workflow';
 import type {Handoff} from '../handoffs';
-import {FlowChart} from './FlowChart';
 
 const SOURCE_LABEL = {
   connected: {dot: 'success', label: 'Connected'},
@@ -117,282 +110,117 @@ function StepDialog({step, index, isEditable, onClose, onSave}: {
   );
 }
 
-/* ---------- Delete ---------- */
+/* ---------- Workflow pages ----------
+ * Every workflow page is the WorkflowOverview component from the app's Astryx integration
+ * (app/astryx-workflows). These functions only map a workflow's data into its props.
+ */
 
-/** Asks before deleting, since a deleted workflow stops running and can't be brought back. */
-function DeleteWorkflowButton({name, onDelete}: {name: string; onDelete: () => void}) {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <>
-      <Button label="Delete workflow" variant="ghost" icon={<Icon icon={Trash2} />} onClick={() => setIsOpen(true)} />
-      <AlertDialog
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        title={`Delete ${name}?`}
-        description="It stops running and is removed for everyone. Its open tasks leave Home. Past outputs that were already sent stay where they went."
-        actionLabel="Delete workflow"
-        onAction={() => {
-          setIsOpen(false);
-          onDelete();
-        }}
-      />
-    </>
-  );
-}
-
-/* ---------- Live ---------- */
-
-type RunRow = Record<string, unknown> & {period: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string};
+const STEP_STATUS: Record<StepRunStatus, {tone: WorkflowTone; label: string}> = {
+  done: {tone: 'success', label: 'Done'},
+  review: {tone: 'info', label: 'Needs your OK'},
+  waiting: {tone: 'warning', label: 'Waiting'},
+  draft: {tone: 'neutral', label: 'Draft'},
+};
+const NOT_RUN = {tone: 'neutral' as const, label: 'Not run yet'};
+const RUN_TONE = {review: 'info', approved: 'success', rerun: 'success'} as const;
+const runNow = (toast: ReturnType<typeof useToast>) => () => toast({body: 'Preview only. Running a workflow comes with the real build.'});
+const handoffDetail = (h: Handoff) => `${h.value ?? ''} · used by ${h.usedBy.length ? h.usedBy.join(', ') : 'nothing yet'}`;
 
 export function LiveWorkflowPage({handoffs, isStep3Approved, onDelete}: {handoffs: Handoff[]; isStep3Approved: boolean; onDelete: () => void}) {
   const toast = useToast();
   const w = MONTHLY_SALES_CLOSE;
   const steps = w.steps.map(s => (s.ticketId === 3 && isStep3Approved ? {...s, status: 'done' as const} : s));
   const [openStep, setOpenStep] = useState<number | null>(null);
-  const uses = handoffs.filter(h => w.uses.includes(h.id));
-  const shares = handoffs.filter(h => h.workflow === w.name);
-  const runs: RunRow[] = w.runs.map(r => (r.result === 'review' && isStep3Approved ? {...r, result: 'approved', detail: 'Approved by Daniel'} : r));
-  const columns: TableColumn<RunRow>[] = [
-    {key: 'period', header: 'Month', renderCell: r => <Text weight="medium">{r.period}</Text>},
-    {
-      key: 'result',
-      header: 'Result',
-      renderCell: r => (
-        <HStack gap={1.5} vAlign="center">
-          <StatusDot variant={r.result === 'review' ? 'info' : 'success'} label={r.detail} />
-          <Text>{r.detail}</Text>
-        </HStack>
-      ),
-    },
-    {key: 'finished', header: 'Finished', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.finished}</Text>},
-  ];
 
-  return (
-    <Layout
-      height="fill"
-      contentWidth={1240}
-      header={
-        <LayoutHeader hasDivider padding={4}>
-          <Breadcrumbs>
-            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            <BreadcrumbItem isCurrent>{w.name}</BreadcrumbItem>
-          </Breadcrumbs>
-        </LayoutHeader>
-      }
-      content={
-        <LayoutContent padding={6}>
-          <VStack gap={6}>
-            <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
-              <VStack gap={1.5}>
-                <HStack gap={3} vAlign="center" wrap="wrap">
-                  <HStack gap={1.5} vAlign="center">
-                    <StatusDot variant="success" label="On" />
-                    <Text type="supporting" weight="medium">On</Text>
-                  </HStack>
-                  <Text type="supporting">{`Next run: ${w.nextRun}`}</Text>
-                </HStack>
-                <Heading level={1}>{w.name}</Heading>
-                <Text type="supporting">{w.description}</Text>
-              </VStack>
-              <HStack gap={2} wrap="wrap">
-                <Button label="Run now" icon={<Icon icon={Play} />} onClick={() => toast({body: 'Preview only. Running a workflow comes with the real build.'})} />
-                <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href="#workflow-edit" />
-                <DeleteWorkflowButton name={w.name} onDelete={onDelete} />
-              </HStack>
-            </HStack>
-
-            <MetadataList orientation="horizontal">
-              <MetadataListItem label="Starts" icon={<Icon icon={CalendarClock} size="sm" />}>{w.schedule}</MetadataListItem>
-              <MetadataListItem label="Needs an OK from" icon={<Icon icon={UserCheck} size="sm" />}>{w.approver}</MetadataListItem>
-              <MetadataListItem label="Sends to" icon={<Icon icon={Send} size="sm" />}>{w.destinations.join(', ')}</MetadataListItem>
-            </MetadataList>
-
-            <VStack gap={2}>
-              <VStack gap={0.5}>
-                <Text type="label">How it runs</Text>
-                <Text type="supporting">This month’s run. Click a step to see it; the step waiting for you opens its ticket.</Text>
-              </VStack>
-              <FlowChart
-                steps={steps}
-                mode="live"
-                schedule={w.schedule}
-                approver={w.approver}
-                destinations={w.destinations}
-                onOpenStep={s => {
-                  if (s.ticketId) window.location.hash = `ticket-${s.ticketId}`;
-                  else setOpenStep(steps.findIndex(x => x.id === s.id));
-                }}
-              />
-            </VStack>
-
-            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
-              <Card padding={4}>
-                <List header={<Text type="label">Uses from other workflows</Text>} hasDividers edge="outset">
-                  {uses.map(h => (
-                    <ListItem
-                      key={h.id}
-                      startContent={<Icon icon={ArrowRightLeft} size="sm" color="secondary" />}
-                      label={<Text weight="medium">{h.name}</Text>}
-                      description={`From ${h.workflow} · ${h.value ?? ''}`}
-                    />
-                  ))}
-                </List>
-              </Card>
-              <Card padding={4}>
-                <List header={<Text type="label">Shares with other workflows</Text>} hasDividers edge="outset">
-                  {shares.length ? (
-                    shares.map(h => (
-                      <ListItem
-                        key={h.id}
-                        startContent={<Icon icon={ArrowRightLeft} size="sm" color="secondary" />}
-                        label={<Text weight="medium">{h.name}</Text>}
-                        description={`${h.value ?? ''} · used by ${h.usedBy.length ? h.usedBy.join(', ') : 'nothing yet'}`}
-                      />
-                    ))
-                  ) : (
-                    <ListItem label={<Text type="supporting">Nothing shared yet. Add a handoff from a step’s output sheet.</Text>} />
-                  )}
-                </List>
-              </Card>
-            </Grid>
-
-            <Card padding={0}>
-              <VStack>
-                <HStack padding={4}>
-                  <Text type="label">Recent runs</Text>
-                </HStack>
-                <Table data={runs} columns={columns} idKey="period" density="balanced" />
-              </VStack>
-            </Card>
-          </VStack>
-          {openStep !== null && (
-            <StepDialog key={openStep} step={steps[openStep]} index={openStep} isEditable={false} onClose={() => setOpenStep(null)} />
-          )}
-        </LayoutContent>
-      }
-    />
+  // Inputs first, then each step, then where the result goes: the same order a board-built workflow uses.
+  const inputs: WorkflowStage[] = steps.flatMap((s, i) =>
+    s.inputs.map((input, k) => ({
+      id: `${s.id}-in-${k}`, kind: 'input' as const, label: '', title: input.label, detail: input.detail,
+      notes: [`Goes to Step ${i + 1}`],
+      status: input.status === 'handoff' ? {tone: 'info' as const, label: 'From a workflow'} : input.status === 'needsConnection' ? {tone: 'warning' as const, label: 'Not connected'} : {tone: 'success' as const, label: 'Connected'},
+    })),
+  ).map((st, i) => ({...st, label: `Input ${i + 1}`}));
+  const stepStages: WorkflowStage[][] = steps.map((s, i) => [
+    {id: s.id, kind: 'step', label: `Step ${i + 1}`, title: s.name, detail: s.does, notes: [`Makes: ${s.output}`], status: STEP_STATUS[s.status]},
+  ]);
+  const last = steps[steps.length - 1];
+  const output: WorkflowStage = {
+    id: 'out', kind: 'output', label: 'Pass on to', title: last.output, detail: 'Excel sheet',
+    notes: [`Waits for an OK from ${w.approver}`, `Goes to ${w.destinations.join(', ')}`],
+    status: isStep3Approved ? {tone: 'success', label: 'Sent'} : {tone: 'info', label: 'Waiting for OK'},
+  };
+  const runs = w.runs.map(r =>
+    r.result === 'review' && isStep3Approved
+      ? {period: r.period, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
+      : {period: r.period, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished},
   );
-}
 
-/* ---------- A workflow built on the board ---------- */
-
-const STAGE_ICON = {input: Database, instructions: WandSparkles, output: Send} as const;
-
-function StageCard({stage}: {stage: BuiltStage}) {
   return (
-    <Card padding={3} width="100%">
-      <VStack gap={2}>
-        <HStack gap={1.5} vAlign="center">
-          <Icon icon={STAGE_ICON[stage.kind]} size="sm" color="secondary" />
-          <Text type="supporting">{stage.label}</Text>
-        </HStack>
-        {stage.kind !== 'instructions' && <Text weight="semibold">{stage.title}</Text>}
-        <Text type={stage.kind === 'instructions' ? 'body' : 'supporting'}>{stage.detail}</Text>
-        {stage.kind === 'output' && (
-          <>
-            <Divider />
-            <Text type="supporting">{stage.approver ? `Waits for an OK from ${stage.approver}` : 'Goes out without an OK'}</Text>
-            <Text type="supporting">{`Goes to ${stage.sendTo?.length ? stage.sendTo.join(', ') : 'nobody yet'}`}</Text>
-          </>
-        )}
-      </VStack>
-    </Card>
+    <>
+      <WorkflowOverview
+        name={w.name}
+        summary={w.description}
+        schedule={w.schedule}
+        nextRun={w.nextRun}
+        approvers={[w.approver]}
+        sendTo={w.destinations}
+        columns={[inputs, ...stepStages, [output]]}
+        onOpenStage={st => {
+          const step = steps.find(s => s.id === st.id);
+          if (step?.ticketId) window.location.hash = `ticket-${step.ticketId}`;
+          else if (step) setOpenStep(steps.indexOf(step));
+          else if (st.kind === 'output') window.location.hash = 'ticket-3';
+        }}
+        uses={handoffs.filter(h => w.uses.includes(h.id)).map(h => ({id: h.id, name: h.name, detail: `From ${h.workflow} · ${h.value ?? ''}`}))}
+        shares={handoffs.filter(h => h.workflow === w.name).map(h => ({id: h.id, name: h.name, detail: handoffDetail(h)}))}
+        runs={runs}
+        editHref="#workflow-edit"
+        onRunNow={runNow(toast)}
+        onDelete={onDelete}
+      />
+      {openStep !== null && (
+        <StepDialog key={openStep} step={steps[openStep]} index={openStep} isEditable={false} onClose={() => setOpenStep(null)} />
+      )}
+    </>
   );
 }
 
 export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkflow; onDelete: () => void}) {
   const toast = useToast();
-  const isVertical = useMediaQuery('(max-width: 900px)');
   const stages = w.columns.flat();
   const outputs = stages.filter(s => s.kind === 'output');
-  const approvers = [...new Set(outputs.map(o => o.approver).filter(Boolean))] as string[];
-  const sendTo = [...new Set(outputs.flatMap(o => o.sendTo ?? []))];
-  const count = (k: BuiltStage['kind']) => stages.filter(s => s.kind === k).length;
+  const count = (k: string) => stages.filter(s => s.kind === k).length;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const columns: WorkflowStage[][] = w.columns.map(col =>
+    col.map(st => ({
+      id: st.id,
+      kind: st.kind === 'instructions' ? 'step' : st.kind,
+      label: st.label,
+      title: st.title,
+      detail: st.detail,
+      notes:
+        st.kind === 'output'
+          ? [st.approver ? `Waits for an OK from ${st.approver}` : 'Goes out without an OK', `Goes to ${st.sendTo?.length ? st.sendTo.join(', ') : 'nobody yet'}`]
+          : st.feeds?.length ? [`Goes to ${st.feeds.join(', ')}`] : undefined,
+      status: NOT_RUN,
+    })),
+  );
   return (
-    <Layout
-      height="fill"
-      contentWidth={1240}
-      header={
-        <LayoutHeader hasDivider padding={4}>
-          <Breadcrumbs>
-            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            <BreadcrumbItem isCurrent>{w.name}</BreadcrumbItem>
-          </Breadcrumbs>
-        </LayoutHeader>
-      }
-      content={
-        <LayoutContent padding={6}>
-          <VStack gap={6}>
-            <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
-              <VStack gap={1.5}>
-                <HStack gap={3} vAlign="center" wrap="wrap">
-                  <HStack gap={1.5} vAlign="center">
-                    <StatusDot variant="success" label="On" />
-                    <Text type="supporting" weight="medium">On</Text>
-                  </HStack>
-                  <Text type="supporting">{`Next run: ${w.nextRun}`}</Text>
-                </HStack>
-                <Heading level={1}>{w.name}</Heading>
-                <Text type="supporting">
-                  {`${plural(count('input'), 'input', 'inputs')}, ${plural(count('instructions'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'pass on to', 'pass on tos')}. Turned on ${w.createdOn}.`}
-                </Text>
-              </VStack>
-              <HStack gap={2} wrap="wrap">
-                <Button label="Run now" icon={<Icon icon={Play} />} onClick={() => toast({body: 'Preview only. Running a workflow comes with the real build.'})} />
-                <DeleteWorkflowButton name={w.name} onDelete={onDelete} />
-              </HStack>
-            </HStack>
-
-            <MetadataList orientation="horizontal">
-              <MetadataListItem label="Starts" icon={<Icon icon={CalendarClock} size="sm" />}>{w.schedule}</MetadataListItem>
-              <MetadataListItem label="Needs an OK from" icon={<Icon icon={UserCheck} size="sm" />}>{approvers.length ? approvers.join(', ') : 'Nobody'}</MetadataListItem>
-              <MetadataListItem label="Sends to" icon={<Icon icon={Send} size="sm" />}>{sendTo.length ? sendTo.join(', ') : 'Nobody yet'}</MetadataListItem>
-            </MetadataList>
-
-            <VStack gap={2}>
-              <VStack gap={0.5}>
-                <Text type="label">How it runs</Text>
-                <Text type="supporting">The tiles you placed on the board, in the order they run. Tiles stacked together run side by side.</Text>
-              </VStack>
-              {isVertical ? (
-                <VStack gap={2}>
-                  {w.columns.map((col, i) => (
-                    <VStack key={i} gap={2}>
-                      {i > 0 && (
-                        <HStack hAlign="center">
-                          <Icon icon={ArrowDown} color="secondary" />
-                        </HStack>
-                      )}
-                      {col.map(st => <StageCard key={st.id} stage={st} />)}
-                    </VStack>
-                  ))}
-                </VStack>
-              ) : (
-                <HStack gap={2} vAlign="center" isScrollable>
-                  {w.columns.map((col, i) => (
-                    <HStack key={i} gap={2} vAlign="center">
-                      {i > 0 && <Icon icon={ArrowRight} color="secondary" />}
-                      <VStack gap={2} width={260}>
-                        {col.map(st => <StageCard key={st.id} stage={st} />)}
-                      </VStack>
-                    </HStack>
-                  ))}
-                </HStack>
-              )}
-            </VStack>
-
-            <Card padding={0}>
-              <VStack>
-                <HStack padding={4}>
-                  <Text type="label">Recent runs</Text>
-                </HStack>
-                <EmptyState isCompact title="No runs yet" description={`The first run is ${w.nextRun}.`} />
-              </VStack>
-            </Card>
-          </VStack>
-        </LayoutContent>
-      }
+    <WorkflowOverview
+      name={w.name}
+      summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('instructions'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'pass on to', 'pass on tos')}. Turned on ${w.createdOn}.`}
+      schedule={w.schedule}
+      nextRun={w.nextRun}
+      approvers={[...new Set(outputs.map(o => o.approver).filter((a): a is string => !!a))]}
+      sendTo={[...new Set(outputs.flatMap(o => o.sendTo ?? []))]}
+      columns={columns}
+      onOpenStage={() => (window.location.hash = `workflow-edit-${w.id}`)}
+      uses={[]}
+      shares={[]}
+      runs={[]}
+      editHref={`#workflow-edit-${w.id}`}
+      onRunNow={runNow(toast)}
+      onDelete={onDelete}
     />
   );
 }

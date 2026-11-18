@@ -7,4 +7,4 @@ For every change:
 2. Show it to the owner first: keep the dev server running (`npx vite --host 0.0.0.0 --port 5173`) for the in-app preview, and update the review link (claude.ai artifact) with the new build.
 3. Commit locally, but only push after the owner says the change looks good.
 
-The app's Astryx rules are in `app/.claude/CLAUDE.md`.
+The app's Astryx rules are in `app/.claude/CLAUDE.md`. Workflow pages all use the shared `WorkflowOverview` component in `app/astryx-workflows`.
