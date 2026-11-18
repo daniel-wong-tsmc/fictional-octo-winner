@@ -1,4 +1,4 @@
-import {Fragment, useState, type CSSProperties} from 'react';
+import {Fragment, useState} from 'react';
 import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
@@ -52,8 +52,8 @@ export type WorkflowOverviewProps = {
   homeHref?: string;
 };
 
-/** Each column takes an equal share of the row, down to a readable minimum, then the row scrolls. */
-const STAGE_COLUMN: CSSProperties = {flex: '1 1 0', minWidth: 180, maxWidth: 280};
+/** Each column takes an equal share of the row, up to this width. Narrow screens stack the columns instead. */
+const STAGE_MAX_WIDTH = 280;
 
 function StageCard({stage, onOpen}: {stage: WorkflowStage; onOpen?: (s: WorkflowStage) => void}) {
   return (
@@ -167,7 +167,7 @@ export function WorkflowOverview({
                   {columns.map((col, i) => (
                     <Fragment key={i}>
                       {i > 0 && <Icon icon={ArrowRight} color="secondary" />}
-                      <VStack gap={2} style={STAGE_COLUMN}>
+                      <VStack gap={2} width={`${100 / columns.length}%`} maxWidth={STAGE_MAX_WIDTH}>
                         {col.map(st => <StageCard key={st.id} stage={st} onOpen={onOpenStage} />)}
                       </VStack>
                     </Fragment>

@@ -1,10 +1,11 @@
-import type {CSSProperties, ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Text} from '@astryxdesign/core/Text';
 import {Card} from '@astryxdesign/core/Card';
 import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Icon} from '@astryxdesign/core/Icon';
+import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Database, Send, WandSparkles} from 'lucide-react';
 
 /** The three kinds of tile a workflow is made of. */
@@ -71,7 +72,6 @@ const VIA_LABEL: Record<WorkflowInputVia, string> = {
 const NOT_SET = 'Not set yet';
 /** Fits the longest label, "Instructions", so values start in one column. */
 const LABEL_WIDTH = 84;
-const VALUE_STYLE: CSSProperties = {flex: '1 1 0', minWidth: 0};
 
 /** The title and labeled details for a tile. Exported so text versions (search, tooltips) match the tile. */
 export function tileText(c: WorkflowTileContent): {title: string; details: {label: string; value: string}[]} {
@@ -144,25 +144,13 @@ export function WorkflowTile({content, status, footer, detailMaxLines, detailLay
       </HStack>
       <Text weight="semibold">{title}</Text>
       {/* Each detail is its label, then its value: the same labels in the same order for every tile of a kind. */}
-      <VStack gap={detailLayout === 'inline' ? 1 : 2}>
-        {details.map(d =>
-          detailLayout === 'inline' ? (
-            <HStack key={d.label} gap={2} vAlign="start">
-              <VStack width={LABEL_WIDTH}>
-                <Text type="supporting" weight="medium">{d.label}</Text>
-              </VStack>
-              <VStack style={VALUE_STYLE}>
-                <Text type="supporting" maxLines={detailMaxLines}>{d.value}</Text>
-              </VStack>
-            </HStack>
-          ) : (
-            <VStack key={d.label} gap={0.5}>
-              <Text type="supporting" weight="medium">{d.label}</Text>
-              <Text type="supporting" maxLines={detailMaxLines}>{d.value}</Text>
-            </VStack>
-          ),
-        )}
-      </VStack>
+      <MetadataList label={{position: detailLayout === 'inline' ? 'start' : 'top', width: LABEL_WIDTH}}>
+        {details.map(d => (
+          <MetadataListItem key={d.label} label={d.label}>
+            <Text type="supporting" maxLines={detailMaxLines}>{d.value}</Text>
+          </MetadataListItem>
+        ))}
+      </MetadataList>
       {footer}
     </VStack>
   );

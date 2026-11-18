@@ -18,7 +18,7 @@ import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
 import {SCHEDULES, MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
-import {WorkflowBuilderPage, boardFromWorkflow, type SavedBoard} from './pages/WorkflowBuilder';
+import {WorkflowBuilderPage, boardFromWorkflow, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
   const read = () => window.location.hash.slice(1) || 'home';
@@ -83,6 +83,12 @@ export default function App() {
     ...MONTHLY_SALES_CLOSE.steps.flatMap(st => (st.ticketId ? [[st.id, ticketRun(st.ticketId, approved)]] : [])),
     ...(lastStep.ticketId ? [['out', ticketRun(lastStep.ticketId, approved)]] : []),
   ]);
+
+  // Saved workflows, as the board's Library lists them: Monthly sales close first, then the ones built here.
+  const library: LibraryItem[] = [
+    ...(hasSalesClose ? [{key: 'workflow-1', name: salesClose.name, href: '#workflow-edit', saved: salesClose.saved, isCurrent: route === 'workflow-edit'}] : []),
+    ...built.map(w => ({key: `workflow-${w.id}`, name: w.name, href: `#workflow-edit-${w.id}`, saved: w.saved as SavedBoard, isCurrent: route === `workflow-edit-${w.id}`})),
+  ];
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
@@ -164,6 +170,7 @@ export default function App() {
               : route === 'workflow-edit' ? {name: salesClose.name, href: '#workflow-1', saved: salesClose.saved, runs: salesCloseRuns} : undefined
           }
           selectTile={selectTile}
+          library={library}
           onTurnOn={(name, columns, saved) => {
             if (route !== 'workflow-edit') return turnOn(name, columns, saved);
             setSalesClose({name, saved});

@@ -23,6 +23,7 @@ import {Switch} from '@astryxdesign/core/Switch';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
+import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
@@ -31,7 +32,7 @@ import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Save, Trash2, Upload} from 'lucide-react';
+import {Eye, Maximize, X, Minus, Play, Plug, Library, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -698,7 +699,23 @@ function placeFor(board: BoardNode[], kind: StepKind, fromId?: string): {x: numb
 
 /* ---------- Bottom toolbar (like a FigJam toolbar) ---------- */
 
-function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
+/** "4 inputs, 3 LLM steps, 1 handoff": what a saved workflow holds, for the Library list. */
+function boardSummary(saved: SavedBoard): string {
+  const n = (k: StepKind) => saved.board.filter(b => b.step.kind === k).length;
+  const plural = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
+  return `${plural(n('input'), 'input', 'inputs')}, ${plural(n('instructions'), 'LLM step', 'LLM steps')}, ${plural(n('output'), 'handoff', 'handoffs')}`;
+}
+
+/**
+ * The bar at the bottom of the board. Nodes on the left add tiles; Library, set apart by a divider, lists
+ * saved workflows and opens one on the board; zoom controls on the right.
+ */
+function BoardToolbar({onAdd, library, onOpen}: {
+  onAdd: (kind: StepKind) => void;
+  /** Saved workflows. The one on the board now is shown but can't be reopened. */
+  library: LibraryItem[];
+  onOpen: (href: string) => void;
+}) {
   const {zoomIn, zoomOut, fitView} = useReactFlow();
   const {zoom} = useViewport();
   // On a phone the node buttons drop their words so the bar fits; tooltips and labels still name them.
@@ -733,6 +750,25 @@ function BoardToolbar({onAdd}: {onAdd: (kind: StepKind) => void}) {
                 );
               })}
             </HStack>
+            <Divider orientation="vertical" />
+            <DropdownMenu
+              button={{label: 'Library', variant: 'ghost', icon: <Icon icon={Library} />, isIconOnly: isSmall, tooltip: 'Saved workflows'}}
+              hasChevron={!isSmall}
+              placement="above"
+              menuWidth={300}
+              header={<Text type="supporting">Saved workflows</Text>}
+              items={
+                library.length
+                  ? library.map(w => ({
+                      label: w.name,
+                      description: w.isCurrent ? `${boardSummary(w.saved)} · Open now` : boardSummary(w.saved),
+                      icon: <Icon icon={WorkflowIcon} />,
+                      isDisabled: w.isCurrent,
+                      onClick: () => onOpen(w.href),
+                    }))
+                  : [{label: 'No saved workflows yet', isDisabled: true}]
+              }
+            />
           </HStack>
         }
         endContent={
@@ -820,7 +856,9 @@ type TurnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => void
  */
 export type Editing = {name: string; href: string; saved?: SavedBoard; runs?: Record<string, TileRun>};
 /** selectTile opens the board with that tile selected, so its side panel is open. */
-type BuilderProps = {editing?: Editing; selectTile?: string; onTurnOn: TurnOn};
+/** A saved workflow in the toolbar's Library: its name, where its board opens, and its saved board. */
+export type LibraryItem = {key: string; name: string; href: string; saved: SavedBoard; isCurrent: boolean};
+type BuilderProps = {editing?: Editing; selectTile?: string; library: LibraryItem[]; onTurnOn: TurnOn};
 
 export function WorkflowBuilderPage(props: BuilderProps) {
   return (
@@ -830,7 +868,7 @@ export function WorkflowBuilderPage(props: BuilderProps) {
   );
 }
 
-function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
+function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
   const isEditing = !!editing;
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
@@ -843,7 +881,9 @@ function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
   const snapshot = (n: string, b: BoardNode[], l: Link[]) => JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l]);
   const [original] = useState(() => snapshot(name, board, links));
   const isDirty = snapshot(name, board, links) !== original;
-  const [isDiscarding, setIsDiscarding] = useState(false);
+  // Where the person asked to go while the board has unsaved changes. Set, it opens the discard check.
+  const [leavingTo, setLeavingTo] = useState<string | null>(null);
+  const leaveTo = (href: string) => (isDirty ? setLeavingTo(href) : (window.location.hash = href.slice(1)));
   const [selectedId, setSelectedId] = useState<string | null>(() => (selectTile && board.some(n => n.id === selectTile) ? selectTile : null));
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
@@ -1077,7 +1117,7 @@ function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
         </VStack>
       </Panel>
       <Panel position="bottom-center">
-        <BoardToolbar onAdd={kind => place(kind)} />
+        <BoardToolbar onAdd={kind => place(kind)} library={library} onOpen={leaveTo} />
       </Panel>
     </ReactFlow>
   );
@@ -1098,7 +1138,7 @@ function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
         <Button
           label="Cancel"
           variant="ghost"
-          onClick={() => (isDirty ? setIsDiscarding(true) : (window.location.hash = editing.href.slice(1)))}
+          onClick={() => leaveTo(editing.href)}
         />
       )}
       <Button
@@ -1126,14 +1166,14 @@ function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
         />
       ) : (
         <Button
-          label="Turn on"
+          label="Save"
           variant="primary"
-          icon={<Icon icon={Power} />}
-          isDisabled={!isTried || !allChecked}
-          tooltip={!isTried ? 'Try it on last month first' : !allChecked ? 'Open the output and check it first' : undefined}
+          icon={<Icon icon={Save} />}
+          isDisabled={!allReady}
+          tooltip={allReady ? 'Saves it to your library' : 'Finish the tiles first'}
           onClick={() => {
             onTurnOn(finalName, toColumns(board, links), {board, links});
-            toast({body: `${finalName} is on. It runs on the first business day of each month.`});
+            toast({body: `${finalName} is saved to your library.`});
           }}
         />
       )}
@@ -1188,20 +1228,19 @@ function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
           )
         }
       />
-      {editing && (
-        <AlertDialog
-          isOpen={isDiscarding}
-          onOpenChange={setIsDiscarding}
-          title="Discard your changes?"
-          description={`Your changes to ${editing.name} won’t be saved. The workflow stays as it was.`}
-          actionLabel="Discard changes"
-          cancelLabel="Keep editing"
-          onAction={() => {
-            setIsDiscarding(false);
-            window.location.hash = editing.href.slice(1);
-          }}
-        />
-      )}
+      <AlertDialog
+        isOpen={leavingTo !== null}
+        onOpenChange={open => !open && setLeavingTo(null)}
+        title="Discard your changes?"
+        description={editing ? `Your changes to ${editing.name} won’t be saved. The workflow stays as it was.` : 'This new workflow hasn’t been saved. It will be lost.'}
+        actionLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onAction={() => {
+          const href = leavingTo;
+          setLeavingTo(null);
+          if (href) window.location.hash = href.slice(1);
+        }}
+      />
       {viewing && isTried && (
         <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board, links)} onClose={() => setViewingId(null)} />
       )}
