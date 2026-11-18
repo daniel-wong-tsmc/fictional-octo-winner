@@ -7,7 +7,7 @@ export default {
   keywords: ['workflow page', 'workflow detail', 'automation overview', 'pipeline page', 'workflow summary'],
   usage: {
     description:
-      'The full page for one workflow: on/off state and next run, schedule, approvers and destinations, its tiles in run order (inputs, LLM steps, pass on to), each drawn with WorkflowTile, what it uses from and shares with other workflows, and its recent runs. It includes Run now, Edit workflow and Delete workflow (with a confirm step). Use it for every workflow page, prefilled or user-built, so they all look the same. Use the workflow builder board to create or change a workflow.',
+      'The full page for one workflow: on/off state and next run, schedule, approvers and destinations, then its recent runs, what it uses from and shares with other workflows, and last its tiles in run order (inputs, LLM steps, pass on to), each drawn with WorkflowTile. It includes Run now, Edit workflow and Delete workflow (with a confirm step). Use it for every workflow page, prefilled or user-built, so they all look the same. Use the workflow builder board to create or change a workflow.',
     bestPractices: [
       {guidance: true, description: 'Pass the stages in run order: inputs in the first column, then each LLM step, then the pass on to tiles.'},
       {guidance: true, description: 'Give every stage a status once the workflow has run, so people can see where it stopped.'},

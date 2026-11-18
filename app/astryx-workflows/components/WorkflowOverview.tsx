@@ -154,6 +154,24 @@ export function WorkflowOverview({
               <MetadataListItem label="Sends to" icon={<Icon icon={Send} size="sm" />}>{sendTo.length ? sendTo.join(', ') : 'Nobody yet'}</MetadataListItem>
             </MetadataList>
 
+            <Card padding={0}>
+              <VStack>
+                <HStack padding={4}>
+                  <Text type="label">Recent runs</Text>
+                </HStack>
+                {runs.length ? (
+                  <Table data={runs as RunRow[]} columns={runColumns} idKey="period" density="balanced" />
+                ) : (
+                  <EmptyState isCompact title="No runs yet" description={`The first run is ${nextRun}.`} />
+                )}
+              </VStack>
+            </Card>
+
+            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
+              <HandoffList title="Uses from other workflows" items={uses} emptyText="Nothing from other workflows." />
+              <HandoffList title="Shares with other workflows" items={shares} emptyText="Nothing shared yet. Add a handoff from a step’s output sheet." />
+            </Grid>
+
             <VStack gap={2}>
               <VStack gap={0.5}>
                 <Text type="label">How it runs</Text>
@@ -188,24 +206,6 @@ export function WorkflowOverview({
                 </HStack>
               )}
             </VStack>
-
-            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
-              <HandoffList title="Uses from other workflows" items={uses} emptyText="Nothing from other workflows." />
-              <HandoffList title="Shares with other workflows" items={shares} emptyText="Nothing shared yet. Add a handoff from a step’s output sheet." />
-            </Grid>
-
-            <Card padding={0}>
-              <VStack>
-                <HStack padding={4}>
-                  <Text type="label">Recent runs</Text>
-                </HStack>
-                {runs.length ? (
-                  <Table data={runs as RunRow[]} columns={runColumns} idKey="period" density="balanced" />
-                ) : (
-                  <EmptyState isCompact title="No runs yet" description={`The first run is ${nextRun}.`} />
-                )}
-              </VStack>
-            </Card>
           </VStack>
           <AlertDialog
             isOpen={isDeleting}
