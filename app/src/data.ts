@@ -59,7 +59,7 @@ export type Ticket = {
   isDraft?: boolean;
 };
 
-export const TASKS: Task[] = [{id: 3, ticketId: 3}];
+export const TASKS: Task[] = [{id: 3, ticketId: 3}, {id: 1, ticketId: 1}];
 
 const ORDERS_USD: Sheet = {
   kind: 'Output',
@@ -89,7 +89,7 @@ const LOW_STOCK: Sheet = {
 
 export const TICKETS: Record<number, Ticket> = {
   1: {
-    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Ran 2h ago, stopped at 09:12',
+    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Stopped Nov 16 at 09:12', finishedAt: '2026-11-16T09:12',
     banner: {status: 'error', title: 'The run stopped.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
     inputs: [
       {name: 'Orders this week', source: ['workflow', 'From workflow: Weekly orders import'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},

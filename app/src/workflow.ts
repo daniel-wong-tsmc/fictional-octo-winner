@@ -2,7 +2,7 @@ import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/W
 // Example workflow for the UI prototype. Nothing here runs.
 
 export type SourceStatus = 'connected' | 'needsConnection' | 'handoff' | 'upload';
-export type StepRunStatus = 'done' | 'review' | 'waiting' | 'draft';
+export type StepRunStatus = 'done' | 'review' | 'waiting' | 'stopped' | 'draft';
 
 /** Where a step's data comes from: the file, app or workflow (source), and what it reads there. */
 export type StepInput = {source: string; reads: string; status: SourceStatus};
@@ -36,7 +36,7 @@ export type Workflow = {
   /** Handoff ids this workflow shares with other workflows. */
   shares: string[];
   /** started and finished are the run's date and time, such as "Nov 2, 08:00". */
-  runs: {period: string; started: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string}[];
+  runs: {period: string; started: string; result: 'review' | 'approved' | 'rerun' | 'stopped'; detail: string; finished: string}[];
 };
 
 export const SCHEDULES = [
@@ -98,13 +98,75 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   ],
 };
 
+export const WEEKLY_REVENUE_REPORT: Workflow = {
+  id: 2,
+  name: 'Weekly revenue report',
+  description: 'Combines the week’s orders and refunds, converts them to USD, totals revenue by region, and shares total revenue with Monthly sales close.',
+  schedule: SCHEDULES[1],
+  nextRun: 'Monday, November 23, 8:00',
+  approver: PEOPLE[0],
+  destinations: ['Slack: #finance-close'],
+  outputFormat: 'A single number',
+  steps: [
+    {
+      id: 'w1',
+      name: 'Combine orders and refunds',
+      does: 'Combine this week’s orders with this week’s refunds into net orders, keeping each order’s currency.',
+      inputs: [
+        {source: 'Weekly orders import', reads: 'Orders this week', status: 'handoff'},
+        {source: 'Shopify', reads: 'Refunds, last month', status: 'connected'},
+      ],
+      output: 'Net orders',
+      status: 'stopped',
+      trialResult: '1,284 orders, 63 refunds',
+      ticketId: 1,
+    },
+    {
+      id: 'w2',
+      name: 'Convert to USD',
+      does: 'Convert each net order to US dollars using the exchange rate on its order date.',
+      inputs: [{source: 'ECB exchange rates', reads: 'Daily rates', status: 'connected'}],
+      output: 'Orders in USD',
+      status: 'waiting',
+      trialResult: '1,221 orders converted',
+    },
+    {
+      id: 'w3',
+      name: 'Revenue by region',
+      does: 'Total the week’s USD revenue for each region.',
+      inputs: [],
+      output: 'Revenue by region',
+      status: 'waiting',
+      trialResult: '5 regions',
+    },
+    {
+      id: 'w4',
+      name: 'Total revenue',
+      does: 'Add up all regions into one total revenue figure in USD.',
+      inputs: [],
+      output: 'Total revenue (USD)',
+      status: 'waiting',
+      trialResult: '1,482,906.17 USD',
+    },
+  ],
+  uses: [],
+  shares: ['h-total-usd'],
+  runs: [
+    {period: 'Week of Nov 9', started: 'Nov 16, 08:00', result: 'stopped', detail: 'Stopped at step 1: the orders file has no Currency column', finished: 'Nov 16, 09:12'},
+    {period: 'Week of Nov 2', started: 'Nov 9, 08:00', result: 'approved', detail: 'Approved by Daniel', finished: 'Nov 9, 10:05'},
+    {period: 'Week of Oct 26', started: 'Nov 2, 08:00', result: 'approved', detail: 'Approved by Daniel', finished: 'Nov 2, 09:48'},
+  ],
+};
+
+/** Workflows that come with the prototype, in sidebar order. Built workflows are numbered after these. */
+export const PREFILLED_WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE, WEEKLY_REVENUE_REPORT];
+
 /**
  * The steps of every workflow, in order. A task's "Step X of Y" is counted from here, so no ticket
- * carries a typed position. Monthly sales close reads its own steps; the others are example workflows.
+ * carries a typed position. Prefilled workflows read their own steps; the others are example workflows.
  */
 export const STEP_LISTS: Record<string, string[]> = {
-  [MONTHLY_SALES_CLOSE.name]: MONTHLY_SALES_CLOSE.steps.map(s => s.name),
-  'Weekly revenue report': ['Combine orders and refunds', 'Convert to USD', 'Revenue by region', 'Total revenue'],
+  ...Object.fromEntries(PREFILLED_WORKFLOWS.map(w => [w.name, w.steps.map(s => s.name)])),
   'Customer churn list': ['Collect customer activity', 'Flag customers at risk', 'Group by account owner', 'Send to account owners'],
   'Inventory snapshot': ['Find low-stock items', 'Share low-stock list'],
   'Q1 forecast': ['Collect sales history', 'Forecast assumptions', 'Build the Q1 forecast'],

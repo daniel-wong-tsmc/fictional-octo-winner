@@ -677,7 +677,8 @@ const flowTheme = {
 } as CSSProperties;
 
 /** Keeps every tile in view as tiles are added or removed, without shrinking text past readable. */
-const FIT = {padding: 0.2, maxZoom: 1, minZoom: 0.6, duration: 250};
+/** Fit the whole workflow on screen. minZoom is low enough for six columns of tiles on a laptop. */
+const FIT = {padding: 0.15, maxZoom: 1, minZoom: 0.4, duration: 250};
 function FitOnChange({fitKey}: {fitKey: number}) {
   const {fitView} = useReactFlow();
   useEffect(() => {

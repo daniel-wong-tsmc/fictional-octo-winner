@@ -2,7 +2,7 @@ import {useToast} from '@astryxdesign/core/Toast';
 import {
   WorkflowOverview, type WorkflowStage, type WorkflowTone,
 } from '@workspace/astryx-workflows/components/WorkflowOverview';
-import {MONTHLY_SALES_CLOSE, type BuiltWorkflow, type StepRunStatus} from '../workflow';
+import type {BuiltWorkflow, StepRunStatus, Workflow, WorkflowStep} from '../workflow';
 import {toColumns, type SavedBoard} from './WorkflowBuilder';
 
 /* ---------- Workflow pages ----------
@@ -13,7 +13,8 @@ import {toColumns, type SavedBoard} from './WorkflowBuilder';
 const STEP_STATUS: Record<StepRunStatus, {tone: WorkflowTone; label: string}> = {
   done: {tone: 'success', label: 'Done'},
   review: {tone: 'info', label: 'Needs approval'},
-  waiting: {tone: 'warning', label: 'Waiting'},
+  waiting: {tone: 'neutral', label: 'Waiting'},
+  stopped: {tone: 'error', label: 'Stopped'},
   draft: {tone: 'neutral', label: 'Draft'},
 };
 const NOT_RUN = {tone: 'neutral' as const, label: 'Not run yet'};
@@ -23,31 +24,35 @@ const SOURCE_TONE = {
   handoff: {tone: 'info', label: 'From a workflow'},
   upload: {tone: 'neutral', label: 'Uploaded'},
 } as const;
-const RUN_TONE = {review: 'info', approved: 'success', rerun: 'success'} as const;
+const RUN_TONE = {review: 'info', approved: 'success', rerun: 'success', stopped: 'error'} as const;
 const runNow = (toast: ReturnType<typeof useToast>) => () => toast({body: 'Preview only. Running a workflow comes with the real build.'});
 
 /**
- * Monthly sales close. Its tiles come from its stored board, the same board Edit opens, so the page and the
- * board always match. This month's run adds a status to the tiles it knows about.
+ * A workflow that comes with the prototype, such as Monthly sales close or Weekly revenue report. Its tiles
+ * come from its stored board, the same board Edit opens, so the page and the board always match. The last
+ * run adds a status to the tiles it knows about; an approved ticket marks its step done.
  */
-export function LiveWorkflowPage({name, saved, isStep3Approved, onDelete}: {
+export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}: {
+  workflow: Workflow;
   name: string;
   saved: SavedBoard;
-  isStep3Approved: boolean;
+  /** Tickets approved here. */
+  approved: number[];
   onDelete: () => void;
 }) {
   const toast = useToast();
-  const w = MONTHLY_SALES_CLOSE;
-  const steps = w.steps.map(s => (s.ticketId === 3 && isStep3Approved ? {...s, status: 'done' as const} : s));
+  const isApproved = (s: WorkflowStep) => !!s.ticketId && approved.includes(s.ticketId);
+  const steps = w.steps.map(s => (isApproved(s) ? {...s, status: 'done' as const} : s));
+  const last = steps[steps.length - 1];
   const inputStatus = new Map<string, {tone: WorkflowTone; label: string}>(steps.flatMap(s => s.inputs.map((input, k) => [`${s.id}-in-${k}`, SOURCE_TONE[input.status]])));
+  // The Handoff follows the last step: sent once it is done, waiting while it needs approval.
+  const handoffStatus = last.status === 'done' ? {tone: 'success' as const, label: 'Sent'} : last.status === 'review' ? {tone: 'info' as const, label: 'Waiting for approval'} : NOT_RUN;
   const statusOf = (id: string) =>
-    inputStatus.get(id) ??
-    (steps.find(s => s.id === id) ? STEP_STATUS[steps.find(s => s.id === id)!.status] : undefined) ??
-    (id === 'out' ? (isStep3Approved ? {tone: 'success' as const, label: 'Sent'} : {tone: 'info' as const, label: 'Waiting for approval'}) : NOT_RUN);
+    inputStatus.get(id) ?? (steps.find(s => s.id === id) ? STEP_STATUS[steps.find(s => s.id === id)!.status] : undefined) ?? (id === 'out' ? handoffStatus : NOT_RUN);
   const columns: WorkflowStage[][] = toColumns(saved.board, saved.links).map(col => col.map(st => ({...st, status: statusOf(st.id)})));
   const outputs = columns.flat().flatMap(st => (st.content.kind === 'output' ? [st.content] : []));
   const runs = w.runs.map(r =>
-    r.result === 'review' && isStep3Approved
+    r.result === 'review' && last.status === 'done'
       ? {period: r.period, started: r.started, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
       : {period: r.period, started: r.started, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished},
   );
@@ -61,9 +66,9 @@ export function LiveWorkflowPage({name, saved, isStep3Approved, onDelete}: {
       approvers={[...new Set(outputs.map(o => o.approver).filter(Boolean))]}
       sendTo={[...new Set(outputs.flatMap(o => o.sendTo))]}
       columns={columns}
-      onOpenStage={st => (window.location.hash = `workflow-edit?tile=${st.id}`)}
+      onOpenStage={st => (window.location.hash = `workflow-edit-${w.id}?tile=${st.id}`)}
       runs={runs}
-      editHref="#workflow-edit"
+      editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}
       onDelete={onDelete}
     />
