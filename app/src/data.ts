@@ -1,3 +1,4 @@
+import type {WorkflowTaskCondition} from '@workspace/astryx-workflows/components/WorkflowTaskList';
 // Example data for the UI prototype. Nothing here is real or saved anywhere.
 
 export type Status = 'failed' | 'review' | 'stale' | 'draft' | 'done';
@@ -43,7 +44,6 @@ export type Sheet = {
 export type Ticket = {
   workflow: string;
   step: string;
-  position: string;
   status: Status;
   ran: string;
   /** When the step finished and the person was notified, as an ISO date and time. */
@@ -95,7 +95,7 @@ const LOW_STOCK: Sheet = {
 
 export const TICKETS: Record<number, Ticket> = {
   1: {
-    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', position: 'Step 1 of 4', status: 'failed', ran: 'Ran 2h ago, stopped at 09:12',
+    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Ran 2h ago, stopped at 09:12',
     banner: {status: 'error', title: 'The run stopped.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
     inputs: [
       {name: 'Orders this week', source: ['workflow', 'From workflow: Weekly orders import'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
@@ -116,7 +116,7 @@ export const TICKETS: Record<number, Ticket> = {
     },
   },
   2: {
-    workflow: 'Weekly revenue report', step: 'Convert to USD', position: 'Step 2 of 4', status: 'review', ran: 'Agent finished 40 min ago',
+    workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'review', ran: 'Agent finished 40 min ago',
     inputs: [
       {name: 'Net orders', source: ['step', 'From step: Combine orders and refunds'], stats: ['1,221 rows', '5 columns', "Last week's run"], sheet: 'Net orders'},
       {name: 'Exchange rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['Daily rates', 'Updated today 06:00'], sheet: 'Exchange rates'},
@@ -134,7 +134,7 @@ export const TICKETS: Record<number, Ticket> = {
     canApprove: true,
   },
   3: {
-    workflow: 'Monthly sales close', step: 'Sales summary for Finance', position: 'Step 3 of 3', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
+    workflow: 'Monthly sales close', step: 'Sales summary for Finance', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
     inputs: [
       {name: 'Orders in USD', source: ['step', 'From step: Convert to USD (October)'], stats: ['5,402 rows', '6 columns'], sheet: 'Orders in USD'},
       {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'Targets'},
@@ -155,7 +155,7 @@ export const TICKETS: Record<number, Ticket> = {
     canApprove: true,
   },
   4: {
-    workflow: 'Customer churn list', step: 'Flag customers at risk', position: 'Step 2 of 4', status: 'draft', ran: 'Not run yet',
+    workflow: 'Customer churn list', step: 'Flag customers at risk', status: 'draft', ran: 'Not run yet',
     inputs: [
       {name: 'Active customers', source: ['connection', 'From connection: Salesforce'], stats: ['2,310 rows', '4 columns', 'Synced 5h ago'], sheet: 'Active customers'},
       {name: 'Support tickets, 90 days', source: ['connection', 'From connection: Zendesk'], stats: ['4,118 rows', '4 columns', 'Synced 5h ago'], sheet: 'Support tickets'},
@@ -172,7 +172,7 @@ export const TICKETS: Record<number, Ticket> = {
     isDraft: true,
   },
   5: {
-    workflow: 'Inventory snapshot', step: 'Find low-stock items', position: 'Step 1 of 2', status: 'stale', ran: 'Last ran Nov 11',
+    workflow: 'Inventory snapshot', step: 'Find low-stock items', status: 'stale', ran: 'Last ran Nov 11',
     banner: {status: 'warning', title: 'Inventory data is 3 days old.', description: "The stock file in SharePoint hasn't changed since Nov 11. Two of your reports use this output."},
     inputs: [{name: 'Warehouse stock', source: ['connection', 'From connection: SharePoint, stock_levels.xlsx'], stats: ['1,940 rows', '4 columns'], warning: 'Last updated Nov 11', isWarningStale: true, sheet: 'Warehouse stock'}],
     instructions: 'Take the latest stock file and keep only items where stock on hand is below the reorder point.',
@@ -186,7 +186,7 @@ export const TICKETS: Record<number, Ticket> = {
     },
   },
   6: {
-    workflow: 'Q1 forecast', step: 'Forecast assumptions', position: 'Step 2 of 3', status: 'review', ran: 'Agent finished yesterday',
+    workflow: 'Q1 forecast', step: 'Forecast assumptions', status: 'review', ran: 'Agent finished yesterday',
     inputs: [
       {name: 'Sales history, 24 months', source: ['connection', 'From connection: Snowflake'], stats: ['432 rows', '3 columns'], sheet: 'Sales history'},
       {name: 'Low-stock items', source: ['workflow', 'From workflow: Inventory snapshot'], stats: ['41 rows'], warning: 'Upstream data is 3 days old', isWarningStale: true, sheet: 'Low-stock items'},
@@ -208,8 +208,8 @@ export const TICKETS: Record<number, Ticket> = {
 TICKETS[8] = {...TICKETS[3], step: 'Sales summary for Finance (September)', status: 'done', ran: 'Approved Mon by Daniel', canApprove: false};
 
 
-/** The condition of a ticket, as Home reports it. */
-export type TicketCondition = 'missingData' | 'needsApproval' | 'complete' | 'notRun';
+/** The condition of a ticket. The wording for each lives in WorkflowTaskList. */
+export type TicketCondition = WorkflowTaskCondition;
 
 /**
  * Reads a ticket's condition from its own contents, in this order:

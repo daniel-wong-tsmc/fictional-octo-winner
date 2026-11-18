@@ -37,3 +37,4 @@ RULES:
 APP COMPONENTS (app/astryx-workflows, an Astryx integration installed as @workspace/astryx-workflows):
 - Every workflow page renders `WorkflowOverview` (`npx astryx component WorkflowOverview`). Map the workflow's data into its props; never build a workflow page by hand. Change the page for all workflows there, then update its .doc.mjs.
 - After changing it, run `cd astryx-workflows && ../node_modules/.bin/astryx integration check --strict` and `npx astryx doctor integration components @workspace/astryx-workflows`.
+- Every list of workflow tasks renders `WorkflowTaskList` (`npx astryx component WorkflowTaskList`). Turn tasks into its `WorkflowTask` shape only through `toWorkflowTask` in src/tasks.ts, which reads the ticket and counts the step from `STEP_LISTS` in src/workflow.ts. A new workflow adds its steps to `STEP_LISTS`; never type a position or a status sentence.

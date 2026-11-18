@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Workflow components for this app, added to Astryx as an integration.",
   "exports": {
-    "./components/WorkflowOverview": "./components/WorkflowOverview.tsx"
+    "./components/WorkflowOverview": "./components/WorkflowOverview.tsx",
+    "./components/WorkflowTaskList": "./components/WorkflowTaskList.tsx"
   },
   "peerDependencies": {
     "@astryxdesign/core": "^0.7.15",

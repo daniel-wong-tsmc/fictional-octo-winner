@@ -92,14 +92,23 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   ],
 };
 
-/** Workflows with steps on record. Home counts a task's step position from here. */
-export const WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE];
+/**
+ * The steps of every workflow, in order. A task's "Step X of Y" is counted from here, so no ticket
+ * carries a typed position. Monthly sales close reads its own steps; the others are example workflows.
+ */
+export const STEP_LISTS: Record<string, string[]> = {
+  [MONTHLY_SALES_CLOSE.name]: MONTHLY_SALES_CLOSE.steps.map(s => s.name),
+  'Weekly revenue report': ['Combine orders and refunds', 'Convert to USD', 'Revenue by region', 'Total revenue'],
+  'Customer churn list': ['Collect customer activity', 'Flag customers at risk', 'Group by account owner', 'Send to account owners'],
+  'Inventory snapshot': ['Find low-stock items', 'Share low-stock list'],
+  'Q1 forecast': ['Collect sales history', 'Forecast assumptions', 'Build the Q1 forecast'],
+};
 
-/** "Step 3 of 3", counted from the workflow's own steps. Null when the workflow or step isn't on record. */
-export function stepPosition(workflow: string, step: string): string | null {
-  const steps = WORKFLOWS.find(w => w.name === workflow)?.steps ?? [];
-  const i = steps.findIndex(s => s.name === step);
-  return i < 0 ? null : `Step ${i + 1} of ${steps.length}`;
+/** Where a step sits in its workflow, or null when the workflow or step isn't on record. */
+export function stepPosition(workflow: string, step: string): {number: number; count: number} | null {
+  const steps = STEP_LISTS[workflow] ?? [];
+  const i = steps.indexOf(step);
+  return i < 0 ? null : {number: i + 1, count: steps.length};
 }
 
 /* ---------- Workflows built on the board ---------- */

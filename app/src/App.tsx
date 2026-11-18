@@ -7,7 +7,8 @@ import {Text} from '@astryxdesign/core/Text';
 import {
   Home as HomeIcon, Plus, UserCircle, Workflow,
 } from 'lucide-react';
-import {TASKS, TICKETS, ticketCondition, type Task} from './data';
+import {TASKS, TICKETS, type Task} from './data';
+import {toWorkflowTask} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
@@ -67,7 +68,7 @@ export default function App() {
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
-  const openCount = tasks.filter(t => ticketCondition(TICKETS[t.ticketId], approved.includes(t.ticketId)) !== 'complete').length;
+  const openCount = tasks.map(t => toWorkflowTask(t, approved)).filter(t => t && t.condition !== 'complete').length;
   const isHome = route === 'home';
   const isStep3Approved = approved.includes(3);
 
