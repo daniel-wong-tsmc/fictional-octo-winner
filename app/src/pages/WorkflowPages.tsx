@@ -51,8 +51,8 @@ export function LiveWorkflowPage({name, saved, handoffs, isStep3Approved, onDele
   const outputs = columns.flat().flatMap(st => (st.content.kind === 'output' ? [st.content] : []));
   const runs = w.runs.map(r =>
     r.result === 'review' && isStep3Approved
-      ? {period: r.period, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
-      : {period: r.period, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished},
+      ? {period: r.period, started: r.started, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
+      : {period: r.period, started: r.started, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished},
   );
 
   return (

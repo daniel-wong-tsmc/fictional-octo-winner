@@ -35,7 +35,8 @@ export type Workflow = {
   uses: string[];
   /** Handoff ids this workflow shares with other workflows. */
   shares: string[];
-  runs: {period: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string}[];
+  /** started and finished are the run's date and time, such as "Nov 2, 08:00". */
+  runs: {period: string; started: string; result: 'review' | 'approved' | 'rerun'; detail: string; finished: string}[];
 };
 
 export const SCHEDULES = [
@@ -91,9 +92,9 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   uses: ['h-total-usd'],
   shares: ['h-gap'],
   runs: [
-    {period: 'October 2026', result: 'review', detail: 'Waiting for approval', finished: 'Nov 2, 08:30'},
-    {period: 'September 2026', result: 'approved', detail: 'Approved by Daniel', finished: 'Oct 1, 09:12'},
-    {period: 'August 2026', result: 'rerun', detail: 'Rerun after targets were fixed, then approved', finished: 'Sep 2, 14:40'},
+    {period: 'October 2026', started: 'Nov 2, 08:00', result: 'review', detail: 'Waiting for approval', finished: 'Nov 2, 08:30'},
+    {period: 'September 2026', started: 'Oct 1, 08:00', result: 'approved', detail: 'Approved by Daniel', finished: 'Oct 1, 09:12'},
+    {period: 'August 2026', started: 'Sep 1, 08:00', result: 'rerun', detail: 'Rerun after targets were fixed, then approved', finished: 'Sep 2, 14:40'},
   ],
 };
 

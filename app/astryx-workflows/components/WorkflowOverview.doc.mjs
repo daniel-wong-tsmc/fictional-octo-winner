@@ -30,7 +30,7 @@ export default {
     {name: 'onOpenStage', type: '(stage: WorkflowStage) => void', description: 'Called when a stage is clicked. Without it, stages are not clickable.'},
     {name: 'uses', type: 'WorkflowHandoff[]', description: 'Values this workflow takes from other workflows.', required: true},
     {name: 'shares', type: 'WorkflowHandoff[]', description: 'Values this workflow gives to other workflows.', required: true},
-    {name: 'runs', type: 'WorkflowRun[]', description: 'Recent runs, newest first. Empty shows when the first run is.', required: true},
+    {name: 'runs', type: 'WorkflowRun[]', description: 'Recent runs, newest first, each shown with when it started, its result and when it finished. Empty shows when the first run is.', required: true},
     {name: 'editHref', type: 'string', description: 'Where Edit workflow goes.', required: true},
     {name: 'onRunNow', type: '() => void', description: 'Called when Run now is clicked.', required: true},
     {name: 'onDelete', type: '() => void', description: 'Called after the person confirms the delete.', required: true},

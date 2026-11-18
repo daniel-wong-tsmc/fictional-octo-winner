@@ -32,7 +32,8 @@ export type WorkflowStage = {
 /** A value shared between workflows. */
 export type WorkflowHandoff = {id: string; name: string; detail: string};
 
-export type WorkflowRun = {period: string; tone: WorkflowTone; result: string; finished: string};
+/** One run. period names the data it covered and identifies the row; started and finished are shown as date and time. */
+export type WorkflowRun = {period: string; started: string; tone: WorkflowTone; result: string; finished: string};
 
 export type WorkflowOverviewProps = {
   name: string;
@@ -100,7 +101,7 @@ export function WorkflowOverview({
   const isVertical = useMediaQuery('(max-width: 900px)');
   const [isDeleting, setIsDeleting] = useState(false);
   const runColumns: TableColumn<RunRow>[] = [
-    {key: 'period', header: 'Month', renderCell: r => <Text weight="medium">{r.period}</Text>},
+    {key: 'started', header: 'Started', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.started}</Text>},
     {
       key: 'result',
       header: 'Result',
