@@ -3,6 +3,7 @@ import {AppShell} from '@astryxdesign/core/AppShell';
 import {SideNav, SideNavHeading, SideNavItem, SideNavSection} from '@astryxdesign/core/SideNav';
 import {NavIcon} from '@astryxdesign/core/NavIcon';
 import {Icon} from '@astryxdesign/core/Icon';
+import {IconButton} from '@astryxdesign/core/IconButton';
 import {Text} from '@astryxdesign/core/Text';
 import {
   Home as HomeIcon, Plus, UserCircle, Workflow,
@@ -101,14 +102,17 @@ export default function App() {
               isSelected={isHome}
               endContent={<Text type="supporting" hasTabularNumbers>{String(openCount)}</Text>}
             />
-            <SideNavItem label="Workflows" icon={Workflow} collapsible={{defaultIsCollapsed: false}}>
+            <SideNavItem
+              label="Workflows"
+              icon={Workflow}
+              collapsible={{defaultIsCollapsed: false}}
+              actions={<IconButton label="New workflow" tooltip="New workflow" icon={<Icon icon={Plus} />} href="#workflow-new" variant="ghost" size="sm" />}>
               {hasSalesClose && (
                 <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
               )}
               {built.map(w => (
                 <SideNavItem key={w.id} label={w.name} href={`#workflow-${w.id}`} isSelected={route === `workflow-${w.id}` || route === `workflow-edit-${w.id}`} />
               ))}
-              <SideNavItem label="New workflow" icon={Plus} href="#workflow-new" isSelected={route === 'workflow-new'} />
             </SideNavItem>
           </SideNavSection>
         </SideNav>
