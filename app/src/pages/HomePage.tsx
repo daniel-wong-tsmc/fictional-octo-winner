@@ -11,7 +11,7 @@ import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Link} from '@astryxdesign/core/Link';
 import {ChevronRight, Plus, Sparkles} from 'lucide-react';
 import {useState} from 'react';
-import {STATUS, type Task} from '../data';
+import {STATUS, TICKETS, resultLine, type Task} from '../data';
 import {RefLabel} from './shared';
 
 function greeting(): string {
@@ -21,6 +21,9 @@ function greeting(): string {
 
 function TaskRow({task, hideWorkflow}: {task: Task; hideWorkflow?: boolean}) {
   const s = task.status ? STATUS[task.status] : STATUS.draft;
+  // Where the task sits in its workflow, and what the agent produced, both from the task's ticket.
+  const ticket = task.ticketId ? TICKETS[task.ticketId] : undefined;
+  const result = ticket ? resultLine(ticket) : null;
   return (
     <ListItem
       itemKey={task.id}
@@ -34,9 +37,12 @@ function TaskRow({task, hideWorkflow}: {task: Task; hideWorkflow?: boolean}) {
       }
       description={
         <HStack gap={3} wrap="wrap" vAlign="center">
-          {task.status && task.group !== 'done' && <Text type="supporting" weight="medium">{s.label}</Text>}
           {task.ref && !(hideWorkflow && task.ref[0] === 'workflow') && <RefLabel kind={task.ref[0]} label={task.ref[1]} />}
-          {task.why && <Text type="supporting">{task.why}</Text>}
+          <Text type="supporting">
+            {[task.status && task.group !== 'done' ? s.label : null, ticket ? `${ticket.position}: ${ticket.step}` : null, result]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
         </HStack>
       }
       endContent={
@@ -114,12 +120,7 @@ export function HomePage({tasks}: {tasks: Task[]}) {
               disabledMessage="Coming soon: ask the agent from here."
             />
             <VStack gap={6}>
-              <VStack gap={1}>
-                <Heading level={2}>To do</Heading>
-                <Text type="supporting">
-                  What your workflows need from you, grouped by workflow. Open a task to see its ticket. Rows are example data.
-                </Text>
-              </VStack>
+              <Heading level={2}>To do</Heading>
               {open.length === 0 && (
                 <EmptyState isCompact title="Nothing needs you right now" description="New tasks show up here when a workflow needs your OK or runs into a problem." />
               )}

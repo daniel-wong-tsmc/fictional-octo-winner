@@ -79,7 +79,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       ],
       output: 'October summary',
       status: 'review',
-      trialResult: '5 regions, 2.1% below target overall',
+      trialResult: '5 regions, 3.1% below target overall',
       ticketId: 3,
     },
   ],
