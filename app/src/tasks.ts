@@ -1,26 +1,58 @@
-import type {WorkflowTask} from '@workspace/astryx-workflows/components/WorkflowTaskList';
-import {TICKETS, ticketCondition, type Task} from './data';
-import {stepPosition} from './workflow';
+import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
+import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
+import {SCHEDULES, stepPosition} from './workflow';
+
+/** "Nov 2, 08:30": a date and time as Home's board shows it. */
+export function shortDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}, ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})}`;
+}
+
+/** A workflow as Home's board needs it: its schedule, next run, page, and its last finished run. */
+export type BoardWorkflow = {key: string; name: string; schedule: string; nextRunAt: string; href: string; lastFinished?: string};
+
+const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
+  needsApproval: 'needsApproval',
+  missingData: 'missingData',
+  complete: 'complete',
+  notRun: 'unscheduled',
+};
 
 /**
- * Turns a task into the shape WorkflowTaskList shows. Every part comes from the task's ticket and its
- * workflow's steps. Returns null when the step isn't in its workflow's step list, so a bad record never
- * shows up half filled.
+ * Everything on Home's board, from data only: each workflow's next run (Scheduled, or Unscheduled when it
+ * only runs when started), each task read from its ticket (Needs attention, Done, or Unscheduled for a draft),
+ * and each workflow's last finished run (Done). Tasks whose step isn't in their workflow's step list are left out.
  */
-export function toWorkflowTask(task: Task, approved: number[]): WorkflowTask | null {
-  const t = TICKETS[task.ticketId];
-  const pos = t && stepPosition(t.workflow, t.step);
-  if (!t || !pos) return null;
-  return {
-    id: String(task.id),
-    workflow: t.workflow,
-    stepNumber: pos.number,
-    stepCount: pos.count,
-    condition: ticketCondition(t, approved.includes(task.ticketId)),
-    notifiedAt: t.finishedAt,
-    href: `#ticket-${task.ticketId}`,
-  };
+export function boardItems(tasks: Task[], approved: number[], workflows: BoardWorkflow[]): WorkflowBoardItem[] {
+  const next: WorkflowBoardItem[] = [...workflows]
+    .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt))
+    .map(w =>
+      w.schedule === SCHEDULES[3]
+        ? {id: `next-${w.key}`, workflow: w.name, state: 'unscheduled', href: w.href}
+        : {id: `next-${w.key}`, workflow: w.name, state: 'scheduled', schedule: w.schedule, at: shortDateTime(w.nextRunAt), href: w.href},
+    );
+  const fromTickets: WorkflowBoardItem[] = tasks.flatMap(task => {
+    const t = TICKETS[task.ticketId];
+    const pos = t && stepPosition(t.workflow, t.step);
+    if (!t || !pos) return [];
+    return [{
+      id: `task-${task.id}`,
+      workflow: t.workflow,
+      state: LANE_OF[ticketCondition(t, approved.includes(task.ticketId))],
+      stepNumber: pos.number,
+      stepCount: pos.count,
+      at: t.finishedAt ? shortDateTime(t.finishedAt) : undefined,
+      href: `#ticket-${task.ticketId}`,
+    }];
+  });
+  const finished: WorkflowBoardItem[] = workflows.flatMap(w =>
+    w.lastFinished ? [{id: `done-${w.key}`, workflow: w.name, state: 'complete' as const, at: w.lastFinished, href: w.href}] : [],
+  );
+  return [...next, ...fromTickets, ...finished];
 }
+
+/** How many cards are in Needs attention: the number Home shows in the sidebar. */
+export const attentionCount = (items: WorkflowBoardItem[]) => items.filter(i => i.state === 'needsApproval' || i.state === 'missingData').length;
 
 /** The last run of a tile that has a ticket, as the board's side panel shows it. */
 export type TileRun = {

@@ -1,4 +1,3 @@
-import type {WorkflowTaskCondition} from '@workspace/astryx-workflows/components/WorkflowTaskList';
 // Example data for the UI prototype. Nothing here is real or saved anywhere.
 
 export type Status = 'failed' | 'review' | 'stale' | 'draft' | 'done';
@@ -59,7 +58,7 @@ export type Ticket = {
   isDraft?: boolean;
 };
 
-export const TASKS: Task[] = [{id: 3, ticketId: 3}, {id: 1, ticketId: 1}];
+export const TASKS: Task[] = [{id: 3, ticketId: 3}, {id: 1, ticketId: 1}, {id: 4, ticketId: 4}];
 
 const ORDERS_USD: Sheet = {
   kind: 'Output',
@@ -196,8 +195,8 @@ export const TICKETS: Record<number, Ticket> = {
 TICKETS[8] = {...TICKETS[3], step: 'Sales summary for Finance (September)', status: 'done', ran: 'Approved Mon by Daniel', canApprove: false};
 
 
-/** The condition of a ticket. The wording for each lives in WorkflowTaskList. */
-export type TicketCondition = WorkflowTaskCondition;
+/** The condition of a ticket. Home's board turns it into a lane and wording. */
+export type TicketCondition = 'needsApproval' | 'complete' | 'missingData' | 'notRun';
 
 /**
  * Reads a ticket's condition from its own contents, in this order:

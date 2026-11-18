@@ -26,6 +26,8 @@ export type Workflow = {
   description: string;
   schedule: string;
   nextRun: string;
+  /** The next run as an ISO date and time, for Home's board. */
+  nextRunAt: string;
   approver: string;
   destinations: string[];
   /** File type of what the last step passes on, such as Excel sheet. */
@@ -53,6 +55,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   description: 'Totals last month’s sales by region, compares them with targets, and sends the summary to Finance once approved.',
   schedule: SCHEDULES[0],
   nextRun: 'Tuesday, December 1, 8:00',
+  nextRunAt: '2026-12-01T08:00',
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close', 'Google Drive: Finance close pack'],
   outputFormat: 'Excel sheet',
@@ -104,6 +107,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   description: 'Combines the week’s orders and refunds, converts them to USD, totals revenue by region, and shares total revenue with Monthly sales close.',
   schedule: SCHEDULES[1],
   nextRun: 'Monday, November 23, 8:00',
+  nextRunAt: '2026-11-23T08:00',
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close'],
   outputFormat: 'A single number',
@@ -189,6 +193,7 @@ export type BuiltWorkflow = {
   name: string;
   schedule: string;
   nextRun: string;
+  nextRunAt: string;
   createdOn: string;
   /** Stages in run order. Each column runs after the one before it; stages in a column run side by side. */
   columns: BuiltStage[][];

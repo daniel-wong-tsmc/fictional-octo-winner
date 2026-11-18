@@ -6,25 +6,22 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {Icon} from '@astryxdesign/core/Icon';
 import {Plus, Sparkles} from 'lucide-react';
 import {useState} from 'react';
-import {WorkflowTaskList, type WorkflowTask} from '@workspace/astryx-workflows/components/WorkflowTaskList';
-import type {Task} from '../data';
-import {toWorkflowTask} from '../tasks';
+import {WorkflowBoard, type WorkflowBoardItem} from '@workspace/astryx-workflows/components/WorkflowBoard';
 
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-export function HomePage({tasks, approved}: {tasks: Task[]; approved: number[]}) {
+/** Home: the agent box, then the board of workflow runs in four lanes. */
+export function HomePage({items}: {items: WorkflowBoardItem[]}) {
   const [ask, setAsk] = useState('');
   const today = new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
-  // Every task goes through the same mapping, so tasks from any workflow look the same.
-  const items = tasks.map(t => toWorkflowTask(t, approved)).filter((t): t is WorkflowTask => !!t);
 
   return (
     <Layout
       height="fill"
-      contentWidth={720}
+      contentWidth={1240}
       header={
         <LayoutHeader hasDivider padding={4}>
           <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
@@ -50,7 +47,7 @@ export function HomePage({tasks, approved}: {tasks: Task[]; approved: number[]})
               isDisabled
               disabledMessage="Coming soon: ask the agent from here."
             />
-            <WorkflowTaskList tasks={items} />
+            <WorkflowBoard items={items} />
           </VStack>
         </LayoutContent>
       }

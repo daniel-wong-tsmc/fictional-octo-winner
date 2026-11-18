@@ -9,7 +9,7 @@ import {
   Home as HomeIcon, Plus, UserCircle, Workflow,
 } from 'lucide-react';
 import {TASKS, TICKETS, type Task} from './data';
-import {ticketRun, toWorkflowTask, type TileRun} from './tasks';
+import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
@@ -69,7 +69,7 @@ export default function App() {
     }
     const id = Math.max(...PREFILLED_WORKFLOWS.map(w => w.id), ...built.map(w => w.id)) + 1;
     const createdOn = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric'});
-    setBuilt(prev => [...prev, {id, name, columns, saved, schedule: SCHEDULES[0], nextRun: PREFILLED_WORKFLOWS[0].nextRun, createdOn}]);
+    setBuilt(prev => [...prev, {id, name, columns, saved, schedule: SCHEDULES[0], nextRun: PREFILLED_WORKFLOWS[0].nextRun, nextRunAt: PREFILLED_WORKFLOWS[0].nextRunAt, createdOn}]);
     window.location.hash = `workflow-${id}`;
   };
   const deleteBuilt = (w: BuiltWorkflow) => {
@@ -101,7 +101,20 @@ export default function App() {
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
-  const openCount = tasks.map(t => toWorkflowTask(t, approved)).filter(t => t && t.condition !== 'complete').length;
+  // Home's board: every workflow's next and last run, and every task read from its ticket.
+  const boardWorkflows: BoardWorkflow[] = [
+    ...prefilled.map(p => ({
+      key: `p${p.workflow.id}`,
+      name: p.name,
+      schedule: p.workflow.schedule,
+      nextRunAt: p.workflow.nextRunAt,
+      href: `#workflow-${p.workflow.id}`,
+      lastFinished: p.workflow.runs.find(r => r.result === 'approved' || r.result === 'rerun')?.finished,
+    })),
+    ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`})),
+  ];
+  const homeItems = boardItems(tasks, approved, boardWorkflows);
+  const openCount = attentionCount(homeItems);
   const isHome = route === 'home';
 
   const markApproved = (id: number) => setApproved(prev => (prev.includes(id) ? prev : [...prev, id]));
@@ -200,7 +213,7 @@ export default function App() {
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (
-        openChat ? <ChatPage key={openChat.id} chat={openChat} /> : <HomePage tasks={tasks} approved={approved} />
+        openChat ? <ChatPage key={openChat.id} chat={openChat} /> : <HomePage items={homeItems} />
       )}
     </AppShell>
   );
