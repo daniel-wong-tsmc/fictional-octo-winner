@@ -49,7 +49,10 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}:
   const handoffStatus = last.status === 'done' ? {tone: 'success' as const, label: 'Sent'} : last.status === 'review' ? {tone: 'info' as const, label: 'Waiting for approval'} : NOT_RUN;
   const statusOf = (id: string) =>
     inputStatus.get(id) ?? (steps.find(s => s.id === id) ? STEP_STATUS[steps.find(s => s.id === id)!.status] : undefined) ?? (id === 'out' ? handoffStatus : NOT_RUN);
-  const columns: WorkflowStage[][] = toColumns(saved.board, saved.links).map(col => col.map(st => ({...st, status: statusOf(st.id)})));
+  // An input from another workflow shows as one, even when it came from a section on the board.
+  const statusFor = (st: WorkflowStage) =>
+    st.content.kind === 'input' && st.content.via === 'workflow' && !inputStatus.has(st.id) ? SOURCE_TONE.handoff : statusOf(st.id);
+  const columns: WorkflowStage[][] = toColumns(saved.board, saved.links, saved.sections).map(col => col.map(st => ({...st, status: statusFor(st)})));
   const outputs = columns.flat().flatMap(st => (st.content.kind === 'output' ? [st.content] : []));
   const runs = w.runs.map(r =>
     r.result === 'review' && last.status === 'done'

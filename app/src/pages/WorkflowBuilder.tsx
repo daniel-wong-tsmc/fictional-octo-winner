@@ -23,7 +23,7 @@ import {Switch} from '@astryxdesign/core/Switch';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
-import {DropdownMenu} from '@astryxdesign/core/DropdownMenu';
+import {Popover} from '@astryxdesign/core/Popover';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
@@ -32,7 +32,7 @@ import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Eye, Maximize, X, Minus, Play, Plug, Library, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -58,6 +58,8 @@ const KIND_INFO: Record<StepKind, (typeof WORKFLOW_TILE_KINDS)[WorkflowTileKind]
 const KINDS: StepKind[] = ['input', 'instructions', 'output'];
 /** Drag type used when a node is dragged from the toolbar onto the board. */
 const DRAG_TYPE = 'application/x-workflow-node';
+/** Drag type used when a saved workflow is dragged from the Library onto the board. */
+const DRAG_WORKFLOW = 'application/x-saved-workflow';
 
 /** Apps the workspace admin has connected through MCP. */
 const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
@@ -141,6 +143,8 @@ function sendSentence(s: OutputStep): string {
 
 type TileData = {
   step: Step;
+  /** In a section, a Handoff gets a dot on its right so its result can feed a step of another workflow. */
+  isInSection: boolean;
   content: WorkflowTileContent;
   trial: TrialResult | null;
   /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Handoff has something coming in. */
@@ -215,11 +219,27 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         width={250}
         elevation={selected ? 'high' : 'low'}
       />
-      {step.kind !== 'output' && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
+      {(step.kind !== 'output' || data.isInSection) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </>
   );
 }
-const nodeTypes = {tile: Tile};
+type SectionData = {title: string; summary: string};
+type SectionNode = Node<SectionData, 'section'>;
+type BoardFlowNode = TileNode | SectionNode;
+
+/** The frame of a section. Dragging it moves every tile inside. */
+function SectionFrame({data, selected}: NodeProps<SectionNode>) {
+  return (
+    <Card variant="muted" width="100%" height="100%" padding={4} elevation={selected ? 'low' : 'none'}>
+      <HStack gap={2} vAlign="center" wrap="wrap">
+        <Icon icon={WorkflowIcon} size="sm" color="secondary" />
+        <Text weight="semibold">{data.title}</Text>
+        <Text type="supporting">{data.summary}</Text>
+      </HStack>
+    </Card>
+  );
+}
+const nodeTypes = {tile: Tile, section: SectionFrame};
 /** Dots big enough to grab with a mouse or a finger. */
 const HANDLE_STYLE: CSSProperties = {
   width: 'var(--spacing-5)',
@@ -359,6 +379,29 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
       {app && <Selector label="What to read" options={app.reads} value={step.resource} onChange={resource => onChange({...step, resource})} />}
       <HStack>
         <Button label="Upload a file instead" variant="ghost" icon={<Icon icon={Upload} />} onClick={chooseUpload} />
+      </HStack>
+    </VStack>
+  );
+}
+
+/** The side panel for a selected section: which workflow it is, and how to open or remove it. */
+function SectionPanel({section, openHref, onOpen, onRemove}: {section: Section; openHref?: string; onOpen: (href: string) => void; onRemove: () => void}) {
+  return (
+    <VStack gap={4}>
+      <VStack gap={1}>
+        <HStack gap={2} vAlign="center">
+          <Icon icon={WorkflowIcon} size="sm" color="secondary" />
+          <Text type="supporting" weight="medium">Saved workflow</Text>
+        </HStack>
+        <Heading level={3}>{section.title}</Heading>
+        <Text type="supporting">{section.summary}</Text>
+      </VStack>
+      <Text type="supporting">
+        Drag the section to move everything in it. Draw a line from its Handoff into an LLM step of this workflow to use its result.
+      </Text>
+      <HStack gap={2} wrap="wrap">
+        {openHref && <Button label="Open this workflow" icon={<Icon icon={ArrowUpRight} />} onClick={() => onOpen(openHref)} />}
+        <Button label="Remove section" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
       </HStack>
     </VStack>
   );
@@ -568,7 +611,23 @@ function TrialDialog({title, step, trial, onClose}: {title: string; step: Step; 
 
 /* ---------- Board ---------- */
 
-type BoardNode = {id: string; step: Step; position: {x: number; y: number}; measured?: {width?: number; height?: number}};
+/** A tile on the board. sectionId puts it inside a section, and then its position is relative to that section. */
+type BoardNode = {id: string; step: Step; position: {x: number; y: number}; measured?: {width?: number; height?: number}; sectionId?: string};
+
+/**
+ * A saved workflow dropped onto the board: a frame around copies of its tiles that moves them together, like a
+ * FigJam section. key is the workflow's Library key.
+ */
+type Section = {
+  id: string; key: string; title: string; summary: string; position: {x: number; y: number}; size: {width: number; height: number};
+  /** The size React Flow measured; kept and handed back like a tile's. */
+  measured?: {width?: number; height?: number};
+};
+/** Room inside a section: around its tiles, and above them for its title. */
+const SECTION_PAD = 32;
+const SECTION_TOP = 72;
+const TILE_W = 250;
+const TILE_H = 180;
 
 let nextId = 1;
 const newId = () => `n${nextId++}`;
@@ -636,7 +695,10 @@ function linkProblem(board: BoardNode[], links: Link[], source: string | null, t
   const from = board.find(n => n.id === source);
   const to = board.find(n => n.id === target);
   if (!from || !to || from.id === to.id) return 'Pick two different tiles.';
-  if (from.step.kind === 'output') return 'Handoff is the last stage. Nothing comes after it.';
+  // A Handoff ends its workflow. Its only line out goes into a step of another workflow on the board.
+  if (from.step.kind === 'output' && !(to.step.kind === 'instructions' && from.sectionId !== to.sectionId)) {
+    return 'A Handoff only connects into an LLM step of another workflow.';
+  }
   if (to.step.kind === 'input') return 'Inputs are the first stage. Nothing goes into them.';
   if (from.step.kind === 'input' && to.step.kind === 'output') return 'Data needs an LLM step before it’s passed on.';
   if (links.some(l => l.source === from.id && l.target === to.id)) return 'These tiles are already connected.';
@@ -677,8 +739,8 @@ const flowTheme = {
 } as CSSProperties;
 
 /** Keeps every tile in view as tiles are added or removed, without shrinking text past readable. */
-/** Fit the whole workflow on screen. minZoom is low enough for six columns of tiles on a laptop. */
-const FIT = {padding: 0.15, maxZoom: 1, minZoom: 0.4, duration: 250};
+/** Fit the whole board on screen. minZoom is low enough for two workflows side by side on a laptop. */
+const FIT = {padding: 0.1, maxZoom: 1, minZoom: 0.25, duration: 250};
 function FitOnChange({fitKey}: {fitKey: number}) {
   const {fitView} = useReactFlow();
   useEffect(() => {
@@ -709,14 +771,17 @@ function boardSummary(saved: SavedBoard): string {
 
 /**
  * The bar at the bottom of the board. Nodes on the left add tiles; Library, set apart by a divider, lists
- * saved workflows and opens one on the board; zoom controls on the right.
+ * saved workflows to drop onto the board as sections, or open; zoom controls on the right.
  */
-function BoardToolbar({onAdd, library, onOpen}: {
+function BoardToolbar({onAdd, library, onAddWorkflow, onOpen}: {
   onAdd: (kind: StepKind) => void;
-  /** Saved workflows. The one on the board now is shown but can't be reopened. */
+  /** Saved workflows. The one on the board now is shown but can't be added or reopened. */
   library: LibraryItem[];
+  /** Adds a saved workflow to the board as a section. */
+  onAddWorkflow: (item: LibraryItem) => void;
   onOpen: (href: string) => void;
 }) {
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const {zoomIn, zoomOut, fitView} = useReactFlow();
   const {zoom} = useViewport();
   // On a phone the node buttons drop their words so the bar fits; tooltips and labels still name them.
@@ -752,24 +817,59 @@ function BoardToolbar({onAdd, library, onOpen}: {
               })}
             </HStack>
             <Divider orientation="vertical" />
-            <DropdownMenu
-              button={{label: 'Library', variant: 'ghost', icon: <Icon icon={Library} />, isIconOnly: isSmall, tooltip: 'Saved workflows'}}
-              hasChevron={!isSmall}
+            <Popover
+              isOpen={isLibraryOpen}
+              onOpenChange={setIsLibraryOpen}
               placement="above"
-              menuWidth={300}
-              header={<Text type="supporting">Saved workflows</Text>}
-              items={
-                library.length
-                  ? library.map(w => ({
-                      label: w.name,
-                      description: w.isCurrent ? `${boardSummary(w.saved)} · Open now` : boardSummary(w.saved),
-                      icon: <Icon icon={WorkflowIcon} />,
-                      isDisabled: w.isCurrent,
-                      onClick: () => onOpen(w.href),
-                    }))
-                  : [{label: 'No saved workflows yet', isDisabled: true}]
-              }
-            />
+              width={340}
+              isModal={false}
+              label="Library"
+              content={
+                <VStack gap={2}>
+                  <Text type="supporting">Saved workflows. Drag one onto the board, or click to add it.</Text>
+                  {library.length === 0 && <Text type="supporting">No saved workflows yet.</Text>}
+                  {library.map(w => (
+                    <HStack key={w.key} gap={1} vAlign="center">
+                      <ClickableCard
+                        label={w.isCurrent ? `${w.name} is open now` : `Add ${w.name} to the board`}
+                        padding={2}
+                        width="100%"
+                        isDisabled={w.isCurrent}
+                        draggable={!w.isCurrent}
+                        onDragStart={e => {
+                          e.dataTransfer.setData(DRAG_WORKFLOW, w.key);
+                          e.dataTransfer.effectAllowed = 'copy';
+                        }}
+                        onClick={() => {
+                          onAddWorkflow(w);
+                          setIsLibraryOpen(false);
+                        }}>
+                        <VStack gap={0.5}>
+                          <HStack gap={1.5} vAlign="center">
+                            <Icon icon={WorkflowIcon} size="sm" color="secondary" />
+                            <Text weight="medium">{w.name}</Text>
+                          </HStack>
+                          <Text type="supporting">{w.isCurrent ? `${boardSummary(w.saved)} · Open now` : boardSummary(w.saved)}</Text>
+                        </VStack>
+                      </ClickableCard>
+                      <IconButton
+                        label={`Open ${w.name}`}
+                        tooltip="Open its board"
+                        variant="ghost"
+                        size="sm"
+                        icon={<Icon icon={ArrowUpRight} />}
+                        isDisabled={w.isCurrent}
+                        onClick={() => {
+                          setIsLibraryOpen(false);
+                          onOpen(w.href);
+                        }}
+                      />
+                    </HStack>
+                  ))}
+                </VStack>
+              }>
+              <Button label="Library" variant="ghost" icon={<Icon icon={Library} />} isIconOnly={isSmall} tooltip="Saved workflows" />
+            </Popover>
           </HStack>
         }
         endContent={
@@ -814,7 +914,13 @@ function runOrder(board: BoardNode[], links: Link[]): BoardNode[][] {
  */
 function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTileContent> {
   const number = new Map<string, number>();
-  runOrder(board, links).flat().filter(n => n.step.kind === 'instructions').forEach((n, i) => number.set(n.id, i + 1));
+  // Each workflow on the board counts its own steps, so a section keeps its Step 1.
+  const counts = new Map<string, number>();
+  runOrder(board, links).flat().filter(n => n.step.kind === 'instructions').forEach(n => {
+    const k = (counts.get(n.sectionId ?? '') ?? 0) + 1;
+    counts.set(n.sectionId ?? '', k);
+    number.set(n.id, k);
+  });
   const targets = (id: string) => links.filter(l => l.source === id).map(l => board.find(n => n.id === l.target)).filter((n): n is BoardNode => !!n);
   const contents = new Map<string, WorkflowTileContent>();
   for (const n of board) {
@@ -838,16 +944,40 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
   return contents;
 }
 
-/** The board as saved workflow columns: each tile with the same content the board shows. */
-export function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
+/**
+ * The board as saved workflow columns, for the workflow page: this workflow's own tiles, with the same content
+ * the board shows. Another workflow dropped in as a section isn't copied onto the page; each of its Handoffs
+ * that feeds this workflow shows as one input from that workflow instead.
+ */
+export function toColumns(board: BoardNode[], links: Link[], sections: Section[] = []): BuiltStage[][] {
+  const own = board.filter(n => !n.sectionId);
+  const isOwn = (id: string) => own.some(n => n.id === id);
   const contents = tileContents(board, links);
-  return runOrder(board, links).map(col => col.map(n => ({id: n.id, content: contents.get(n.id)!})));
+  const columns: BuiltStage[][] = runOrder(own, links.filter(l => isOwn(l.source) && isOwn(l.target))).map(col =>
+    col.map(n => ({id: n.id, content: contents.get(n.id)!})),
+  );
+  const feeds: BuiltStage[] = board
+    .filter(n => n.sectionId && n.step.kind === 'output' && links.some(l => l.source === n.id && isOwn(l.target)))
+    .map(n => {
+      const goesTo = links
+        .filter(l => l.source === n.id && isOwn(l.target))
+        .flatMap(l => {
+          const c = contents.get(l.target);
+          return c?.kind === 'step' ? [`Step ${c.number}`] : [];
+        });
+      const name = n.step.kind === 'output' ? n.step.name : '';
+      const title = sections.find(x => x.id === n.sectionId)?.title ?? 'Another workflow';
+      return {id: n.id, content: {kind: 'input', source: title, via: 'workflow', reads: name, goesTo}};
+    });
+  if (!feeds.length) return columns;
+  // Inputs run first, so these join the first column when it holds inputs, or start a new one.
+  return columns[0]?.every(st => st.content.kind === 'input') ? [[...columns[0], ...feeds], ...columns.slice(1)] : [feeds, ...columns];
 }
 
 /* ---------- Page ---------- */
 
 /** The board as it was when the workflow was turned on, so Edit can reopen it. */
-export type SavedBoard = {board: BoardNode[]; links: Link[]};
+export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]};
 
 type TurnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => void;
 /** The workflow being edited: its name, its page, and its saved board when it was built here. */
@@ -877,11 +1007,13 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
   const isPhone = useMediaQuery('(max-width: 640px)');
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard());
+  const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
-  const snapshot = (n: string, b: BoardNode[], l: Link[]) => JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l]);
-  const [original] = useState(() => snapshot(name, board, links));
-  const isDirty = snapshot(name, board, links) !== original;
+  const snapshot = (n: string, b: BoardNode[], l: Link[], sec: Section[]) =>
+    JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l, sec.map(({id, position}) => ({id, position}))]);
+  const [original] = useState(() => snapshot(name, board, links, sections));
+  const isDirty = snapshot(name, board, links, sections) !== original;
   // Where the person asked to go while the board has unsaved changes. Set, it opens the discard check.
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   const leaveTo = (href: string) => (isDirty ? setLeavingTo(href) : (window.location.hash = href.slice(1)));
@@ -900,6 +1032,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
   }, [trial]);
 
   const selected = board.find(n => n.id === selectedId) ?? null;
+  const selectedSection = sections.find(sec => sec.id === selectedId) ?? null;
   const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
   const outputs = board.filter(n => n.step.kind === 'output');
   const allChecked = outputs.every(o => checked.includes(o.id));
@@ -921,11 +1054,13 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
    */
   const place = (kind: StepKind, at?: {x: number; y: number}, fromId?: string) => {
     const id = newId();
-    const end = lastStep(board, links);
-    const from = at ? undefined : board.find(n => n.id === fromId) ?? (kind === 'input' ? undefined : end);
+    // Tiles inside sections belong to other workflows; new tiles attach only to this workflow's own.
+    const own = board.filter(n => !n.sectionId);
+    const end = lastStep(own, links);
+    const from = at ? undefined : own.find(n => n.id === fromId) ?? (kind === 'input' ? undefined : end);
     // A new LLM step slots in after `from` and takes over its lines onward, so nothing gets left behind.
     const isInsert = kind === 'instructions' && !!from && from.step.kind === 'instructions';
-    const firstStep = board.find(n => n.step.kind === 'instructions');
+    const firstStep = own.find(n => n.step.kind === 'instructions');
     let nextLinks = links;
     if (!at) {
       if (kind === 'input') nextLinks = firstStep ? [...links, link(id, firstStep.id)] : links;
@@ -934,14 +1069,14 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
           ? [...links.map(l => (l.source === from.id ? link(id, l.target) : l)), link(from.id, id)]
           : [...links, link(from.id, id)];
       } else if (kind === 'instructions') {
-        nextLinks = [...links, ...board.filter(n => n.step.kind === 'input').map(n => link(n.id, id))];
+        nextLinks = [...links, ...own.filter(n => n.step.kind === 'input').map(n => link(n.id, id))];
       }
     }
-    const position = at ?? placeFor(board, kind, from?.id);
+    const position = at ?? placeFor(own, kind, from?.id);
     setBoard(prev => {
       const sameKind = prev.filter(n => n.step.kind === kind).length;
       // Make room: when a step slots in, everything to its right moves one column over.
-      const shifted = isInsert ? prev.map(n => (n.position.x >= position.x ? {...n, position: {...n.position, x: n.position.x + COL}} : n)) : prev;
+      const shifted = isInsert ? prev.map(n => (!n.sectionId && n.position.x >= position.x ? {...n, position: {...n.position, x: n.position.x + COL}} : n)) : prev;
       return [...shifted, {id, step: blankStep(kind, sameKind), position}];
     });
     setLinks(nextLinks);
@@ -951,6 +1086,51 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
     setTrial('none');
   };
   const add = (fromId: string, kind: StepKind) => place(kind, undefined, fromId);
+
+  /**
+   * Drops a saved workflow onto the board as a section: copies of all its tiles and lines inside one frame.
+   * At `at` when dropped; otherwise to the left of everything, since a workflow you add usually feeds this one.
+   */
+  const addWorkflow = (item: LibraryItem, at?: {x: number; y: number}) => {
+    // Its own prefix, so it can't clash with a tile id such as a prefilled workflow's s1.
+    const sid = `section-${newId().slice(1)}`;
+    // Absolute positions in the saved board, so a workflow that itself has sections still lays out right.
+    const abs = (n: BoardNode) => {
+      const parent = item.saved.sections?.find(x => x.id === n.sectionId);
+      return parent ? {x: parent.position.x + n.position.x, y: parent.position.y + n.position.y} : n.position;
+    };
+    const src = item.saved.board;
+    const minX = Math.min(...src.map(n => abs(n).x));
+    const minY = Math.min(...src.map(n => abs(n).y));
+    const idOf = (id: string) => `${sid}-${id}`;
+    const tiles: BoardNode[] = src.map(n => ({
+      id: idOf(n.id), step: n.step, sectionId: sid, measured: n.measured,
+      position: {x: abs(n).x - minX + SECTION_PAD, y: abs(n).y - minY + SECTION_TOP},
+    }));
+    const size = {
+      width: Math.max(...tiles.map(t => t.position.x + (t.measured?.width ?? TILE_W))) + SECTION_PAD,
+      height: Math.max(...tiles.map(t => t.position.y + (t.measured?.height ?? TILE_H))) + SECTION_PAD,
+    };
+    const left = Math.min(0, ...board.filter(n => !n.sectionId).map(n => n.position.x), ...sections.map(x => x.position.x));
+    const top = Math.min(0, ...board.filter(n => !n.sectionId).map(n => n.position.y), ...sections.map(x => x.position.y));
+    const position = at ?? {x: left - size.width - COL / 2, y: top};
+    setSections(prev => [...prev, {id: sid, key: item.key, title: item.name, summary: boardSummary(item.saved), position, size}]);
+    setBoard(prev => [...prev, ...tiles]);
+    setLinks(prev => [...prev, ...item.saved.links.map(l => link(idOf(l.source), idOf(l.target)))]);
+    if (!at) setFitKey(k => k + 1);
+    setSelectedId(null);
+    setSelectedLinkId(null);
+    setTrial('none');
+  };
+  /** Takes a section off the board, with its tiles and every line touching them. */
+  const removeSection = (sid: string) => {
+    const gone = new Set(board.filter(n => n.sectionId === sid).map(n => n.id));
+    setBoard(prev => prev.filter(n => n.sectionId !== sid));
+    setLinks(prev => prev.filter(l => !gone.has(l.source) && !gone.has(l.target)));
+    setSections(prev => prev.filter(x => x.id !== sid));
+    setSelectedId(null);
+    setTrial('none');
+  };
 
   const changeLinks = (next: Link[]) => {
     setLinks(next);
@@ -995,7 +1175,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
     setTrial('none');
   };
 
-  const nodes: TileNode[] = useMemo(() => {
+  const tileNodes: TileNode[] = useMemo(() => {
     const contents = tileContents(board, links);
     return board.map(n => {
       // An Input tile with nothing after it offers an LLM step. LLM tiles add nothing; use the toolbar.
@@ -1005,20 +1185,28 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
       const result = trial === 'done' ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
-        id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId,
-        data: {step: n.step, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+        id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
+        data: {step: n.step, isInSection: !!n.sectionId, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board, links, selectedId, trial, checked, openTrial]);
+  // Sections come first: React Flow needs a parent before the tiles inside it.
+  const nodes: BoardFlowNode[] = [
+    ...sections.map((sec): SectionNode => ({
+      id: sec.id, type: 'section', position: sec.position, width: sec.size.width, height: sec.size.height, measured: sec.measured,
+      selected: sec.id === selectedId, data: {title: sec.title, summary: sec.summary},
+    })),
+    ...tileNodes,
+  ];
   const linkedTo = (ids: string[]): PanelLink[] =>
     ids.flatMap(id => {
       const n = board.find(b => b.id === id);
       return n ? [{id, kind: n.step.kind, title: titleOf(id)}] : [];
     });
   const titleOf = (id: string) => {
-    const content = nodes.find(n => n.id === id)?.data.content;
+    const content = tileNodes.find(n => n.id === id)?.data.content;
     return content ? tileText(content).title : '';
   };
   const viewing = board.find(n => n.id === viewingId) ?? null;
@@ -1034,7 +1222,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
 
   // React Flow reports drags (position) and measured tile sizes (dimensions). We keep both;
   // selection and content live in our own state.
-  const onNodesChange = (changes: NodeChange<TileNode>[]) => {
+  const onNodesChange = (changes: NodeChange<BoardFlowNode>[]) => {
     const kept = changes.filter(c => c.type === 'position' || c.type === 'dimensions');
     if (!kept.length) return;
     const next = applyNodeChanges(kept, nodes);
@@ -1044,10 +1232,17 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
         return m ? {...n, position: m.position, measured: m.measured} : n;
       }),
     );
+    // A dragged section moves; its tiles follow because their positions are relative to it.
+    setSections(prev =>
+      prev.map(sec => {
+        const m = next.find(x => x.id === sec.id);
+        return m ? {...sec, position: m.position, measured: m.measured} : sec;
+      }),
+    );
   };
 
   const canvas = (
-    <ReactFlow<TileNode, LinkEdge>
+    <ReactFlow<BoardFlowNode, LinkEdge>
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -1078,11 +1273,19 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
       edgesReconnectable
       deleteKeyCode={['Backspace', 'Delete']}
       onDragOver={e => {
-        if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+        if (!e.dataTransfer.types.includes(DRAG_TYPE) && !e.dataTransfer.types.includes(DRAG_WORKFLOW)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={e => {
+        const workflowKey = e.dataTransfer.getData(DRAG_WORKFLOW);
+        const item = library.find(w => w.key === workflowKey && !w.isCurrent);
+        if (item) {
+          e.preventDefault();
+          const p = screenToFlowPosition({x: e.clientX, y: e.clientY});
+          addWorkflow(item, {x: p.x - SECTION_PAD, y: p.y - SECTION_PAD});
+          return;
+        }
         const kind = e.dataTransfer.getData(DRAG_TYPE) as StepKind;
         if (!KINDS.includes(kind)) return;
         e.preventDefault();
@@ -1093,7 +1296,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
       connectionRadius={48}
       fitView
       fitViewOptions={FIT}
-      minZoom={0.3}
+      minZoom={0.2}
       maxZoom={1.5}
       colorMode="system"
       style={flowTheme}
@@ -1118,7 +1321,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
         </VStack>
       </Panel>
       <Panel position="bottom-center">
-        <BoardToolbar onAdd={kind => place(kind)} library={library} onOpen={leaveTo} />
+        <BoardToolbar onAdd={kind => place(kind)} library={library} onAddWorkflow={item => addWorkflow(item)} onOpen={leaveTo} />
       </Panel>
     </ReactFlow>
   );
@@ -1161,7 +1364,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
           isDisabled={!isDirty || !allReady}
           tooltip={!isDirty ? 'Nothing has changed yet' : !allReady ? 'Finish the tiles first' : undefined}
           onClick={() => {
-            onTurnOn(finalName, toColumns(board, links), {board, links});
+            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
             toast({body: `Changes to ${finalName} are saved.`});
           }}
         />
@@ -1173,7 +1376,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
           isDisabled={!allReady}
           tooltip={allReady ? 'Saves it to your library' : 'Finish the tiles first'}
           onClick={() => {
-            onTurnOn(finalName, toColumns(board, links), {board, links});
+            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
             toast({body: `${finalName} is saved to your library.`});
           }}
         />
@@ -1194,7 +1397,10 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
     </LayoutHeader>
   );
 
-  const panel = (
+  const sectionItem = selectedSection ? library.find(w => w.key === selectedSection.key) : undefined;
+  const panel = selectedSection ? (
+    <SectionPanel section={selectedSection} openHref={sectionItem?.href} onOpen={leaveTo} onRemove={() => removeSection(selectedSection.id)} />
+  ) : (
     <StepPanel
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
@@ -1222,7 +1428,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
         }
         end={
           // The side panel only opens for a selected tile, so the board gets the full width otherwise.
-          isNarrow || !selected ? undefined : (
+          isNarrow || (!selected && !selectedSection) ? undefined : (
             <LayoutPanel hasDivider padding={4} width={360} label="Selected tile">
               {panel}
             </LayoutPanel>
@@ -1246,7 +1452,7 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
         <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board, links)} onClose={() => setViewingId(null)} />
       )}
       {isNarrow && (
-        <Dialog isOpen={!!selected} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
+        <Dialog isOpen={!!selected || !!selectedSection} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
           <Layout
             height="fill"
             header={<DialogHeader title="Set up tile" onOpenChange={open => !open && setSelectedId(null)} />}
