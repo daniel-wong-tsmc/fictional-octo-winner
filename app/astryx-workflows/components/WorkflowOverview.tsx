@@ -170,7 +170,7 @@ export function WorkflowOverview({
 
             <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
               <HandoffList title="Uses from other workflows" items={uses} emptyText="Nothing from other workflows." />
-              <HandoffList title="Shares with other workflows" items={shares} emptyText="Nothing shared yet. Add a shared value from a step’s output sheet." />
+              <HandoffList title="Shares with other workflows" items={shares} emptyText="Nothing shared yet. Add a shared value from a step’s output results." />
             </Grid>
 
             <VStack gap={2}>

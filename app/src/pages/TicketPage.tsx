@@ -420,7 +420,7 @@ export function TicketPage({
     setInputSheet(names[0]);
     setInputsOpen(true);
     setUpload(null);
-    toast({body: `Added ${names.length} ${names.length === 1 ? 'sheet' : 'sheets'} from ${file.name} to Input sheets.`});
+    toast({body: `Added ${names.length} ${names.length === 1 ? 'sheet' : 'sheets'} from ${file.name} to Input data.`});
   };
 
   return (
@@ -507,82 +507,7 @@ export function TicketPage({
               />
             )}
 
-            {/* Inputs and output on the left, instructions on the right */}
-            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
-              <VStack gap={3}>
-                <Region
-                  title="Inputs"
-                  count={inputCount}
-                  endContent={
-                    <DropdownMenu
-                      button={{label: 'Add input', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
-                      header={<Text type="supporting">From another workflow</Text>}
-                      alignment="end"
-                      items={
-                        otherHandoffs.length
-                          ? otherHandoffs.map(h => ({
-                              label: h.name,
-                              description: `${h.workflow} · ${shapeOf(h.rule)} · ${h.value ?? ''}`,
-                              icon: <Icon icon={ArrowRightLeft} />,
-                              onClick: () => {
-                                setLinkedInputs(prev => [...prev, h.id]);
-                                toast({body: `${h.name} from ${h.workflow} is now an input. It fills in on every run.`});
-                              },
-                            }))
-                          : [{label: 'No other shared values yet', isDisabled: true}]
-                      }
-                    />
-                  }>
-                  <List hasDividers edge="outset">
-                    {fileInputs.map(d => <DataRow key={d.name} data={d} onSelect={() => goToInput(d.sheet)} />)}
-                  </List>
-                  {linkedInputs.length > 0 && (
-                    <List hasDividers edge="outset" header={<Text type="supporting">From other workflows</Text>}>
-                      {linkedInputs.map(hid => {
-                        const h = handoffs.find(x => x.id === hid);
-                        return h ? <HandoffInputRow key={hid} handoff={h} onRemove={() => setLinkedInputs(prev => prev.filter(x => x !== hid))} /> : null;
-                      })}
-                    </List>
-                  )}
-                </Region>
-
-                <Region title="Output">
-                  {/* Step 1: the result, always passed on */}
-                  <VStack gap={1.5}>
-                    <Text type="label">Result</Text>
-                    <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
-                  </VStack>
-                  <List edge="outset">
-                    <DataRow data={result} onSelect={() => goToOutput(result.sheet)} />
-                  </List>
-
-                  <Divider />
-
-                  {/* Step 2: handoffs, with step 3: checks */}
-                  <VStack gap={0.5}>
-                    <Text type="label">{`Shared values · ${myHandoffs.length}`}</Text>
-                    <Text type="supporting">
-                      {hasResult
-                        ? 'Values from the result that other workflows can use as inputs. Add one from the output sheet below.'
-                        : 'Values other workflows can use as inputs. Available after the agent has run.'}
-                    </Text>
-                  </VStack>
-
-                  <List hasDividers edge="outset">
-                  {myHandoffs.map(h => (
-                    <HandoffRow
-                      key={h.id}
-                      handoff={h}
-                      onRemove={() => {
-                        onRemoveHandoff(h.id);
-                        toast({body: h.usedBy.length ? `Removed ${h.name}. ${h.usedBy.join(' and ')} lost this input.` : `Removed ${h.name}.`});
-                      }}
-                    />
-                  ))}
-                  </List>
-                </Region>
-              </VStack>
-
+            {/* Instructions on top, then inputs beside outputs. The sheets follow: output results, then input data. */}
               <Region title="Instructions to the agent" variant="muted">
                 <VStack gap={4}>
                   {isEditing ? (
@@ -632,11 +557,82 @@ export function TicketPage({
                   </Collapsible>
                 </VStack>
               </Region>
+            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
+              <Region
+                title="Inputs"
+                count={inputCount}
+                endContent={
+                  <DropdownMenu
+                    button={{label: 'Add input', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
+                    header={<Text type="supporting">From another workflow</Text>}
+                    alignment="end"
+                    items={
+                      otherHandoffs.length
+                        ? otherHandoffs.map(h => ({
+                            label: h.name,
+                            description: `${h.workflow} · ${shapeOf(h.rule)} · ${h.value ?? ''}`,
+                            icon: <Icon icon={ArrowRightLeft} />,
+                            onClick: () => {
+                              setLinkedInputs(prev => [...prev, h.id]);
+                              toast({body: `${h.name} from ${h.workflow} is now an input. It fills in on every run.`});
+                            },
+                          }))
+                        : [{label: 'No other shared values yet', isDisabled: true}]
+                    }
+                  />
+                }>
+                <List hasDividers edge="outset">
+                  {fileInputs.map(d => <DataRow key={d.name} data={d} onSelect={() => goToInput(d.sheet)} />)}
+                </List>
+                {linkedInputs.length > 0 && (
+                  <List hasDividers edge="outset" header={<Text type="supporting">From other workflows</Text>}>
+                    {linkedInputs.map(hid => {
+                      const h = handoffs.find(x => x.id === hid);
+                      return h ? <HandoffInputRow key={hid} handoff={h} onRemove={() => setLinkedInputs(prev => prev.filter(x => x !== hid))} /> : null;
+                    })}
+                  </List>
+                )}
+              </Region>
+              <Region title="Outputs">
+                {/* Step 1: the result, always passed on */}
+                <VStack gap={1.5}>
+                  <Text type="label">Result</Text>
+                  <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
+                </VStack>
+                <List edge="outset">
+                  <DataRow data={result} onSelect={() => goToOutput(result.sheet)} />
+                </List>
+
+                <Divider />
+
+                {/* Step 2: handoffs, with step 3: checks */}
+                <VStack gap={0.5}>
+                  <Text type="label">{`Shared values · ${myHandoffs.length}`}</Text>
+                  <Text type="supporting">
+                    {hasResult
+                      ? 'Values from the result that other workflows can use as inputs. Add one from the output results below.'
+                      : 'Values other workflows can use as inputs. Available after the agent has run.'}
+                  </Text>
+                </VStack>
+
+                <List hasDividers edge="outset">
+                {myHandoffs.map(h => (
+                  <HandoffRow
+                    key={h.id}
+                    handoff={h}
+                    onRemove={() => {
+                      onRemoveHandoff(h.id);
+                      toast({body: h.usedBy.length ? `Removed ${h.name}. ${h.usedBy.join(' and ')} lost this input.` : `Removed ${h.name}.`});
+                    }}
+                  />
+                ))}
+                </List>
+              </Region>
             </Grid>
 
             {/* Sheets: output first (what you approve), inputs collapsed */}
             <Workbook
-              title="Output sheets"
+              title="Output results"
               description="What the agent writes. Read only; change the instructions to change these."
               sheets={outputSheets}
               selected={outputSheet}
@@ -691,7 +687,7 @@ export function TicketPage({
             />
             {inputSheets.length > 0 && (
               <Workbook
-                title="Input sheets"
+                title="Input data"
                 description="What the agent reads. Upload an Excel to add its sheets here."
                 sheets={inputSheets}
                 selected={inputSheet}
