@@ -64,11 +64,7 @@ export function LiveWorkflowPage({name, saved, handoffs, isStep3Approved, onDele
       approvers={[...new Set(outputs.map(o => o.approver).filter(Boolean))]}
       sendTo={[...new Set(outputs.flatMap(o => o.sendTo))]}
       columns={columns}
-      onOpenStage={st => {
-        // A step waiting on you opens its ticket; anything else opens the board, as on every workflow.
-        const ticketId = steps.find(s => s.id === st.id)?.ticketId ?? (st.id === 'out' ? 3 : undefined);
-        window.location.hash = ticketId ? `ticket-${ticketId}` : 'workflow-edit';
-      }}
+      onOpenStage={st => (window.location.hash = `workflow-edit?tile=${st.id}`)}
       uses={handoffs.filter(h => w.uses.includes(h.id)).map(h => ({id: h.id, name: h.name, detail: `From ${h.workflow} · ${h.value ?? ''}`}))}
       shares={handoffs.filter(h => h.workflow === w.name).map(h => ({id: h.id, name: h.name, detail: handoffDetail(h)}))}
       runs={runs}
@@ -96,7 +92,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
       approvers={[...new Set(outputs.map(o => o.approver).filter(Boolean))]}
       sendTo={[...new Set(outputs.flatMap(o => o.sendTo))]}
       columns={columns}
-      onOpenStage={() => (window.location.hash = `workflow-edit-${w.id}`)}
+      onOpenStage={st => (window.location.hash = `workflow-edit-${w.id}?tile=${st.id}`)}
       uses={[]}
       shares={[]}
       runs={[]}

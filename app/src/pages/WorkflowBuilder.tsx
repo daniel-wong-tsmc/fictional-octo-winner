@@ -8,6 +8,7 @@ import '@xyflow/react/dist/style.css';
 import {Layout, LayoutContent, LayoutFooter, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
+import {List, ListItem} from '@astryxdesign/core/List';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -33,6 +34,7 @@ import {useToast} from '@astryxdesign/core/Toast';
 import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Save, Trash2, Upload} from 'lucide-react';
 import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
+import type {TileRun} from '../tasks';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
@@ -361,12 +363,45 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
   );
 }
 
-function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
+/** A tile the selected tile is linked to, for the panel's Comes from and Goes to lists. */
+type PanelLink = {id: string; kind: StepKind; title: string};
+
+/** Tiles linked to the selected one. Clicking one selects it, so you can walk the workflow from the panel. */
+function LinkedTiles({label, items, emptyText, onSelect}: {label: string; items: PanelLink[]; emptyText: string; onSelect: (id: string) => void}) {
+  return (
+    <List header={<Text type="label">{label}</Text>} hasDividers edge="outset" density="compact">
+      {items.length ? (
+        items.map(l => (
+          <ListItem
+            key={l.id}
+            onClick={() => onSelect(l.id)}
+            startContent={<Icon icon={KIND_INFO[l.kind].icon} size="sm" color="secondary" />}
+            label={<Text>{l.title}</Text>}
+            description={KIND_INFO[l.kind].label}
+          />
+        ))
+      ) : (
+        <ListItem label={<Text type="supporting">{emptyText}</Text>} />
+      )}
+    </List>
+  );
+}
+
+/**
+ * The side panel for the selected tile: what flows in, its settings (for an LLM step, the agent's
+ * instructions), what flows out, and its last run when it has a ticket.
+ */
+function StepPanel({step, title, comesFrom, goesTo, run, trial, onOpenTrial, onChange, onRemove, onSelect}: {
   step: Step | null;
+  title: string;
+  comesFrom: PanelLink[];
+  goesTo: PanelLink[];
+  run?: TileRun;
   trial: TrialResult | null;
   onOpenTrial: () => void;
   onChange: (s: Step) => void;
   onRemove: () => void;
+  onSelect: (id: string) => void;
 }) {
   if (!step) {
     return <EmptyState isCompact title="Select a tile" description="Click a tile on the board to set it up." />;
@@ -374,10 +409,39 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
   const info = KIND_INFO[step.kind];
   return (
     <VStack gap={4}>
-      <HStack gap={2} vAlign="center">
-        <Icon icon={info.icon} size="sm" />
-        <Heading level={3}>{info.label}</Heading>
-      </HStack>
+      <VStack gap={1}>
+        <HStack gap={2} vAlign="center">
+          <Icon icon={info.icon} size="sm" color="secondary" />
+          <Text type="supporting" weight="medium">{info.label}</Text>
+        </HStack>
+        <Heading level={3}>{title}</Heading>
+      </VStack>
+
+      {run && (
+        <>
+          <VStack gap={1.5}>
+            <Text type="label">Last run</Text>
+            <HStack gap={1.5} vAlign="center">
+              <StatusDot variant={run.tone} label={run.label} />
+              <Text weight="medium">{run.label}</Text>
+              <Text type="supporting">{run.ran}</Text>
+            </HStack>
+            {step.kind === 'instructions' && run.summary.length > 0 && (
+              <List hasDividers={false} density="compact" edge="outset">
+                {run.summary.map(line => <ListItem key={line} label={<Text type="supporting">{line}</Text>} />)}
+              </List>
+            )}
+            <HStack>
+              <Button label="Open ticket" size="sm" href={`#ticket-${run.ticketId}`} />
+            </HStack>
+          </VStack>
+          <Divider />
+        </>
+      )}
+
+      {step.kind !== 'input' && (
+        <LinkedTiles label="Comes from" items={comesFrom} emptyText="Nothing yet. Draw a line into this tile." onSelect={onSelect} />
+      )}
 
       {trial && (
         <>
@@ -399,6 +463,7 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
 
       {step.kind === 'instructions' && (
         <>
+          <Text type="label">Agent instructions</Text>
           <TextInput
             label="Step name"
             description="Optional. A short name shows on the tile next to the step number."
@@ -446,6 +511,10 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
             onChange={shareWithWorkflows => onChange({...step, shareWithWorkflows})}
           />
         </>
+      )}
+
+      {step.kind !== 'output' && (
+        <LinkedTiles label="Goes to" items={goesTo} emptyText="Nothing yet. Draw a line out of this tile." onSelect={onSelect} />
       )}
 
       <Divider />
@@ -745,8 +814,13 @@ export type SavedBoard = {board: BoardNode[]; links: Link[]};
 
 type TurnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => void;
 /** The workflow being edited: its name, its page, and its saved board when it was built here. */
-export type Editing = {name: string; href: string; saved?: SavedBoard};
-type BuilderProps = {editing?: Editing; onTurnOn: TurnOn};
+/**
+ * The workflow being edited: its name, its page, its saved board when it has one, and the last run of each
+ * tile that has a ticket (by tile id), for the side panel.
+ */
+export type Editing = {name: string; href: string; saved?: SavedBoard; runs?: Record<string, TileRun>};
+/** selectTile opens the board with that tile selected, so its side panel is open. */
+type BuilderProps = {editing?: Editing; selectTile?: string; onTurnOn: TurnOn};
 
 export function WorkflowBuilderPage(props: BuilderProps) {
   return (
@@ -756,7 +830,7 @@ export function WorkflowBuilderPage(props: BuilderProps) {
   );
 }
 
-function Builder({editing, onTurnOn}: BuilderProps) {
+function Builder({editing, selectTile, onTurnOn}: BuilderProps) {
   const isEditing = !!editing;
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
@@ -770,7 +844,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const [original] = useState(() => snapshot(name, board, links));
   const isDirty = snapshot(name, board, links) !== original;
   const [isDiscarding, setIsDiscarding] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => (selectTile && board.some(n => n.id === selectTile) ? selectTile : null));
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
@@ -897,6 +971,11 @@ function Builder({editing, onTurnOn}: BuilderProps) {
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board, links, selectedId, trial, checked, openTrial]);
+  const linkedTo = (ids: string[]): PanelLink[] =>
+    ids.flatMap(id => {
+      const n = board.find(b => b.id === id);
+      return n ? [{id, kind: n.step.kind, title: titleOf(id)}] : [];
+    });
   const titleOf = (id: string) => {
     const content = nodes.find(n => n.id === id)?.data.content;
     return content ? tileText(content).title : '';
@@ -1077,6 +1156,14 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const panel = (
     <StepPanel
       step={selected?.step ?? null}
+      title={selected ? titleOf(selected.id) : ''}
+      comesFrom={linkedTo(links.filter(l => l.target === selectedId).map(l => l.source))}
+      goesTo={linkedTo(links.filter(l => l.source === selectedId).map(l => l.target))}
+      run={selectedId ? editing?.runs?.[selectedId] : undefined}
+      onSelect={id => {
+        setSelectedId(id);
+        setSelectedLinkId(null);
+      }}
       trial={selected && isTried ? trialFor(selected, board, links) : null}
       onOpenTrial={() => selected && openTrial(selected.id)}
       onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />

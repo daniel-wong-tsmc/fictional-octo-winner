@@ -54,16 +54,10 @@ export type Ticket = {
   agentSummary?: string[];
   python: string;
   outputs: DataSet[];
-  connections: string[];
   sheets: Record<string, Sheet>;
   canApprove?: boolean;
   isDraft?: boolean;
 };
-
-export const AVAILABLE_CONNECTIONS: [string, string][] = [
-  ['Salesforce', 'CRM'], ['SharePoint', 'Files'], ['Google Drive', 'Files'], ['Snowflake', 'Warehouse'],
-  ['Slack', 'Messages'], ['Shopify', 'Orders'], ['Zendesk', 'Support'], ['ECB exchange rates', 'Rates'], ['HubSpot', 'CRM'],
-];
 
 export const TASKS: Task[] = [{id: 3, ticketId: 3}];
 
@@ -105,7 +99,6 @@ export const TICKETS: Record<number, Ticket> = {
     agentSummary: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Stopped before writing the output: no Currency column to carry forward'],
     python: `orders = read_sheet("Orders this week")\nrefunds = read_sheet("Refunds")\n\nnet = orders.merge(refunds, on="Order ID", how="left")\nnet["Amount"] = net["Amount"] - net["Refund amount"].fillna(0)\nnet = net[["Order ID", "Date", "Region", "Currency", "Amount"]]  # fails: no Currency`,
     outputs: [{name: 'Net orders', emptyNote: 'Not produced. The run stopped before this step finished.', feedsInto: [['step', 'Convert to USD', '#ticket-2']], sheet: 'Net orders'}],
-    connections: ['SharePoint', 'Shopify'],
     sheets: {
       'Orders this week': {kind: 'Input', columns: ['Order ID', 'Date', 'Customer', 'Region', 'Amount', 'Currency'], missingColumns: [5], rows: [
         ['SO-48211', '2026-11-09', 'Lindqvist AB', 'Europe', '1,240.00', ''], ['SO-48212', '2026-11-09', 'Tanaka Trading', 'Japan', '182,500', ''],
@@ -125,7 +118,6 @@ export const TICKETS: Record<number, Ticket> = {
     agentSummary: ["Looked up the rate for each order's currency and date", "Used Friday's rate for 37 weekend orders", 'Added one new column: Amount (USD)'],
     python: `orders = read_sheet("Net orders").sort_values("Date")\nrates = read_sheet("Exchange rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency",\n                    direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
     outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#home'], ['workflow', 'Monthly sales close', '#ticket-3']], sheet: 'Orders in USD'}],
-    connections: ['ECB exchange rates', 'SharePoint'],
     sheets: {
       'Net orders': NET_ORDERS,
       'Exchange rates': {kind: 'Input', columns: ['Date', 'Currency', 'Rate to USD'], rows: [['2026-11-06', 'EUR', '1.0832'], ['2026-11-06', 'GBP', '1.2915'], ['2026-11-09', 'EUR', '1.0841'], ['2026-11-09', 'JPY', '0.00662'], ['2026-11-10', 'CAD', '0.7271'], ['2026-11-11', 'GBP', '1.2930'], ['2026-11-12', 'EUR', '1.0866']]},
@@ -144,7 +136,6 @@ export const TICKETS: Record<number, Ticket> = {
     agentSummary: ['Totaled 5,402 orders into 5 regions', 'Matched each region to its October target', 'Sorted by gap, biggest shortfall first'],
     python: `orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
     outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Google Drive: Finance close pack', '#home']], sheet: 'October summary'}],
-    connections: ['Google Drive', 'Slack'],
     sheets: {
       'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
       Targets: {kind: 'Input', columns: ['Region', 'Month', 'Target (USD)'], rows: [['US', 'Oct', '1,850,000'], ['Europe', 'Oct', '1,240,000'], ['UK', 'Oct', '610,000'], ['Japan', 'Oct', '420,000'], ['Canada', 'Oct', '300,000']]},
@@ -163,7 +154,6 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Flag customers who haven't ordered in 60 days, or who opened 3 or more support tickets in the last 90 days. Add a column that says which rule they hit.",
     python: '# The agent writes this after the first run.',
     outputs: [{name: 'Customers at risk', emptyNote: 'Not produced yet. Run the step to see the result here.', feedsInto: [['step', 'Weekly retention email', '#home']], sheet: 'Customers at risk'}],
-    connections: ['Salesforce', 'Zendesk'],
     sheets: {
       'Active customers': {kind: 'Input', columns: ['Customer', 'Account owner', 'Last order', 'Plan'], rows: [['Lindqvist AB', 'M. Okafor', '2026-11-02', 'Pro'], ['Tanaka Trading', 'J. Weiss', '2026-08-21', 'Team'], ['Harper & Cole', 'M. Okafor', '2026-10-30', 'Pro'], ['Maison Ferrand', 'A. Dubois', '2026-07-14', 'Starter'], ['Northpeak Ltd', 'J. Weiss', '2026-11-10', 'Team']]},
       'Support tickets': {kind: 'Input', columns: ['Ticket', 'Customer', 'Opened', 'Topic'], rows: [['ZD-9921', 'Tanaka Trading', '2026-10-03', 'Billing'], ['ZD-9988', 'Tanaka Trading', '2026-10-19', 'Login'], ['ZD-10102', 'Tanaka Trading', '2026-11-04', 'Billing'], ['ZD-10140', 'Harper & Cole', '2026-11-06', 'Export']]},
@@ -179,7 +169,6 @@ export const TICKETS: Record<number, Ticket> = {
     agentSummary: ['Read the newest stock file', 'Kept 41 items below their reorder point'],
     python: `stock = read_sheet("Warehouse stock")\nlow = stock[stock["On hand"] < stock["Reorder point"]]\nwrite_sheet("Low-stock items", low)`,
     outputs: [{name: 'Low-stock items', stats: ['41 rows', '4 columns', 'From Nov 11 data'], feedsInto: [['workflow', 'Q1 forecast', '#ticket-6'], ['file', 'Weekly ops report', '#home']], sheet: 'Low-stock items'}],
-    connections: ['SharePoint'],
     sheets: {
       'Warehouse stock': {kind: 'Input', columns: ['SKU', 'Item', 'On hand', 'Reorder point'], rows: [['SKU-1102', 'Steel brackets, 40mm', '1,200', '800'], ['SKU-1107', 'Hinge set, matte', '140', '300'], ['SKU-1220', 'Cable ties, 200pk', '2,850', '1,000'], ['SKU-1301', 'Wall anchors, M6', '90', '250'], ['SKU-1315', 'Shelf pins', '4,400', '2,000']]},
       'Low-stock items': LOW_STOCK,
@@ -196,7 +185,6 @@ export const TICKETS: Record<number, Ticket> = {
     agentSummary: ['Averaged Q1 sales for 2025 and 2026 per product line', 'Applied 4% growth', 'Flagged 2 product lines short of stock'],
     python: `hist = read_sheet("Sales history")\nq1 = hist[hist["Month"].str[-2:].isin(["01", "02", "03"])]\nbase = q1.groupby("Product line")["Units"].sum() / 2\nforecast = (base * 1.04).round().rename("Q1 forecast")`,
     outputs: [{name: 'Q1 forecast by line', stats: ['18 rows', '4 columns'], feedsInto: [['file', 'Board pack', '#home']], sheet: 'Q1 forecast'}],
-    connections: ['Snowflake'],
     sheets: {
       'Sales history': {kind: 'Input', columns: ['Month', 'Product line', 'Units'], rows: [['2026-01', 'Hardware', '18,420'], ['2026-02', 'Hardware', '16,980'], ['2026-03', 'Hardware', '19,310'], ['2026-01', 'Fasteners', '42,100'], ['2026-02', 'Fasteners', '39,870']]},
       'Low-stock items': {...LOW_STOCK, kind: 'Input'},

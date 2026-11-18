@@ -21,3 +21,29 @@ export function toWorkflowTask(task: Task, approved: number[]): WorkflowTask | n
     href: `#ticket-${task.ticketId}`,
   };
 }
+
+/** The last run of a tile that has a ticket, as the board's side panel shows it. */
+export type TileRun = {
+  ticketId: number;
+  tone: 'info' | 'success' | 'warning' | 'neutral';
+  label: string;
+  /** When it ran, or who approved it. */
+  ran: string;
+  /** What the agent did, in its own short lines. */
+  summary: string[];
+};
+
+const RUN_STATUS = {
+  needsApproval: {tone: 'info', label: 'Needs approval'},
+  complete: {tone: 'success', label: 'Approved'},
+  missingData: {tone: 'warning', label: 'Missing data'},
+  notRun: {tone: 'neutral', label: 'Not run yet'},
+} as const;
+
+/** Reads a ticket's last run: its condition, when it ran, and what the agent did. */
+export function ticketRun(ticketId: number, approved: number[]): TileRun {
+  const t = TICKETS[ticketId];
+  const isApproved = approved.includes(ticketId);
+  const status = RUN_STATUS[ticketCondition(t, isApproved)];
+  return {ticketId, ...status, ran: isApproved ? 'Approved just now' : t.ran, summary: t.agentSummary ?? []};
+}

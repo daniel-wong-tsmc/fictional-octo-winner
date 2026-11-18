@@ -27,9 +27,9 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
-  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plug, Plus, RotateCcw, Sparkles, Trash2,
+  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, MousePointerClick, Pencil, Plus, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
-import {AVAILABLE_CONNECTIONS, TICKETS, type DataSet, type Sheet} from '../data';
+import {TICKETS, type DataSet, type Sheet} from '../data';
 import {
   CHECK_LABEL, checksFor, describeRule, previewValue, rulesForPick, shapeOf,
   type CheckKind, type Handoff, type Pick,
@@ -249,33 +249,6 @@ function AddHandoffDialog({
   );
 }
 
-/* ---------- Connections (MCP servers) ---------- */
-
-function Connections({items, onAdd, onRemove}: {items: string[]; onAdd: (n: string) => void; onRemove: (n: string) => void}) {
-  const available = AVAILABLE_CONNECTIONS.filter(([n]) => !items.includes(n));
-  return (
-    <VStack gap={2}>
-      <HStack hAlign="between" vAlign="center">
-        <Text type="label">Connections the agent can use</Text>
-      </HStack>
-      <HStack gap={1.5} wrap="wrap" vAlign="center">
-        {items.map(name => (
-          <Token key={name} label={name} icon={<StatusDot variant="success" label="Connected" />} onRemove={() => onRemove(name)} />
-        ))}
-        <DropdownMenu
-          button={{label: 'Add connection', variant: 'ghost', size: 'sm', icon: <Icon icon={Plus} />}}
-          header={<Text type="supporting">Approved by your workspace admin</Text>}
-          items={
-            available.length
-              ? available.map(([name, kind]) => ({label: name, description: kind, icon: <Icon icon={Plug} />, onClick: () => onAdd(name)}))
-              : [{label: 'All approved connections are added', isDisabled: true}]
-          }
-        />
-      </HStack>
-    </VStack>
-  );
-}
-
 /* ---------- Sheets ---------- */
 
 /** The workflow builder's trial dialog imports the sheet table from here. */
@@ -389,7 +362,6 @@ export function TicketPage({
   const [isPicking, setIsPicking] = useState(false);
   const [pick, setPick] = useState<Pick | null>(null);
   const [instructions, setInstructions] = useState(t.instructions);
-  const [connections, setConnections] = useState(t.connections);
   const [isApproved, setIsApproved] = useState(t.status === 'done');
   const [upload, setUpload] = useState<File | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -658,18 +630,6 @@ export function TicketPage({
                     trigger={<Text type="supporting" weight="medium">Show the code</Text>}>
                     <CodeBlock code={t.python} language="python" width="100%" size="sm" isWrapped />
                   </Collapsible>
-                  <Divider />
-                  <Connections
-                    items={connections}
-                    onAdd={name => {
-                      setConnections(c => [...c, name]);
-                      toast({body: `Connected ${name} to this ticket.`});
-                    }}
-                    onRemove={name => {
-                      setConnections(c => c.filter(x => x !== name));
-                      toast({body: `Disconnected ${name}. The agent can't read from it on this ticket.`});
-                    }}
-                  />
                 </VStack>
               </Region>
             </Grid>

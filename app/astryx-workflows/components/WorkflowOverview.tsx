@@ -177,7 +177,7 @@ export function WorkflowOverview({
               <VStack gap={0.5}>
                 <Text type="label">How it runs</Text>
                 <Text type="supporting">
-                  {`The tiles in the order they run. Tiles stacked together run side by side.${onOpenStage ? ' Click a tile to see it.' : ''}`}
+                  {`The tiles in the order they run. Tiles stacked together run side by side.${onOpenStage ? ' Click a tile to open it on the board.' : ''}`}
                 </Text>
               </VStack>
               {isVertical ? (

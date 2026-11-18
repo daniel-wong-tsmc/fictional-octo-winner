@@ -9,7 +9,7 @@ import {
   Home as HomeIcon, Plus, UserCircle, Workflow,
 } from 'lucide-react';
 import {TASKS, TICKETS, type Task} from './data';
-import {toWorkflowTask} from './tasks';
+import {ticketRun, toWorkflowTask, type TileRun} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
@@ -30,7 +30,9 @@ function useHashRoute(): string {
 }
 
 export default function App() {
-  const route = useHashRoute();
+  // A route can carry ?tile=<id>, which opens the board with that tile selected.
+  const [route, query = ''] = useHashRoute().split('?');
+  const selectTile = new URLSearchParams(query).get('tile') ?? undefined;
   const [tasks, setTasks] = useState<Task[]>(TASKS);
   // Tickets the person approved here. A ticket's condition is read from the ticket plus this.
   const [approved, setApproved] = useState<number[]>([]);
@@ -68,6 +70,13 @@ export default function App() {
     window.location.hash = 'home';
     toast({body: `${salesClose.name} is deleted.`});
   };
+
+  // Monthly sales close's tiles that have a ticket: each step with one, and the Handoff after the last step.
+  const lastStep = MONTHLY_SALES_CLOSE.steps[MONTHLY_SALES_CLOSE.steps.length - 1];
+  const salesCloseRuns: Record<string, TileRun> = Object.fromEntries([
+    ...MONTHLY_SALES_CLOSE.steps.flatMap(st => (st.ticketId ? [[st.id, ticketRun(st.ticketId, approved)]] : [])),
+    ...(lastStep.ticketId ? [['out', ticketRun(lastStep.ticketId, approved)]] : []),
+  ]);
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
@@ -135,8 +144,9 @@ export default function App() {
           editing={
             editingBuilt
               ? {name: editingBuilt.name, href: `#workflow-${editingBuilt.id}`, saved: editingBuilt.saved as SavedBoard}
-              : route === 'workflow-edit' ? {name: salesClose.name, href: '#workflow-1', saved: salesClose.saved} : undefined
+              : route === 'workflow-edit' ? {name: salesClose.name, href: '#workflow-1', saved: salesClose.saved, runs: salesCloseRuns} : undefined
           }
+          selectTile={selectTile}
           onTurnOn={(name, columns, saved) => {
             if (route !== 'workflow-edit') return turnOn(name, columns, saved);
             setSalesClose({name, saved});
