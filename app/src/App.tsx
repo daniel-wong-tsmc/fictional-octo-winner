@@ -153,7 +153,7 @@ export default function App() {
           }}
         />
       ) : route === 'workflow-1' && hasSalesClose ? (
-        <LiveWorkflowPage name={salesClose.name} saved={salesClose.saved} handoffs={handoffs} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />
+        <LiveWorkflowPage name={salesClose.name} saved={salesClose.saved} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (

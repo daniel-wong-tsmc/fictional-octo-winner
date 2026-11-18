@@ -1,12 +1,10 @@
 import {Fragment, useState, type CSSProperties} from 'react';
 import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
-import {Grid} from '@astryxdesign/core/Grid';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Card} from '@astryxdesign/core/Card';
-import {List, ListItem} from '@astryxdesign/core/List';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Table, pixel, type TableColumn} from '@astryxdesign/core/Table';
@@ -15,7 +13,7 @@ import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {
-  ArrowDown, ArrowRight, ArrowRightLeft, CalendarClock, Pencil, Play, Send, Trash2, UserCheck,
+  ArrowDown, ArrowRight, CalendarClock, Pencil, Play, Send, Trash2, UserCheck,
 } from 'lucide-react';
 import {WorkflowTile, type WorkflowTileContent, type WorkflowTileTone} from './WorkflowTile';
 
@@ -29,8 +27,6 @@ export type WorkflowStage = {
   status?: {tone: WorkflowTone; label: string};
 };
 
-/** A value shared between workflows. */
-export type WorkflowHandoff = {id: string; name: string; detail: string};
 
 /** One run. period names the data it covered and identifies the row; started and finished are shown as date and time. */
 export type WorkflowRun = {period: string; started: string; tone: WorkflowTone; result: string; finished: string};
@@ -47,8 +43,6 @@ export type WorkflowOverviewProps = {
   columns: WorkflowStage[][];
   /** Called when a stage is clicked. Without it, stages are not clickable. */
   onOpenStage?: (stage: WorkflowStage) => void;
-  uses: WorkflowHandoff[];
-  shares: WorkflowHandoff[];
   runs: WorkflowRun[];
   /** Where Edit workflow goes. */
   editHref: string;
@@ -67,35 +61,14 @@ function StageCard({stage, onOpen}: {stage: WorkflowStage; onOpen?: (s: Workflow
   );
 }
 
-function HandoffList({title, items, emptyText}: {title: string; items: WorkflowHandoff[]; emptyText: string}) {
-  return (
-    <Card padding={4}>
-      <List header={<Text type="label">{title}</Text>} hasDividers edge="outset">
-        {items.length ? (
-          items.map(h => (
-            <ListItem
-              key={h.id}
-              startContent={<Icon icon={ArrowRightLeft} size="sm" color="secondary" />}
-              label={<Text weight="medium">{h.name}</Text>}
-              description={h.detail}
-            />
-          ))
-        ) : (
-          <ListItem label={<Text type="supporting">{emptyText}</Text>} />
-        )}
-      </List>
-    </Card>
-  );
-}
-
 type RunRow = WorkflowRun & Record<string, unknown>;
 
 /**
- * The page for one workflow: what it is, when it runs, its stages in order, what it shares, and its runs.
+ * The page for one workflow: what it is, when it runs, its recent runs, and its stages in order.
  * Every workflow page uses it, so they all look the same.
  */
 export function WorkflowOverview({
-  name, summary, schedule, nextRun, approvers, sendTo, columns, onOpenStage, uses, shares, runs, editHref, onRunNow, onDelete,
+  name, summary, schedule, nextRun, approvers, sendTo, columns, onOpenStage, runs, editHref, onRunNow, onDelete,
   homeHref = '#home',
 }: WorkflowOverviewProps) {
   const isVertical = useMediaQuery('(max-width: 900px)');
@@ -167,11 +140,6 @@ export function WorkflowOverview({
                 )}
               </VStack>
             </Card>
-
-            <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="start">
-              <HandoffList title="Uses from other workflows" items={uses} emptyText="Nothing from other workflows." />
-              <HandoffList title="Shares with other workflows" items={shares} emptyText="Nothing shared with other workflows yet." />
-            </Grid>
 
             <VStack gap={2}>
               <VStack gap={0.5}>

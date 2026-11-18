@@ -4,7 +4,6 @@ import {
 } from '@workspace/astryx-workflows/components/WorkflowOverview';
 import {MONTHLY_SALES_CLOSE, type BuiltWorkflow, type StepRunStatus} from '../workflow';
 import {toColumns, type SavedBoard} from './WorkflowBuilder';
-import type {Handoff} from '../handoffs';
 
 /* ---------- Workflow pages ----------
  * Every workflow page is the WorkflowOverview component from the app's Astryx integration
@@ -26,16 +25,14 @@ const SOURCE_TONE = {
 } as const;
 const RUN_TONE = {review: 'info', approved: 'success', rerun: 'success'} as const;
 const runNow = (toast: ReturnType<typeof useToast>) => () => toast({body: 'Preview only. Running a workflow comes with the real build.'});
-const handoffDetail = (h: Handoff) => `${h.value ?? ''} · used by ${h.usedBy.length ? h.usedBy.join(', ') : 'nothing yet'}`;
 
 /**
  * Monthly sales close. Its tiles come from its stored board, the same board Edit opens, so the page and the
  * board always match. This month's run adds a status to the tiles it knows about.
  */
-export function LiveWorkflowPage({name, saved, handoffs, isStep3Approved, onDelete}: {
+export function LiveWorkflowPage({name, saved, isStep3Approved, onDelete}: {
   name: string;
   saved: SavedBoard;
-  handoffs: Handoff[];
   isStep3Approved: boolean;
   onDelete: () => void;
 }) {
@@ -65,8 +62,6 @@ export function LiveWorkflowPage({name, saved, handoffs, isStep3Approved, onDele
       sendTo={[...new Set(outputs.flatMap(o => o.sendTo))]}
       columns={columns}
       onOpenStage={st => (window.location.hash = `workflow-edit?tile=${st.id}`)}
-      uses={handoffs.filter(h => w.uses.includes(h.id)).map(h => ({id: h.id, name: h.name, detail: `From ${h.workflow} · ${h.value ?? ''}`}))}
-      shares={handoffs.filter(h => h.workflow === w.name).map(h => ({id: h.id, name: h.name, detail: handoffDetail(h)}))}
       runs={runs}
       editHref="#workflow-edit"
       onRunNow={runNow(toast)}
@@ -93,8 +88,6 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
       sendTo={[...new Set(outputs.flatMap(o => o.sendTo))]}
       columns={columns}
       onOpenStage={st => (window.location.hash = `workflow-edit-${w.id}?tile=${st.id}`)}
-      uses={[]}
-      shares={[]}
       runs={[]}
       editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}
