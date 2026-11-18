@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
 import {
   Background, BackgroundVariant, BaseEdge, EdgeLabelRenderer, Handle, Panel, Position, ReactFlow, ReactFlowProvider,
-  applyNodeChanges, getBezierPath, useReactFlow, useViewport,
+  applyNodeChanges, getBezierPath, useReactFlow, useUpdateNodeInternals, useViewport,
   type Connection, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -143,8 +143,8 @@ function sendSentence(s: OutputStep): string {
 
 type TileData = {
   step: Step;
-  /** In a section, a Handoff gets a dot on its right so its result can feed a step of another workflow. */
-  isInSection: boolean;
+  /** With another workflow on the board, a Handoff gets a dot on its right so its result can feed that workflow. */
+  canFeedOtherWorkflow: boolean;
   content: WorkflowTileContent;
   trial: TrialResult | null;
   /** Has the lines it needs: inputs lead somewhere, LLM steps have both sides, Handoff has something coming in. */
@@ -219,7 +219,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         width={250}
         elevation={selected ? 'high' : 'low'}
       />
-      {(step.kind !== 'output' || data.isInSection) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
+      {(step.kind !== 'output' || data.canFeedOtherWorkflow) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </>
   );
 }
@@ -739,6 +739,8 @@ const flowTheme = {
 } as CSSProperties;
 
 /** Keeps every tile in view as tiles are added or removed, without shrinking text past readable. */
+/** Above every tile and section, including a selected one. */
+const DRAWING_LINE_LAYER: CSSProperties = {zIndex: 2000};
 /** Fit the whole board on screen. minZoom is low enough for two workflows side by side on a laptop. */
 const FIT = {padding: 0.1, maxZoom: 1, minZoom: 0.25, duration: 250};
 function FitOnChange({fitKey}: {fitKey: number}) {
@@ -1008,6 +1010,15 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard());
   const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
+  // A Handoff's right dot comes and goes with other workflows on the board. React Flow only learns a tile's
+  // dots when it measures it, so ask it to measure the Handoffs again whenever that changes.
+  const updateNodeInternals = useUpdateNodeInternals();
+  const hasOtherWorkflows = sections.length > 0;
+  useEffect(() => {
+    updateNodeInternals(board.filter(n => n.step.kind === 'output').map(n => n.id));
+    // Only the dot's presence matters here, not every board change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOtherWorkflows]);
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
   const snapshot = (n: string, b: BoardNode[], l: Link[], sec: Section[]) =>
@@ -1186,15 +1197,17 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
-        data: {step: n.step, isInSection: !!n.sectionId, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board, links, selectedId, trial, checked, openTrial]);
+  }, [board, links, sections.length, selectedId, trial, checked, openTrial]);
   // Sections come first: React Flow needs a parent before the tiles inside it.
   const nodes: BoardFlowNode[] = [
     ...sections.map((sec): SectionNode => ({
+      // Below the lines layer, so lines inside and between sections stay visible over the grey frame.
+      zIndex: -1,
       id: sec.id, type: 'section', position: sec.position, width: sec.size.width, height: sec.size.height, measured: sec.measured,
       selected: sec.id === selectedId, data: {title: sec.title, summary: sec.summary},
     })),
@@ -1271,6 +1284,10 @@ function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
         reconnected.current = false;
       }}
       edgesReconnectable
+      // A selected section would otherwise jump above the lines and hide them again.
+      elevateNodesOnSelect={false}
+      // The line being drawn shows above tiles and sections, so you can see where it is going.
+      connectionLineContainerStyle={DRAWING_LINE_LAYER}
       deleteKeyCode={['Backspace', 'Delete']}
       onDragOver={e => {
         if (!e.dataTransfer.types.includes(DRAG_TYPE) && !e.dataTransfer.types.includes(DRAG_WORKFLOW)) return;
