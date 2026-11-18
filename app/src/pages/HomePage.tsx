@@ -10,7 +10,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {ChevronRight, Plus, Sparkles} from 'lucide-react';
 import {useState} from 'react';
-import type {Task, TaskState} from '../data';
+import {TICKETS, ticketCondition, type Task, type TicketCondition} from '../data';
 import {stepPosition} from '../workflow';
 
 function greeting(): string {
@@ -18,13 +18,14 @@ function greeting(): string {
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-const STATE: Record<TaskState, {dot: 'info' | 'success' | 'warning'; label: string}> = {
+const CONDITION: Record<TicketCondition, {dot: 'info' | 'success' | 'warning' | 'neutral'; label: string}> = {
   needsApproval: {dot: 'info', label: 'needs approval'},
   complete: {dot: 'success', label: 'ran completely'},
   missingData: {dot: 'warning', label: 'is missing data'},
+  notRun: {dot: 'neutral', label: 'hasn’t run yet'},
 };
 
-/** "Nov 2, 08:30": when the workflow notified the person. */
+/** "Nov 2, 08:30": when the step finished and the person was notified. */
 function notifiedLabel(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
@@ -32,38 +33,43 @@ function notifiedLabel(iso: string): string {
   return `${date}, ${time}`;
 }
 
+type Row = {task: Task; condition: TicketCondition};
+
 /**
- * One task: the workflow's name, then which step it is about and its state, then when the person was told.
- * Every part comes from the task's fields; the step position is counted from the workflow.
+ * One task, read from its ticket: the workflow's name, the step's position and the ticket's condition,
+ * then when the step finished. The position is counted from the workflow's steps where they are on record.
  */
-function TaskRow({task}: {task: Task}) {
-  const s = STATE[task.state];
-  const position = stepPosition(task.workflow, task.step) ?? task.step;
+function TaskRow({row: {task, condition}}: {row: Row}) {
+  const t = TICKETS[task.ticketId];
+  const c = CONDITION[condition];
+  const line = `${stepPosition(t.workflow, t.step) ?? t.position} ${c.label}`;
   return (
     <ListItem
       itemKey={task.id}
-      href={task.ticketId ? `#ticket-${task.ticketId}` : undefined}
+      href={`#ticket-${task.ticketId}`}
       align="first-line"
-      startContent={<StatusDot variant={s.dot} label={`${position} ${s.label}`} />}
-      label={<Text weight="medium">{task.workflow}</Text>}
-      description={`${position} ${s.label}`}
+      startContent={<StatusDot variant={c.dot} label={line} />}
+      label={<Text weight="medium">{t.workflow}</Text>}
+      description={line}
       endContent={
         <HStack gap={2} vAlign="center">
-          <Text type="supporting" hasTabularNumbers>{notifiedLabel(task.notifiedAt)}</Text>
-          {task.ticketId && <Icon icon={ChevronRight} size="sm" color="secondary" />}
+          {t.finishedAt && <Text type="supporting" hasTabularNumbers>{notifiedLabel(t.finishedAt)}</Text>}
+          <Icon icon={ChevronRight} size="sm" color="secondary" />
         </HStack>
       }
     />
   );
 }
 
-export function HomePage({tasks}: {tasks: Task[]}) {
+export function HomePage({tasks, approved}: {tasks: Task[]; approved: number[]}) {
   const [ask, setAsk] = useState('');
   const today = new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
-  // Newest first. Steps that ran completely move to Done.
-  const sorted = [...tasks].sort((x, y) => y.notifiedAt.localeCompare(x.notifiedAt));
-  const done = sorted.filter(t => t.state === 'complete');
-  const open = sorted.filter(t => t.state !== 'complete');
+  // Each row's condition comes from its ticket. Newest first; steps that ran completely move to Done.
+  const rows: Row[] = tasks
+    .map(task => ({task, condition: ticketCondition(TICKETS[task.ticketId], approved.includes(task.ticketId))}))
+    .sort((x, y) => (TICKETS[y.task.ticketId].finishedAt ?? '').localeCompare(TICKETS[x.task.ticketId].finishedAt ?? ''));
+  const done = rows.filter(r => r.condition === 'complete');
+  const open = rows.filter(r => r.condition !== 'complete');
 
   return (
     <Layout
@@ -101,7 +107,7 @@ export function HomePage({tasks}: {tasks: Task[]}) {
               )}
               {open.length > 0 && (
                 <List density="balanced" edge="outset">
-                  {open.map(t => <TaskRow key={t.id} task={t} />)}
+                  {open.map(r => <TaskRow key={r.task.id} row={r} />)}
                 </List>
               )}
               {done.length > 0 && (
@@ -110,7 +116,7 @@ export function HomePage({tasks}: {tasks: Task[]}) {
                   chevronPosition="start"
                   trigger={<Text type="label" color="secondary">{`Done · ${done.length}`}</Text>}>
                   <List density="balanced" edge="outset">
-                    {done.map(t => <TaskRow key={t.id} task={t} />)}
+                    {done.map(r => <TaskRow key={r.task.id} row={r} />)}
                   </List>
                 </Collapsible>
               )}

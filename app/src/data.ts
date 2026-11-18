@@ -11,24 +11,8 @@ export const STATUS: Record<Status, {dot: 'error' | 'warning' | 'info' | 'neutra
   done: {dot: 'success', label: 'Approved'},
 };
 
-/** What a task tells the person about one step of a workflow. */
-export type TaskState = 'needsApproval' | 'complete' | 'missingData';
-
-/**
- * Something a workflow notified the person about. Everything shown on Home comes from these fields:
- * the workflow's name, where the step sits in that workflow, its state, and when the person was told.
- */
-export type Task = {
-  id: number;
-  /** Name of the workflow, as in the workflow list. */
-  workflow: string;
-  /** Name of the step, as in that workflow's steps. Its position is counted from the workflow. */
-  step: string;
-  state: TaskState;
-  /** When the workflow notified the person, as an ISO date and time. */
-  notifiedAt: string;
-  ticketId?: number;
-};
+/** A task on Home points at a ticket. Everything the row says is read from that ticket. */
+export type Task = {id: number; ticketId: number};
 
 export type DataSet = {
   name: string;
@@ -62,6 +46,8 @@ export type Ticket = {
   position: string;
   status: Status;
   ran: string;
+  /** When the step finished and the person was notified, as an ISO date and time. */
+  finishedAt?: string;
   banner?: {status: 'error' | 'warning'; title: string; description: string};
   inputs: DataSet[];
   instructions: string;
@@ -79,9 +65,7 @@ export const AVAILABLE_CONNECTIONS: [string, string][] = [
   ['Slack', 'Messages'], ['Shopify', 'Orders'], ['Zendesk', 'Support'], ['ECB exchange rates', 'Rates'], ['HubSpot', 'CRM'],
 ];
 
-export const TASKS: Task[] = [
-  {id: 3, workflow: 'Monthly sales close', step: 'Sales summary for Finance', state: 'needsApproval', notifiedAt: '2026-11-02T08:30', ticketId: 3},
-];
+export const TASKS: Task[] = [{id: 3, ticketId: 3}];
 
 const ORDERS_USD: Sheet = {
   kind: 'Output',
@@ -150,7 +134,7 @@ export const TICKETS: Record<number, Ticket> = {
     canApprove: true,
   },
   3: {
-    workflow: 'Monthly sales close', step: 'Sales summary for Finance', position: 'Step 3 of 3', status: 'review', ran: 'Agent finished at 08:30',
+    workflow: 'Monthly sales close', step: 'Sales summary for Finance', position: 'Step 3 of 3', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
     inputs: [
       {name: 'Orders in USD', source: ['step', 'From step: Convert to USD (October)'], stats: ['5,402 rows', '6 columns'], sheet: 'Orders in USD'},
       {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'Targets'},
@@ -223,3 +207,22 @@ export const TICKETS: Record<number, Ticket> = {
 };
 TICKETS[8] = {...TICKETS[3], step: 'Sales summary for Finance (September)', status: 'done', ran: 'Approved Mon by Daniel', canApprove: false};
 
+
+/** The condition of a ticket, as Home reports it. */
+export type TicketCondition = 'missingData' | 'needsApproval' | 'complete' | 'notRun';
+
+/**
+ * Reads a ticket's condition from its own contents, in this order:
+ * an input with a warning, a missing column or no rows means missing data; an approved step ran completely;
+ * a step waiting on an OK needs approval; anything else has not run yet.
+ */
+export function ticketCondition(t: Ticket, isApproved: boolean): TicketCondition {
+  const inputGap = t.inputs.some(i => {
+    const sheet = t.sheets[i.sheet];
+    return !!i.warning || !!sheet?.isEmpty || !!sheet?.missingColumns?.length;
+  });
+  if (inputGap) return 'missingData';
+  if (isApproved || t.status === 'done') return 'complete';
+  if (t.canApprove) return 'needsApproval';
+  return 'notRun';
+}

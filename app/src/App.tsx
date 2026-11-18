@@ -7,7 +7,7 @@ import {Text} from '@astryxdesign/core/Text';
 import {
   Home as HomeIcon, Plus, UserCircle, Workflow,
 } from 'lucide-react';
-import {TASKS, type Task} from './data';
+import {TASKS, TICKETS, ticketCondition, type Task} from './data';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
@@ -30,6 +30,8 @@ function useHashRoute(): string {
 export default function App() {
   const route = useHashRoute();
   const [tasks, setTasks] = useState<Task[]>(TASKS);
+  // Tickets the person approved here. A ticket's condition is read from the ticket plus this.
+  const [approved, setApproved] = useState<number[]>([]);
   const [handoffs, setHandoffs] = useState<Handoff[]>(SEED_HANDOFFS);
   // Workflows turned on from the board. Monthly sales close is the prefilled one and can be deleted too.
   const [built, setBuilt] = useState<BuiltWorkflow[]>([]);
@@ -58,19 +60,18 @@ export default function App() {
   };
   const deleteSalesClose = () => {
     setHasSalesClose(false);
-    setTasks(prev => prev.filter(t => t.workflow !== MONTHLY_SALES_CLOSE.name));
+    setTasks(prev => prev.filter(t => TICKETS[t.ticketId].workflow !== MONTHLY_SALES_CLOSE.name));
     window.location.hash = 'home';
     toast({body: `${MONTHLY_SALES_CLOSE.name} is deleted.`});
   };
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
   const ticketId = ticketMatch ? Number(ticketMatch[1]) : null;
-  const openCount = tasks.filter(t => t.state !== 'complete').length;
+  const openCount = tasks.filter(t => ticketCondition(TICKETS[t.ticketId], approved.includes(t.ticketId)) !== 'complete').length;
   const isHome = route === 'home';
-  const isStep3Approved = tasks.some(t => t.ticketId === 3 && t.state === 'complete');
+  const isStep3Approved = approved.includes(3);
 
-  const markApproved = (id: number) =>
-    setTasks(prev => prev.map(t => (t.ticketId === id ? {...t, state: 'complete' as const} : t)));
+  const markApproved = (id: number) => setApproved(prev => (prev.includes(id) ? prev : [...prev, id]));
 
   return (
     <AppShell
@@ -117,7 +118,7 @@ export default function App() {
           id={ticketId}
           handoffs={handoffs}
           onApprove={markApproved}
-          onUndoApprove={tid => setTasks(prev => prev.map(t => (t.ticketId === tid ? TASKS.find(o => o.id === t.id) ?? t : t)))}
+          onUndoApprove={tid => setApproved(prev => prev.filter(x => x !== tid))}
           onAddHandoff={h => setHandoffs(prev => [...prev, h])}
           onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
         />
@@ -136,7 +137,7 @@ export default function App() {
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (
-        <HomePage tasks={tasks} />
+        <HomePage tasks={tasks} approved={approved} />
       )}
     </AppShell>
   );
