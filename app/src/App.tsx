@@ -16,7 +16,7 @@ import {TicketPage} from './pages/TicketPage';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
 import {SCHEDULES, MONTHLY_SALES_CLOSE, type BuiltStage, type BuiltWorkflow} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
-import {WorkflowBuilderPage, type SavedBoard} from './pages/WorkflowBuilder';
+import {WorkflowBuilderPage, boardFromWorkflow, type SavedBoard} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
   const read = () => window.location.hash.slice(1) || 'home';
@@ -38,6 +38,8 @@ export default function App() {
   // Workflows turned on from the board. Monthly sales close is the prefilled one and can be deleted too.
   const [built, setBuilt] = useState<BuiltWorkflow[]>([]);
   const [hasSalesClose, setHasSalesClose] = useState(true);
+  // Monthly sales close is stored as a board, like a built workflow. Its page and its Edit board both read it.
+  const [salesClose, setSalesClose] = useState(() => ({name: MONTHLY_SALES_CLOSE.name, saved: boardFromWorkflow(MONTHLY_SALES_CLOSE)}));
   const toast = useToast();
   const builtMatch = route.match(/^workflow-(\d+)$/);
   const openBuilt = builtMatch ? built.find(w => w.id === Number(builtMatch[1])) ?? null : null;
@@ -64,7 +66,7 @@ export default function App() {
     setHasSalesClose(false);
     setTasks(prev => prev.filter(t => TICKETS[t.ticketId].workflow !== MONTHLY_SALES_CLOSE.name));
     window.location.hash = 'home';
-    toast({body: `${MONTHLY_SALES_CLOSE.name} is deleted.`});
+    toast({body: `${salesClose.name} is deleted.`});
   };
 
   const ticketMatch = route.match(/^ticket-(\d+)$/);
@@ -108,7 +110,7 @@ export default function App() {
               collapsible={{defaultIsCollapsed: false}}
               actions={<IconButton label="New workflow" tooltip="New workflow" icon={<Icon icon={Plus} />} href="#workflow-new" variant="ghost" size="sm" />}>
               {hasSalesClose && (
-                <SideNavItem label="Monthly sales close" href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
+                <SideNavItem label={salesClose.name} href="#workflow-1" isSelected={route === 'workflow-1' || route === 'workflow-edit' || ticketId === 3} />
               )}
               {built.map(w => (
                 <SideNavItem key={w.id} label={w.name} href={`#workflow-${w.id}`} isSelected={route === `workflow-${w.id}` || route === `workflow-edit-${w.id}`} />
@@ -133,12 +135,16 @@ export default function App() {
           editing={
             editingBuilt
               ? {name: editingBuilt.name, href: `#workflow-${editingBuilt.id}`, saved: editingBuilt.saved as SavedBoard}
-              : route === 'workflow-edit' ? {name: MONTHLY_SALES_CLOSE.name, href: '#workflow-1'} : undefined
+              : route === 'workflow-edit' ? {name: salesClose.name, href: '#workflow-1', saved: salesClose.saved} : undefined
           }
-          onTurnOn={(name, columns, saved) => (route === 'workflow-edit' ? (window.location.hash = 'workflow-1') : turnOn(name, columns, saved))}
+          onTurnOn={(name, columns, saved) => {
+            if (route !== 'workflow-edit') return turnOn(name, columns, saved);
+            setSalesClose({name, saved});
+            window.location.hash = 'workflow-1';
+          }}
         />
       ) : route === 'workflow-1' && hasSalesClose ? (
-        <LiveWorkflowPage handoffs={handoffs} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />
+        <LiveWorkflowPage name={salesClose.name} saved={salesClose.saved} handoffs={handoffs} isStep3Approved={isStep3Approved} onDelete={deleteSalesClose} />
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (

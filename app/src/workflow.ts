@@ -53,7 +53,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   schedule: SCHEDULES[0],
   nextRun: 'Tuesday, December 1, 8:00',
   approver: PEOPLE[0],
-  destinations: ['Slack: #finance-close', 'Finance close pack'],
+  destinations: ['Slack: #finance-close', 'Google Drive: Finance close pack'],
   outputFormat: 'Excel sheet',
   steps: [
     {

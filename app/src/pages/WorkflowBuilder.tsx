@@ -31,7 +31,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
 import {Eye, Maximize, X, Minus, Play, Plug, Plus, Power, Save, Trash2, Upload} from 'lucide-react';
-import {PEOPLE, type BuiltStage} from '../workflow';
+import {PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import {SheetTable} from './TicketPage';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
@@ -40,8 +40,9 @@ import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, t
 
 type StepKind = 'input' | 'instructions' | 'output';
 
-type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | null; fileName: string; sheets: string[]; app: string; resource: string};
-type InstructionsStep = {kind: 'instructions'; text: string};
+/** source 'workflow' reads a value another workflow hands over: app is that workflow, resource the value. */
+type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | null; fileName: string; sheets: string[]; app: string; resource: string};
+type InstructionsStep = {kind: 'instructions'; name: string; text: string};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
@@ -59,7 +60,9 @@ const DRAG_TYPE = 'application/x-workflow-node';
 const MCP_APPS: {name: string; isConnected: boolean; reads: string[]}[] = [
   {name: 'Google Drive', isConnected: true, reads: ['FY26 targets.xlsx', 'Finance close pack (folder)']},
   {name: 'SharePoint', isConnected: true, reads: ['stock_levels.xlsx', 'Close archive (folder)']},
-  {name: 'Shopify', isConnected: false, reads: ['Orders, last month', 'Refunds, last month']},
+  {name: 'Shopify', isConnected: true, reads: ['Orders, last month', 'Refunds, last month']},
+  {name: 'ECB exchange rates', isConnected: true, reads: ['Daily rates']},
+  {name: 'HubSpot', isConnected: false, reads: ['Contacts', 'Deals']},
   {name: 'Salesforce', isConnected: true, reads: ['Active customers', 'Open opportunities']},
   {name: 'Snowflake', isConnected: true, reads: ['sales_history', 'inventory_daily']},
 ];
@@ -78,12 +81,12 @@ const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Ord
 
 function blankStep(kind: StepKind, n: number): Step {
   if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
-  if (kind === 'instructions') return {kind, text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1]};
+  if (kind === 'instructions') return {kind, name: '', text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1]};
   return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
 }
 
 function isReady(s: Step): boolean {
-  if (s.kind === 'input') return s.source === 'upload' ? !!s.fileName : s.source === 'mcp' ? !!s.app && !!s.resource : false;
+  if (s.kind === 'input') return s.source === 'upload' ? !!s.fileName : s.source ? !!s.app && !!s.resource : false;
   if (s.kind === 'instructions') return !!s.text.trim();
   return !!s.name.trim();
 }
@@ -113,7 +116,7 @@ type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
 /** What each tile produced on the trial. The last LLM step and every Pass on to tile end with the summary. */
 function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
-  if (node.step.kind === 'input') return {line: node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
+  if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
   if (node.step.kind === 'instructions') {
     const feedsOutput = links.some(l => l.source === node.id && board.find(n => n.id === l.target)?.step.kind === 'output');
     return feedsOutput
@@ -281,6 +284,21 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
     );
   }
 
+  if (step.source === 'workflow') {
+    return (
+      <VStack gap={3}>
+        <VStack gap={1}>
+          <Text type="label">From another workflow</Text>
+          <Text>{`${step.resource}, from ${step.app}`}</Text>
+          <Text type="supporting">That workflow hands this value over each time it runs. Change it from that workflow’s output.</Text>
+        </VStack>
+        <HStack>
+          <Button label="Use a file or app instead" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
+        </HStack>
+      </VStack>
+    );
+  }
+
   if (step.source === 'upload') {
     return (
       <VStack gap={4}>
@@ -379,6 +397,12 @@ function StepPanel({step, trial, onOpenTrial, onChange, onRemove}: {
 
       {step.kind === 'instructions' && (
         <>
+          <TextInput
+            label="Step name"
+            description="Optional. A short name shows on the tile next to the step number."
+            value={step.name}
+            onChange={name => onChange({...step, name})}
+          />
           <TextArea
             label="What should the AI do?"
             description="Plain words, like you’d tell a colleague. It can use everything that flows into this tile."
@@ -479,15 +503,43 @@ const newId = () => `n${nextId++}`;
 const COL = 360;
 const ROW = 260;
 
-function startingBoard(isEditing: boolean): BoardNode[] {
-  if (!isEditing) return [{id: newId(), step: blankStep('input', 0), position: {x: 0, y: 0}}];
-  return [
-    {id: newId(), step: {kind: 'input', source: 'upload', ...UPLOAD_EXAMPLE, app: '', resource: ''}, position: {x: 0, y: 0}},
-    {id: newId(), step: {kind: 'input', source: 'mcp', fileName: '', sheets: [], app: 'Google Drive', resource: 'FY26 targets.xlsx'}, position: {x: 0, y: ROW}},
-    {id: newId(), step: blankStep('instructions', 0), position: {x: COL, y: ROW / 2}},
-    {id: newId(), step: blankStep('instructions', 1), position: {x: COL * 2, y: ROW / 2}},
-    {id: newId(), step: {...(blankStep('output', 0) as OutputStep), sendTo: ['Slack: #finance-close', 'Google Drive: Finance close pack'], shareWithWorkflows: true}, position: {x: COL * 3, y: ROW / 2}},
+function startingBoard(): BoardNode[] {
+  return [{id: newId(), step: blankStep('input', 0), position: {x: 0, y: 0}}];
+}
+
+/**
+ * A workflow's steps laid out as a board: its inputs in the first column, each step in its own column, then
+ * the Pass on to. Its page and its Edit board both read this, so they always show the same tiles.
+ */
+export function boardFromWorkflow(w: Workflow): SavedBoard {
+  const inputs: BoardNode[] = w.steps.flatMap(st => st.inputs.map((input, k) => ({id: `${st.id}-in-${k}`, input})))
+    .map(({id, input}, i) => ({
+      id,
+      position: {x: 0, y: i * ROW},
+      step: {
+        kind: 'input' as const,
+        source: input.status === 'handoff' ? ('workflow' as const) : input.status === 'upload' ? ('upload' as const) : ('mcp' as const),
+        fileName: input.status === 'upload' ? input.source : '',
+        sheets: input.status === 'upload' ? [input.reads] : [],
+        app: input.status === 'upload' ? '' : input.source,
+        resource: input.status === 'upload' ? '' : input.reads,
+      },
+    }));
+  const middle = ((inputs.length - 1) * ROW) / 2;
+  const steps: BoardNode[] = w.steps.map((st, i) => ({
+    id: st.id, position: {x: COL * (i + 1), y: middle}, step: {kind: 'instructions', name: st.name, text: st.does},
+  }));
+  const output: BoardNode = {
+    id: 'out',
+    position: {x: COL * (w.steps.length + 1), y: middle},
+    step: {kind: 'output', name: w.steps[w.steps.length - 1].output, format: w.outputFormat, needsOk: true, approver: w.approver, sendTo: w.destinations, shareWithWorkflows: w.shares.length > 0},
+  };
+  const links = [
+    ...w.steps.flatMap(st => st.inputs.map((_, k) => link(`${st.id}-in-${k}`, st.id))),
+    ...w.steps.slice(1).map((st, i) => link(w.steps[i].id, st.id)),
+    link(w.steps[w.steps.length - 1].id, 'out'),
   ];
+  return {board: [...inputs, ...steps, output], links};
 }
 
 /** A line between two tiles. People draw these; the app only draws them for tiles added with a click. */
@@ -666,15 +718,15 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
     if (s.kind === 'input') {
       contents.set(n.id, {
         kind: 'input',
-        source: s.source === 'upload' ? s.fileName : s.source === 'mcp' ? s.app : '',
+        source: s.source === 'upload' ? s.fileName : s.source ? s.app : '',
         via: s.source,
-        reads: s.source === 'upload' ? s.sheets.join(', ') : s.source === 'mcp' ? s.resource : '',
+        reads: s.source === 'upload' ? s.sheets.join(', ') : s.source ? s.resource : '',
         goesTo: targets(n.id).map(t => `Step ${number.get(t.id)}`),
       });
     } else if (s.kind === 'instructions') {
       // An LLM step makes the output it feeds, or the data the next LLM step works on.
       const makes = targets(n.id).map(t => (t.step.kind === 'output' ? t.step.name || 'Output' : `Data for Step ${number.get(t.id)}`));
-      contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, instructions: s.text, makes: makes.join(', ')});
+      contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, name: s.name.trim() || undefined, instructions: s.text, makes: makes.join(', ')});
     } else {
       contents.set(n.id, {kind: 'output', name: s.name, format: s.format, approver: s.needsOk ? s.approver : '', sendTo: s.sendTo});
     }
@@ -683,7 +735,7 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
 }
 
 /** The board as saved workflow columns: each tile with the same content the board shows. */
-function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
+export function toColumns(board: BoardNode[], links: Link[]): BuiltStage[][] {
   const contents = tileContents(board, links);
   return runOrder(board, links).map(col => col.map(n => ({id: n.id, content: contents.get(n.id)!})));
 }
@@ -713,7 +765,7 @@ function Builder({editing, onTurnOn}: BuilderProps) {
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const isPhone = useMediaQuery('(max-width: 640px)');
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
-  const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(isEditing));
+  const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard());
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
   const snapshot = (n: string, b: BoardNode[], l: Link[]) => JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l]);
