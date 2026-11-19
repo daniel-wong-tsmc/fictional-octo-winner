@@ -29,8 +29,9 @@ export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow' | 'shared';
 /**
  * What a tile says, by kind. Each field is one setting of the tile, and each kind always shows the same
  * details in the same order:
- * - Input: title is the source; details From, Reads, Goes to.
- * - LLM: title is "Step N" (plus its name when it has one); details Instructions, Makes.
+ * - Input: title is the source; details From, Reads.
+ * - LLM: title is "Step N" (plus its name when it has one); details Instructions.
+ * Where a tile leads is shown by the lines or arrows around it, not in its text.
  * - Handoff: title is the output's name; details Format, Approver, Sends to.
  */
 export type WorkflowTileContent =
@@ -41,8 +42,6 @@ export type WorkflowTileContent =
       via: WorkflowInputVia | null;
       /** Sheets, table or value it reads. */
       reads: string;
-      /** Steps it feeds, such as "Step 1". */
-      goesTo: string[];
     }
   | {
       kind: 'step';
@@ -52,8 +51,6 @@ export type WorkflowTileContent =
       name?: string;
       /** What the AI is told to do. */
       instructions: string;
-      /** What it hands on: the output's name, or the next step. Empty until it is connected. */
-      makes: string;
     }
   | {
       kind: 'output';
@@ -82,7 +79,6 @@ export function tileText(c: WorkflowTileContent): {title: string; details: {labe
       details: [
         {label: 'From', value: c.via ? VIA_LABEL[c.via] : NOT_SET},
         {label: 'Reads', value: c.reads || NOT_SET},
-        {label: 'Goes to', value: c.goesTo.length ? c.goesTo.join(', ') : 'Not connected yet'},
       ],
     };
   }
@@ -91,7 +87,6 @@ export function tileText(c: WorkflowTileContent): {title: string; details: {labe
       title: c.name ? `Step ${c.number}: ${c.name}` : `Step ${c.number}`,
       details: [
         {label: 'Instructions', value: c.instructions || NOT_SET},
-        {label: 'Makes', value: c.makes || 'Not connected yet'},
       ],
     };
   }

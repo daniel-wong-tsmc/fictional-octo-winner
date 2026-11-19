@@ -1037,7 +1037,6 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
     counts.set(n.sectionId ?? '', k);
     number.set(n.id, k);
   });
-  const targets = (id: string) => links.filter(l => l.source === id).map(l => board.find(n => n.id === l.target)).filter((n): n is BoardNode => !!n);
   const contents = new Map<string, WorkflowTileContent>();
   for (const n of board) {
     const s = n.step;
@@ -1047,12 +1046,9 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
         source: s.source === 'upload' ? s.fileName : s.source ? s.app : '',
         via: s.source,
         reads: s.source === 'upload' ? s.sheets.join(', ') : s.source ? s.resource : '',
-        goesTo: targets(n.id).map(t => `Step ${number.get(t.id)}`),
       });
     } else if (s.kind === 'instructions') {
-      // An LLM step makes the output it feeds, or the data the next LLM step works on.
-      const makes = targets(n.id).map(t => (t.step.kind === 'output' ? t.step.name || 'Output' : `Data for Step ${number.get(t.id)}`));
-      contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, name: s.name.trim() || undefined, instructions: s.text, makes: makes.join(', ')});
+      contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, name: s.name.trim() || undefined, instructions: s.text});
     } else {
       contents.set(n.id, {kind: 'output', name: s.name, format: s.format, approver: s.needsOk ? s.approver : '', sendTo: s.sendTo});
     }
@@ -1075,15 +1071,9 @@ export function toColumns(board: BoardNode[], links: Link[], sections: Section[]
   const feeds: BuiltStage[] = board
     .filter(n => n.sectionId && n.step.kind === 'output' && links.some(l => l.source === n.id && isOwn(l.target)))
     .map(n => {
-      const goesTo = links
-        .filter(l => l.source === n.id && isOwn(l.target))
-        .flatMap(l => {
-          const c = contents.get(l.target);
-          return c?.kind === 'step' ? [`Step ${c.number}`] : [];
-        });
       const name = n.step.kind === 'output' ? n.step.name : '';
       const title = sections.find(x => x.id === n.sectionId)?.title ?? 'Another workflow';
-      return {id: n.id, content: {kind: 'input', source: title, via: 'workflow', reads: name, goesTo}};
+      return {id: n.id, content: {kind: 'input', source: title, via: 'workflow', reads: name}};
     });
   if (!feeds.length) return columns;
   // Inputs run first, so these join the first column when it holds inputs, or start a new one.
