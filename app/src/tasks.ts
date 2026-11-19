@@ -1,6 +1,7 @@
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
 import {SCHEDULES, stepPosition} from './workflow';
+import {personName, type SharedData} from './sharedData';
 
 /** "Nov 2, 08:30": a date and time as Home's board shows it. */
 export function shortDateTime(iso: string): string {
@@ -21,9 +22,11 @@ const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
 /**
  * Everything on Home's board, from data only: each workflow's next run (Scheduled, or Unscheduled when it
  * only runs when started), each task read from its ticket (Needs attention, Done, or Unscheduled for a draft),
- * and each workflow's last finished run (Done). Tasks whose step isn't in their workflow's step list are left out.
+ * each workflow's last finished run (Done), and data other people's workflows hand you (Data ready for use, or
+ * a failed run). Tasks whose step isn't in their workflow's step list are left out. Ready data opens a new
+ * workflow on the board with that data as its first input.
  */
-export function boardItems(tasks: Task[], approved: number[], workflows: BoardWorkflow[]): WorkflowBoardItem[] {
+export function boardItems(tasks: Task[], approved: number[], workflows: BoardWorkflow[], shared: SharedData[]): WorkflowBoardItem[] {
   const next: WorkflowBoardItem[] = [...workflows]
     .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt))
     .map(w =>
@@ -50,7 +53,16 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
   const finished: WorkflowBoardItem[] = workflows.flatMap(w =>
     w.lastFinished ? [{id: `done-${w.key}`, workflow: w.name, state: 'complete' as const, at: w.lastFinished, href: w.href}] : [],
   );
-  return [...next, ...fromTickets, ...finished];
+  const data: WorkflowBoardItem[] = shared.map(d => ({
+    id: `data-${d.id}`,
+    workflow: d.workflow,
+    data: d.name,
+    owner: personName(d.owner),
+    state: d.lastRun.result === 'ready' ? 'dataReady' : 'dataFailed',
+    at: shortDateTime(d.lastRun.at),
+    href: d.lastRun.result === 'ready' ? `#workflow-new?data=${d.id}` : undefined,
+  }));
+  return [...next, ...data, ...fromTickets, ...finished];
 }
 
 /** How many cards are in Needs attention: the number Home shows in the sidebar. */

@@ -35,7 +35,9 @@ import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type SharedData} from '../sharedData';
+import {shortDateTime} from '../tasks';
+import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -46,8 +48,12 @@ import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, t
 
 type StepKind = 'input' | 'instructions' | 'output';
 
-/** source 'workflow' reads a value another workflow hands over: app is that workflow, resource the value. */
-type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | null; fileName: string; sheets: string[]; app: string; resource: string};
+/**
+ * source 'workflow' reads a value another of your workflows hands over: app is that workflow, resource the value.
+ * source 'shared' reads data someone else's workflow shares with you (SHARED_DATA): app is their workflow,
+ * resource the data.
+ */
+type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | 'shared' | null; fileName: string; sheets: string[]; app: string; resource: string};
 /**
  * An LLM step. python is the code it runs: written by the AI on its last run (empty until it runs), or by the
  * person when isCodeEdited. topP and temperature are its advanced settings.
@@ -120,7 +126,7 @@ type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
 /** What each tile produced on the trial. The last LLM step and every Handoff tile end with the summary. */
 function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
-  if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
+  if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'shared' ? '5 rows read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
   if (node.step.kind === 'instructions') {
     const feedsOutput = links.some(l => l.source === node.id && board.find(n => n.id === l.target)?.step.kind === 'output');
     return feedsOutput
@@ -160,7 +166,11 @@ type TileNode = Node<TileData, 'tile'>;
 function Tile({id, data, selected}: NodeProps<TileNode>) {
   const {step} = data;
   const ready = isReady(step);
-  const status = data.isUnchecked
+  // Shared data whose workflow failed: the step can't get its data until the owner fixes it.
+  const isUpstreamFailed = step.kind === 'input' && step.source === 'shared' && sharedByName(step.resource)?.lastRun.result === 'failed';
+  const status = isUpstreamFailed
+    ? {tone: 'error' as const, label: 'Previous workflow failed'}
+    : data.isUnchecked
     ? {tone: 'info' as const, label: 'Check output'}
     : data.trial
     ? {tone: 'success' as const, label: 'Tried'}
@@ -293,10 +303,14 @@ function SourceChoice({icon, label, title, description, onClick}: {icon: typeof 
   );
 }
 
+/** An Input step that reads data someone else's workflow shares with you. */
+const sharedInput = (d: SharedData): InputStep => ({kind: 'input', source: 'shared', fileName: '', sheets: [], app: d.workflow, resource: d.name});
+
 function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep) => void}) {
   const toast = useToast();
   const chooseUpload = () => onChange({...step, source: 'upload', ...UPLOAD_EXAMPLE});
   const chooseApp = () => onChange({...step, source: 'mcp', app: 'Google Drive', resource: 'FY26 targets.xlsx'});
+  const chooseShared = () => onChange({...step, ...sharedInput(SHARED_DATA.find(d => d.lastRun.result === 'ready') ?? SHARED_DATA[0])});
 
   if (step.source === null) {
     return (
@@ -304,6 +318,53 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
         <Text>Where does the data come from?</Text>
         <SourceChoice icon={Upload} label="Upload Excel" title="Upload Excel" description="Drop an Excel or CSV file. You can upload a new one each run." onClick={chooseUpload} />
         <SourceChoice icon={Plug} label="Connect an app through MCP" title="Connect an app (MCP)" description="Read straight from Google Drive, SharePoint, Shopify and other apps your admin connected." onClick={chooseApp} />
+        <SourceChoice icon={Inbox} label="Use data shared with you" title="Data shared with you" description="Use the output of someone else’s workflow. You get the new version each time it runs." onClick={chooseShared} />
+      </VStack>
+    );
+  }
+
+  if (step.source === 'shared') {
+    const d = sharedByName(step.resource);
+    return (
+      <VStack gap={4}>
+        <Selector
+          label="Shared data"
+          description="Outputs other people’s workflows share with you."
+          options={SHARED_DATA.map(x => ({value: x.name, label: x.name, description: `${sharedFrom(x)}${x.lastRun.result === 'failed' ? ', last run failed' : ''}`}))}
+          value={step.resource}
+          onChange={name => {
+            const next = sharedByName(name);
+            if (next) onChange({...step, ...sharedInput(next)});
+          }}
+        />
+        {d && (
+          <VStack gap={2}>
+            <Text type="supporting">{`${sharedFrom(d)}. ${d.format}.`}</Text>
+            {d.lastRun.result === 'ready' ? (
+              <HStack gap={1.5} vAlign="center">
+                <StatusDot variant="success" label="Ready" />
+                <Text type="supporting">{`Ready ${shortDateTime(d.lastRun.at)}. You get the new version each time it runs.`}</Text>
+              </HStack>
+            ) : (
+              <VStack gap={2}>
+                <HStack gap={1.5} vAlign="center">
+                  <StatusDot variant="error" label="Failed" />
+                  <Text type="supporting">{failedMessage(d)}</Text>
+                </HStack>
+                <HStack>
+                  <Button
+                    label={`Ask ${personName(d.owner)}`}
+                    size="sm"
+                    onClick={() => toast({body: `Asked ${personName(d.owner)} to check ${d.workflow}. Your step waits until it produces an output.`})}
+                  />
+                </HStack>
+              </VStack>
+            )}
+          </VStack>
+        )}
+        <HStack>
+          <Button label="Use a file or app instead" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
+        </HStack>
       </VStack>
     );
   }
@@ -701,8 +762,10 @@ const newId = () => `n${nextId++}`;
 const COL = 360;
 const ROW = 260;
 
-function startingBoard(): BoardNode[] {
-  return [{id: newId(), step: blankStep('input', 0), position: {x: 0, y: 0}}];
+/** A new board: one Input, already reading shared data when the board was opened from Home's data card. */
+function startingBoard(startData?: string): BoardNode[] {
+  const d = SHARED_DATA.find(x => x.id === startData);
+  return [{id: newId(), step: d ? sharedInput(d) : blankStep('input', 0), position: {x: 0, y: 0}}];
 }
 
 /**
@@ -1061,7 +1124,8 @@ export type Editing = {name: string; href: string; saved?: SavedBoard; runs?: Re
 /** selectTile opens the board with that tile selected, so its side panel is open. */
 /** A saved workflow in the toolbar's Library: its name, where its board opens, and its saved board. */
 export type LibraryItem = {key: string; name: string; href: string; saved: SavedBoard; isCurrent: boolean};
-type BuilderProps = {editing?: Editing; selectTile?: string; library: LibraryItem[]; onTurnOn: TurnOn};
+/** startData opens a new board whose first Input reads that shared data (an id in SHARED_DATA). */
+type BuilderProps = {editing?: Editing; selectTile?: string; startData?: string; library: LibraryItem[]; onTurnOn: TurnOn};
 
 export function WorkflowBuilderPage(props: BuilderProps) {
   return (
@@ -1071,14 +1135,14 @@ export function WorkflowBuilderPage(props: BuilderProps) {
   );
 }
 
-function Builder({editing, selectTile, library, onTurnOn}: BuilderProps) {
+function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderProps) {
   const isEditing = !!editing;
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const isPhone = useMediaQuery('(max-width: 640px)');
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
-  const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard());
+  const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(startData));
   const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
   // A Handoff's right dot comes and goes with other workflows on the board. React Flow only learns a tile's
   // dots when it measures it, so ask it to measure the Handoffs again whenever that changes.

@@ -11,6 +11,7 @@ import {
 import {TASKS, TICKETS, type Task} from './data';
 import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
+import {SHARED_DATA} from './sharedData';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
@@ -38,6 +39,8 @@ export default function App() {
   // A route can carry ?tile=<id>, which opens the board with that tile selected.
   const [route, query = ''] = useHashRoute().split('?');
   const selectTile = new URLSearchParams(query).get('tile') ?? undefined;
+  // #workflow-new?data=<id> starts a new workflow with data someone shared as its first input.
+  const startData = new URLSearchParams(query).get('data') ?? undefined;
   const openChat = CHATS.find(c => route === `chat-${c.id}`) ?? null;
   const [tasks, setTasks] = useState<Task[]>(TASKS);
   // Tickets the person approved here. A ticket's condition is read from the ticket plus this.
@@ -124,7 +127,7 @@ export default function App() {
     })),
     ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`})),
   ];
-  const homeItems = boardItems(tasks, approved, boardWorkflows);
+  const homeItems = boardItems(tasks, approved, boardWorkflows, SHARED_DATA);
   const openCount = attentionCount(homeItems);
   const isHome = route === 'home';
 
@@ -211,6 +214,7 @@ export default function App() {
                 : undefined
           }
           selectTile={selectTile}
+          startData={route === 'workflow-new' ? startData : undefined}
           library={library}
           onTurnOn={turnOn}
         />

@@ -18,13 +18,13 @@ export type WorkflowTileTone = 'success' | 'info' | 'warning' | 'error' | 'neutr
  * read from here, so a kind is named and drawn the same way everywhere.
  */
 export const WORKFLOW_TILE_KINDS: Record<WorkflowTileKind, {label: string; icon: typeof Send; hint: string}> = {
-  input: {label: 'Input', icon: Database, hint: 'Excel upload or an app through MCP'},
+  input: {label: 'Input', icon: Database, hint: 'Excel upload, an app through MCP, or data shared with you'},
   step: {label: 'LLM', icon: WandSparkles, hint: 'Tell the AI what to do with the data'},
   output: {label: 'Handoff', icon: Send, hint: 'Who gets the result, and who approves it'},
 };
 
 /** How an input gets its data. */
-export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow';
+export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow' | 'shared';
 
 /**
  * What a tile says, by kind. Each field is one setting of the tile, and each kind always shows the same
@@ -68,6 +68,7 @@ const VIA_LABEL: Record<WorkflowInputVia, string> = {
   upload: 'Excel upload',
   mcp: 'App, through MCP',
   workflow: 'Another workflow',
+  shared: 'Shared with you',
 };
 const NOT_SET = 'Not set yet';
 /** Fits the longest label, "Instructions", so values start in one column. */

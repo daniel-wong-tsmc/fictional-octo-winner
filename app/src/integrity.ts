@@ -4,7 +4,8 @@
 
 import {TASKS, TICKETS} from './data';
 import {SEED_HANDOFFS} from './handoffs';
-import {MCP_APPS, PREFILLED_WORKFLOWS, stepPosition} from './workflow';
+import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, stepPosition} from './workflow';
+import {SHARED_DATA} from './sharedData';
 
 export function dataProblems(): string[] {
   const problems: string[] = [];
@@ -75,6 +76,17 @@ export function dataProblems(): string[] {
     for (const user of h.usedBy) {
       if (!workflows.has(user) && !destinations.has(user)) problems.push(`Shared value "${h.name}": used by "${user}", which is neither a workflow nor a destination.`);
     }
+  }
+
+  // Data shared with you: owned by someone else, from a workflow that isn't yours, each name used once.
+  const sharedNames = new Set<string>();
+  for (const d of SHARED_DATA) {
+    if (!PEOPLE.includes(d.owner)) problems.push(`Shared data "${d.name}": owner "${d.owner}" isn't one of the people.`);
+    if (d.owner === PEOPLE[0]) problems.push(`Shared data "${d.name}": it's yours, so it belongs in your workflows, not in data shared with you.`);
+    if (workflows.has(d.workflow)) problems.push(`Shared data "${d.name}": "${d.workflow}" is one of your workflows, not someone else's.`);
+    if (sharedNames.has(d.name)) problems.push(`Shared data "${d.name}" is listed twice.`);
+    if (Number.isNaN(new Date(d.lastRun.at).getTime())) problems.push(`Shared data "${d.name}": last run time "${d.lastRun.at}" isn't a date.`);
+    sharedNames.add(d.name);
   }
 
   // Home's tasks.
