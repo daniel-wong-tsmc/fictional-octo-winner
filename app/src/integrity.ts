@@ -31,6 +31,8 @@ export function dataProblems(): string[] {
       for (const input of s.inputs) {
         if (input.status === 'handoff') {
           if (!workflows.has(input.source)) problems.push(`${w.name}, ${s.name}: input from workflow "${input.source}", which doesn't exist.`);
+        } else if (input.status === 'shared') {
+          if (!SHARED_DATA.some(d => d.workflow === input.source && d.name === input.reads)) problems.push(`${w.name}, ${s.name}: reads "${input.reads}" from ${input.source}, which nobody shares with you.`);
         } else if (input.status !== 'upload') {
           const app = apps.get(input.source);
           if (!app) problems.push(`${w.name}, ${s.name}: input from app "${input.source}", which isn't a connected app.`);

@@ -10,7 +10,13 @@ export function shortDateTime(iso: string): string {
 }
 
 /** A workflow as Home's board needs it: its schedule, next run, page, and its last finished run. */
-export type BoardWorkflow = {key: string; name: string; schedule: string; nextRunAt: string; href: string; lastFinished?: string; isDraft?: boolean};
+export type BoardWorkflow = {
+  key: string; name: string; schedule: string; nextRunAt: string; href: string; lastFinished?: string; isDraft?: boolean;
+  /** Names of the shared data (SHARED_DATA) its inputs read. */
+  sharedInputs: string[];
+  /** When its last run stopped, when that run is the latest one. */
+  lastStopped?: string;
+};
 
 const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
   needsApproval: 'needsApproval',
@@ -22,9 +28,10 @@ const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
 /**
  * Everything on Home's board, from data only: each workflow's next run (Scheduled, or Unscheduled when it
  * only runs when started), each task read from its ticket (Needs attention, Done, or Unscheduled for a draft),
- * each workflow's last finished run (Done), and data other people's workflows hand you (Data ready for use, or
- * a failed run). Tasks whose step isn't in their workflow's step list are left out. Ready data opens a new
- * workflow on the board with that data as its first input.
+ * each workflow's last finished run (Done), and data other people's workflows hand you that none of your
+ * workflows reads yet (New data ready for use, or a failed run). A workflow that reads shared data whose run
+ * failed goes to Needs attention, since it can't process. Tasks whose step isn't in their workflow's step list
+ * are left out. Ready data opens a new workflow on the board with that data as its first input.
  */
 export function boardItems(tasks: Task[], approved: number[], workflows: BoardWorkflow[], shared: SharedData[]): WorkflowBoardItem[] {
   const next: WorkflowBoardItem[] = [...workflows]
@@ -53,7 +60,8 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
   const finished: WorkflowBoardItem[] = workflows.flatMap(w =>
     w.lastFinished ? [{id: `done-${w.key}`, workflow: w.name, state: 'complete' as const, at: w.lastFinished, href: w.href}] : [],
   );
-  const data: WorkflowBoardItem[] = shared.map(d => ({
+  const read = new Set(workflows.flatMap(w => w.sharedInputs));
+  const data: WorkflowBoardItem[] = shared.filter(d => !read.has(d.name)).map(d => ({
     id: `data-${d.id}`,
     workflow: d.workflow,
     data: d.name,
@@ -62,11 +70,18 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
     at: shortDateTime(d.lastRun.at),
     href: d.lastRun.result === 'ready' ? `#workflow-new?data=${d.id}` : undefined,
   }));
-  return [...next, ...data, ...fromTickets, ...finished];
+  const blocked: WorkflowBoardItem[] = workflows.flatMap(w => {
+    const failed = shared.find(d => w.sharedInputs.includes(d.name) && d.lastRun.result === 'failed');
+    return failed
+      ? [{id: `blocked-${w.key}`, workflow: w.name, owner: personName(failed.owner), state: 'upstreamFailed' as const, at: w.lastStopped ?? shortDateTime(failed.lastRun.at), href: w.href}]
+      : [];
+  });
+  return [...next, ...data, ...blocked, ...fromTickets, ...finished];
 }
 
 /** How many cards are in Needs attention: the number Home shows in the sidebar. */
-export const attentionCount = (items: WorkflowBoardItem[]) => items.filter(i => i.state === 'needsApproval' || i.state === 'missingData').length;
+export const attentionCount = (items: WorkflowBoardItem[]) =>
+  items.filter(i => i.state === 'needsApproval' || i.state === 'missingData' || i.state === 'upstreamFailed').length;
 
 /** The last run of a tile that has a ticket, as the board's side panel shows it. */
 export type TileRun = {

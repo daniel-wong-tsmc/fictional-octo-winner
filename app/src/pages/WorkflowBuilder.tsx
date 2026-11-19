@@ -157,8 +157,6 @@ type TileData = {
   /** Handoff tile whose trial output nobody has opened yet. */
   isUnchecked: boolean;
   onOpenTrial: (id: string) => void;
-  next: {label: string; kind: StepKind}[];
-  onAdd: (from: string, kind: StepKind) => void;
 };
 type TileNode = Node<TileData, 'tile'>;
 
@@ -198,23 +196,6 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         </HStack>
       )}
     </VStack>
-  ) : ready && data.next.length > 0 ? (
-    <HStack gap={1} wrap="wrap">
-      {data.next.map(n => (
-        <Button
-          key={n.kind}
-          className="nodrag"
-          label={n.label}
-          size="sm"
-          variant="ghost"
-          icon={<Icon icon={Plus} />}
-          onClick={e => {
-            e.stopPropagation();
-            data.onAdd(id, n.kind);
-          }}
-        />
-      ))}
-    </HStack>
   ) : undefined;
   return (
     <>
@@ -779,7 +760,7 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
       position: {x: 0, y: i * ROW},
       step: {
         kind: 'input' as const,
-        source: input.status === 'handoff' ? ('workflow' as const) : input.status === 'upload' ? ('upload' as const) : ('mcp' as const),
+        source: input.status === 'handoff' ? ('workflow' as const) : input.status === 'shared' ? ('shared' as const) : input.status === 'upload' ? ('upload' as const) : ('mcp' as const),
         fileName: input.status === 'upload' ? input.source : '',
         sheets: input.status === 'upload' ? [input.reads] : [],
         app: input.status === 'upload' ? '' : input.source,
@@ -1114,6 +1095,10 @@ export function toColumns(board: BoardNode[], links: Link[], sections: Section[]
 /** The board as it was when the workflow was turned on, so Edit can reopen it. */
 export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]};
 
+/** Names of the shared data a saved board's own Input tiles read (tiles inside a dropped section don't count). */
+export const sharedInputsOf = (saved: SavedBoard): string[] =>
+  saved.board.flatMap(n => (!n.sectionId && n.step.kind === 'input' && n.step.source === 'shared' ? [n.step.resource] : []));
+
 type TurnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => void;
 /** The workflow being edited: its name, its page, and its saved board when it was built here. */
 /**
@@ -1186,7 +1171,7 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
   const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
     ? 'Start here: select the Input tile and add your data.'
     : !count('instructions')
-      ? 'Next: drag an LLM node from the toolbar, or click “Add LLM step” on the Input tile.'
+      ? 'Next: drag an LLM node from the toolbar.'
       : !count('output')
         ? 'Next: drag a Handoff node from the toolbar, or click it there to add one after the last LLM step.'
         : !allLinked
@@ -1230,7 +1215,6 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
     setSelectedLinkId(null);
     setTrial('none');
   };
-  const add = (fromId: string, kind: StepKind) => place(kind, undefined, fromId);
 
   /**
    * Drops a saved workflow onto the board as a section: copies of all its tiles and lines inside one frame.
@@ -1323,15 +1307,11 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
   const tileNodes: TileNode[] = useMemo(() => {
     const contents = tileContents(board, links);
     return board.map(n => {
-      // An Input tile with nothing after it offers an LLM step. LLM tiles add nothing; use the toolbar.
-      const hasNext = links.some(l => l.source === n.id);
-      let next: TileData['next'] = [];
-      if (!hasNext && n.step.kind === 'input') next = [{label: 'Add LLM step', kind: 'instructions'}];
       const result = trial === 'done' ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
-        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, next, onAdd: add},
+        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
@@ -1367,9 +1347,15 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
     }
   };
 
-  // React Flow reports drags (position) and measured tile sizes (dimensions). We keep both;
-  // selection and content live in our own state.
+  // React Flow reports drags (position), measured tile sizes (dimensions) and the Delete or Backspace key
+  // (remove). We keep the first two and remove the selected tile or section; selection and content live in
+  // our own state.
   const onNodesChange = (changes: NodeChange<BoardFlowNode>[]) => {
+    for (const c of changes) {
+      if (c.type !== 'remove') continue;
+      if (sections.some(sec => sec.id === c.id)) removeSection(c.id);
+      else remove(c.id);
+    }
     const kept = changes.filter(c => c.type === 'position' || c.type === 'dimensions');
     if (!kept.length) return;
     const next = applyNodeChanges(kept, nodes);

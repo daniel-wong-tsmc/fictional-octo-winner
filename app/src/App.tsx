@@ -19,7 +19,7 @@ import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
 import {SCHEDULES, PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
-import {WorkflowBuilderPage, boardFromWorkflow, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
+import {WorkflowBuilderPage, boardFromWorkflow, sharedInputsOf, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
 
 function useHashRoute(): string {
   const read = () => window.location.hash.slice(1) || 'home';
@@ -124,8 +124,10 @@ export default function App() {
       href: `#workflow-${p.workflow.id}`,
       lastFinished: p.workflow.runs.find(r => r.result === 'approved' || r.result === 'rerun')?.finished,
       isDraft: p.workflow.isDraft,
+      sharedInputs: sharedInputsOf(p.saved),
+      lastStopped: p.workflow.runs[0]?.result === 'stopped' ? p.workflow.runs[0].started : undefined,
     })),
-    ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`})),
+    ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`, sharedInputs: sharedInputsOf(w.saved as SavedBoard)})),
   ];
   const homeItems = boardItems(tasks, approved, boardWorkflows, SHARED_DATA);
   const openCount = attentionCount(homeItems);

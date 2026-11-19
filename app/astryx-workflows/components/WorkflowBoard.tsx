@@ -9,7 +9,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, CircleAlert, CircleCheck, Clock, Inbox} from 'lucide-react';
 
 /** Where a workflow run stands. The board picks the lane and the wording from this. */
-export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'draft' | 'dataReady' | 'dataFailed' | 'needsApproval' | 'missingData' | 'complete';
+export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'draft' | 'dataReady' | 'dataFailed' | 'upstreamFailed' | 'needsApproval' | 'missingData' | 'complete';
 
 /**
  * One card on the board: a workflow's next run, data someone else's workflow handed you, or a run that needs
@@ -22,7 +22,7 @@ export type WorkflowBoardItem = {
   state: WorkflowBoardState;
   /** For shared data: what the other workflow hands you, shown as the card's title. */
   data?: string;
-  /** For shared data: who owns the workflow that makes it. */
+  /** For shared data, and for your workflow that didn't run because shared data failed: who owns the workflow that makes it. */
   owner?: string;
   /** The step the card is about, counting from 1, and how many steps the workflow has. */
   stepNumber?: number;
@@ -45,14 +45,16 @@ const STATE: Record<WorkflowBoardState, {dot: 'info' | 'success' | 'warning' | '
   draft: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
   dataReady: {dot: 'success', step: '', when: 'Ready'},
   dataFailed: {dot: 'error', step: '', when: 'Failed'},
+  upstreamFailed: {dot: 'error', step: '', when: 'Didn’t run'},
   needsApproval: {dot: 'info', step: 'needs approval', when: 'Notified'},
   missingData: {dot: 'warning', step: 'is missing data', when: 'Notified'},
   complete: {dot: 'success', step: 'ran completely', when: 'Finished'},
 };
 
 /**
- * The lanes, left to right. To-run holds two groups. Data ready for use holds what other people's workflows
- * hand you, including a failed run, so you know to ask its owner. Needs attention holds everything that needs you.
+ * The lanes, left to right. To-run holds two groups. New data ready for use holds what other people's workflows
+ * hand you that none of your workflows reads yet, including a failed run. Needs attention holds everything that
+ * needs you, including your workflow that didn't run because the data it reads failed.
  */
 const LANES: {title: string; icon: typeof Clock; empty: string; groups: {title?: string; states: WorkflowBoardState[]}[]}[] = [
   {
@@ -64,8 +66,8 @@ const LANES: {title: string; icon: typeof Clock; empty: string; groups: {title?:
       {title: 'Unscheduled', states: ['unscheduled', 'draft']},
     ],
   },
-  {title: 'Data ready for use', icon: Inbox, empty: 'No one has shared data with you yet.', groups: [{states: ['dataReady', 'dataFailed']}]},
-  {title: 'Needs attention', icon: CircleAlert, empty: 'Nothing needs you right now.', groups: [{states: ['needsApproval', 'missingData']}]},
+  {title: 'New data ready for use', icon: Inbox, empty: 'No new data has been shared with you.', groups: [{states: ['dataReady', 'dataFailed']}]},
+  {title: 'Needs attention', icon: CircleAlert, empty: 'Nothing needs you right now.', groups: [{states: ['upstreamFailed', 'needsApproval', 'missingData']}]},
   {title: 'Done', icon: CircleCheck, empty: 'Finished runs show here.', groups: [{states: ['complete']}]},
 ];
 
@@ -76,7 +78,7 @@ export const upstreamFailedLine = (owner: string) => `Previous workflow failed t
 export function boardLine(item: WorkflowBoardItem): string {
   if (item.state === 'scheduled') return item.schedule ?? '';
   if (item.state === 'dataReady') return `From ${item.owner ?? 'someone'}’s ${item.workflow}`;
-  if (item.state === 'dataFailed') return upstreamFailedLine(item.owner ?? 'its owner');
+  if (item.state === 'dataFailed' || item.state === 'upstreamFailed') return upstreamFailedLine(item.owner ?? 'its owner');
   const s = STATE[item.state];
   if (item.stepNumber && item.stepCount) return `Step ${item.stepNumber} of ${item.stepCount} ${s.step}`;
   if (item.state === 'draft') return 'Draft, not turned on yet';
@@ -115,7 +117,7 @@ function BoardCard({item}: {item: WorkflowBoardItem}) {
 }
 
 /**
- * Home's board of workflow runs in four lanes: To-run (Scheduled and Unscheduled), Data ready for use, Needs attention
+ * Home's board of workflow runs in four lanes: To-run (Scheduled and Unscheduled), New data ready for use, Needs attention
  * and Done. Each card is placed and worded from its state, so runs from any workflow look the same. Lanes sit
  * side by side and stack on narrow screens.
  */

@@ -1,7 +1,8 @@
 import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 // Example workflow for the UI prototype. Nothing here runs.
 
-export type SourceStatus = 'connected' | 'needsConnection' | 'handoff' | 'upload';
+/** 'shared' reads data someone else's workflow shares with you (SHARED_DATA): source is their workflow, reads the data. */
+export type SourceStatus = 'connected' | 'needsConnection' | 'handoff' | 'shared' | 'upload';
 export type StepRunStatus = 'done' | 'review' | 'waiting' | 'stopped' | 'draft';
 
 /** Where a step's data comes from: the file, app or workflow (source), and what it reads there. */
@@ -229,8 +230,55 @@ export const CUSTOMER_CHURN_LIST: Workflow = {
   runs: [],
 };
 
+/**
+ * Reads data Marco Ruiz's Pipeline health check shares with you. That workflow failed on Nov 16, so this one's
+ * scheduled run that morning had nothing to read and didn't process.
+ */
+export const AT_RISK_FOLLOW_UPS: Workflow = {
+  id: 4,
+  name: 'At-risk account follow-ups',
+  description: 'Takes the at-risk accounts Marco Ruiz’s Pipeline health check shares with you, adds what each account still owes, and sends Finance a ranked follow-up list.',
+  schedule: SCHEDULES[1],
+  nextRun: 'Monday, November 23, 8:00',
+  nextRunAt: '2026-11-23T08:00',
+  approver: PEOPLE[0],
+  destinations: ['Slack: #finance-close'],
+  outputFormat: 'Excel sheet',
+  steps: [
+    {
+      id: 'f1',
+      name: 'Add amounts owed',
+      does: 'Match each at-risk account to its orders from last month and add the amount it still owes.',
+      inputs: [
+        {source: 'Pipeline health check', reads: 'At-risk accounts', status: 'shared'},
+        {source: 'Shopify', reads: 'Orders, last month', status: 'connected'},
+      ],
+      output: 'At-risk accounts with amounts owed',
+      status: 'stopped',
+      trialResult: '38 accounts, 112 orders',
+      python: `accounts = read_shared("Pipeline health check", "At-risk accounts")\norders = read_app("Shopify", "Orders, last month")\nowed = orders[orders["Status"] != "Paid"].groupby("Account")["Amount"].sum().rename("Owed")\nwrite_sheet("At-risk accounts with amounts owed", accounts.join(owed, on="Account").fillna({"Owed": 0}))`,
+    },
+    {
+      id: 'f2',
+      name: 'Follow-up list for Finance',
+      does: 'Rank the accounts by amount owed and write one line on why each is at risk.',
+      inputs: [],
+      output: 'Follow-up list',
+      status: 'waiting',
+      trialResult: '38 accounts ranked',
+      python: `accounts = read_sheet("At-risk accounts with amounts owed").sort_values("Owed", ascending=False)\naccounts["Why"] = accounts.apply(lambda a: f"{a['Signal']}, owes {a['Owed']:,.0f}", axis=1)\nwrite_sheet("Follow-up list", accounts[["Account", "Owner", "Owed", "Why"]])`,
+    },
+  ],
+  uses: [],
+  shares: [],
+  runs: [
+    {period: 'Week of Nov 9', started: 'Nov 16, 08:00', result: 'stopped', detail: 'Didn’t process: Marco Ruiz’s Pipeline health check failed to produce At-risk accounts', finished: 'Nov 16, 08:00'},
+    {period: 'Week of Nov 2', started: 'Nov 9, 08:00', result: 'approved', detail: 'Approved by Daniel', finished: 'Nov 9, 08:41'},
+  ],
+};
+
 /** Workflows that come with the prototype, in sidebar order. Built workflows are numbered after these. */
-export const PREFILLED_WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE, WEEKLY_REVENUE_REPORT, CUSTOMER_CHURN_LIST];
+export const PREFILLED_WORKFLOWS: Workflow[] = [MONTHLY_SALES_CLOSE, WEEKLY_REVENUE_REPORT, CUSTOMER_CHURN_LIST, AT_RISK_FOLLOW_UPS];
 
 /**
  * Apps the workspace admin has connected through MCP. Workflow inputs, tickets and the board's Input tiles

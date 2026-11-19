@@ -4,6 +4,7 @@ import {
 } from '@workspace/astryx-workflows/components/WorkflowOverview';
 import type {BuiltWorkflow, StepRunStatus, Workflow, WorkflowStep} from '../workflow';
 import {toColumns, type SavedBoard} from './WorkflowBuilder';
+import {sharedByName} from '../sharedData';
 
 /* ---------- Workflow pages ----------
  * Every workflow page is the WorkflowOverview component from the app's Astryx integration
@@ -22,8 +23,10 @@ const SOURCE_TONE = {
   connected: {tone: 'success', label: 'Connected'},
   needsConnection: {tone: 'warning', label: 'App not connected'},
   handoff: {tone: 'info', label: 'From a workflow'},
+  shared: {tone: 'info', label: 'Shared with you'},
   upload: {tone: 'neutral', label: 'Uploaded'},
 } as const;
+const UPSTREAM_FAILED = {tone: 'error' as const, label: 'Previous workflow failed'};
 const RUN_TONE = {review: 'info', approved: 'success', rerun: 'success', stopped: 'error'} as const;
 const runNow = (toast: ReturnType<typeof useToast>) => () => toast({body: 'Preview only. Running a workflow comes with the real build.'});
 
@@ -44,7 +47,10 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}:
   const isApproved = (s: WorkflowStep) => !!s.ticketId && approved.includes(s.ticketId);
   const steps = w.steps.map(s => (isApproved(s) ? {...s, status: 'done' as const} : s));
   const last = steps[steps.length - 1];
-  const inputStatus = new Map<string, {tone: WorkflowTone; label: string}>(steps.flatMap(s => s.inputs.map((input, k) => [`${s.id}-in-${k}`, SOURCE_TONE[input.status]])));
+  // Shared data whose workflow failed shows that, so you know why this workflow didn't process.
+  const sourceStatus = (input: WorkflowStep['inputs'][number]) =>
+    input.status === 'shared' && sharedByName(input.reads)?.lastRun.result === 'failed' ? UPSTREAM_FAILED : SOURCE_TONE[input.status];
+  const inputStatus = new Map<string, {tone: WorkflowTone; label: string}>(steps.flatMap(s => s.inputs.map((input, k) => [`${s.id}-in-${k}`, sourceStatus(input)])));
   // The Handoff follows the last step: sent once it is done, waiting while it needs approval.
   const handoffStatus = last.status === 'done' ? {tone: 'success' as const, label: 'Sent'} : last.status === 'review' ? {tone: 'info' as const, label: 'Waiting for approval'} : NOT_RUN;
   const statusOf = (id: string) =>

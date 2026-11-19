@@ -42,7 +42,7 @@ export const SHARED_DATA: SharedData[] = [
     workflow: 'Pipeline health check',
     owner: PEOPLE[2],
     format: 'Excel sheet',
-    lastRun: {result: 'failed', at: '2026-11-18T07:40'},
+    lastRun: {result: 'failed', at: '2026-11-16T07:40'},
   },
 ];
 
