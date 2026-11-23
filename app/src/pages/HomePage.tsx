@@ -1,10 +1,8 @@
 import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
-import {Button} from '@astryxdesign/core/Button';
 import {TextInput} from '@astryxdesign/core/TextInput';
-import {Icon} from '@astryxdesign/core/Icon';
-import {Plus, Sparkles} from 'lucide-react';
+import {Sparkles} from 'lucide-react';
 import {useState} from 'react';
 import {WorkflowBoard, type WorkflowBoardItem} from '@workspace/astryx-workflows/components/WorkflowBoard';
 
@@ -29,7 +27,6 @@ export function HomePage({items}: {items: WorkflowBoardItem[]}) {
               <Heading level={5} accessibilityLevel={1}>{greeting()}</Heading>
               <Text type="supporting">{today}</Text>
             </HStack>
-            <Button label="New workflow" variant="ghost" icon={<Icon icon={Plus} />} href="#workflow-new" />
           </HStack>
         </LayoutHeader>
       }
