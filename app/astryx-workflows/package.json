@@ -8,7 +8,8 @@
     "./components/WorkflowOverview": "./components/WorkflowOverview.tsx",
     "./components/WorkflowTile": "./components/WorkflowTile.tsx",
     "./components/WorkflowSheetTable": "./components/WorkflowSheetTable.tsx",
-    "./components/WorkflowBoard": "./components/WorkflowBoard.tsx"
+    "./components/WorkflowBoard": "./components/WorkflowBoard.tsx",
+    "./components/SharedDataOverview": "./components/SharedDataOverview.tsx"
   },
   "peerDependencies": {
     "@astryxdesign/core": "^0.7.15",

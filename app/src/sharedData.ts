@@ -16,7 +16,9 @@ export type SharedData = {
   owner: string;
   /** File type of what it hands over. */
   format: string;
-  /** How its last run went: ready to use, or failed before it made the output. */
+  /** Runs of the workflow that makes it, newest first: ready, or failed before it made the output. */
+  runs: {started: string; finished: string; result: 'ready' | 'failed'}[];
+  /** The newest run, from `runs`: how it went and when it finished. */
   lastRun: {result: 'ready' | 'failed'; at: string};
   /** One or two sentences on what it holds, as its owner describes it. */
   description: string;
@@ -29,14 +31,17 @@ export type SharedData = {
   preview: {asOf: string; columns: string[]; rows: string[][]};
 };
 
-export const SHARED_DATA: SharedData[] = [
+const ENTRIES: Omit<SharedData, 'lastRun'>[] = [
   {
     id: 'd-targets',
     name: 'Regional targets, Q4',
     workflow: 'Quarterly targets update',
     owner: PEOPLE[1],
     format: 'Excel sheet',
-    lastRun: {result: 'ready', at: '2026-11-17T09:30'},
+    runs: [
+      {started: '2026-11-17T09:00', finished: '2026-11-17T09:30', result: 'ready'},
+      {started: '2026-08-18T09:00', finished: '2026-08-18T09:24', result: 'ready'},
+    ],
     description: 'This quarter’s sales target for each region, set by Finance after the Q3 close, next to what each region sold in Q3.',
     updates: 'Every quarter, after the close',
     preview: {
@@ -56,7 +61,11 @@ export const SHARED_DATA: SharedData[] = [
     workflow: 'Weekly pipeline export',
     owner: PEOPLE[2],
     format: 'Excel sheet',
-    lastRun: {result: 'ready', at: '2026-11-16T07:15'},
+    runs: [
+      {started: '2026-11-16T07:00', finished: '2026-11-16T07:15', result: 'ready'},
+      {started: '2026-11-09T07:00', finished: '2026-11-09T07:12', result: 'ready'},
+      {started: '2026-11-02T07:00', finished: '2026-11-02T07:14', result: 'ready'},
+    ],
     description: 'Every open sales deal in the CRM, totalled by region, with the value expected to close this quarter.',
     updates: 'Every Monday at 07:00',
     preview: {
@@ -76,7 +85,11 @@ export const SHARED_DATA: SharedData[] = [
     workflow: 'Pipeline health check',
     owner: PEOPLE[2],
     format: 'Excel sheet',
-    lastRun: {result: 'failed', at: '2026-11-16T07:40'},
+    runs: [
+      {started: '2026-11-16T07:30', finished: '2026-11-16T07:40', result: 'failed'},
+      {started: '2026-11-09T07:30', finished: '2026-11-09T07:40', result: 'ready'},
+      {started: '2026-11-02T07:30', finished: '2026-11-02T07:38', result: 'ready'},
+    ],
     description: 'Customer accounts likely to cancel or not renew, with the reason they were flagged and who owns each account.',
     updates: 'Every Monday at 07:30',
     preview: {
@@ -92,6 +105,8 @@ export const SHARED_DATA: SharedData[] = [
     },
   },
 ];
+
+export const SHARED_DATA: SharedData[] = ENTRIES.map(d => ({...d, lastRun: {result: d.runs[0].result, at: d.runs[0].finished}}));
 
 /** "Marco Ruiz" from "Marco Ruiz, Sales ops". */
 export const personName = (person: string) => person.split(',')[0];

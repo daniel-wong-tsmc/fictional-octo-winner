@@ -131,9 +131,8 @@ export default function App() {
     ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`, sharedInputs: sharedInputsOf(w.saved as SavedBoard)})),
   ];
   const homeItems = boardItems(tasks, approved, boardWorkflows, SHARED_DATA);
-  // #data-<id>: a page for data someone shares with you, listing which of your workflows read it.
+  // #data-<id>: a page for data someone shares with you.
   const openData = sharedById(route.match(/^data-(.+)$/)?.[1] ?? '');
-  const dataUsedBy = openData ? boardWorkflows.filter(w => w.sharedInputs.includes(openData.name)).map(w => ({name: w.name, href: w.href})) : [];
   const openCount = attentionCount(homeItems);
   const isHome = route === 'home';
 
@@ -234,7 +233,7 @@ export default function App() {
           onDelete={() => deletePrefilled(openPrefilled)}
         />
       ) : openData ? (
-        <SharedDataPage key={openData.id} data={openData} usedBy={dataUsedBy} />
+        <SharedDataPage key={openData.id} data={openData} />
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (
