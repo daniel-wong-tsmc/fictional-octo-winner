@@ -14,7 +14,7 @@ export type WorkflowTileKind = 'input' | 'step' | 'output';
 export type WorkflowTileTone = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 
 /**
- * Name, icon and one-line hint for each kind. The board toolbar, the board tiles and the workflow page all
+ * Name, icon and one-line hint for each kind. The board toolbar and the board tiles both
  * read from here, so a kind is named and drawn the same way everywhere.
  */
 export const WORKFLOW_TILE_KINDS: Record<WorkflowTileKind, {label: string; icon: typeof Send; hint: string}> = {
@@ -118,8 +118,8 @@ export type WorkflowTileProps = {
 };
 
 /**
- * One tile of a workflow: an Input, an LLM step or a Handoff. Used on the workflow board and on every
- * workflow page, so a tile looks and reads the same wherever it appears.
+ * One tile of a workflow: an Input, an LLM step or a Handoff. Used for every tile on the workflow board,
+ * so a tile looks and reads the same wherever it appears.
  */
 export function WorkflowTile({content, status, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', onClick}: WorkflowTileProps) {
   const info = WORKFLOW_TILE_KINDS[content.kind];

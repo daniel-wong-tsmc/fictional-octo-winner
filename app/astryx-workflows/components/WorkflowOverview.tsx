@@ -1,27 +1,10 @@
-import {Fragment, useState} from 'react';
-import {HStack, VStack} from '@astryxdesign/core/Stack';
-import {Text} from '@astryxdesign/core/Text';
+import {useState} from 'react';
 import {Button} from '@astryxdesign/core/Button';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
-import {useMediaQuery} from '@astryxdesign/core/hooks';
-import {
-  ArrowDown, ArrowRight, CalendarClock, Pencil, Play, Send, Trash2, UserCheck,
-} from 'lucide-react';
-import {WorkflowTile, type WorkflowTileContent, type WorkflowTileTone} from './WorkflowTile';
+import {CalendarClock, Pencil, Play, Send, Trash2, UserCheck} from 'lucide-react';
 import {OverviewFrame, OverviewHeading, OverviewRuns, type OverviewRun} from '../parts/OverviewParts';
-
-export type WorkflowTone = WorkflowTileTone;
-
-/** One tile of the workflow, drawn with WorkflowTile: where data comes from, an LLM step, or who the result is passed on to. */
-export type WorkflowStage = {
-  id: string;
-  /** What the tile says. Its kind sets which details it shows. */
-  content: WorkflowTileContent;
-  status?: {tone: WorkflowTone; label: string};
-};
-
 
 /** One run. period names the data it covered and identifies the row; started and finished are shown as date and time. */
 export type WorkflowRun = OverviewRun;
@@ -34,10 +17,6 @@ export type WorkflowOverviewProps = {
   nextRun: string;
   approvers: string[];
   sendTo: string[];
-  /** Stages in run order. Each column runs after the one before it; stages in one column run side by side. */
-  columns: WorkflowStage[][];
-  /** Called when a stage is clicked. Without it, stages are not clickable. */
-  onOpenStage?: (stage: WorkflowStage) => void;
   runs: WorkflowRun[];
   /** Where Edit workflow goes. */
   editHref: string;
@@ -51,26 +30,17 @@ export type WorkflowOverviewProps = {
   isInPanel?: boolean;
 };
 
-/** Each column takes an equal share of the row, up to this width. Narrow screens stack the columns instead. */
-const STAGE_MAX_WIDTH = 280;
-
-function StageCard({stage, onOpen}: {stage: WorkflowStage; onOpen?: (s: WorkflowStage) => void}) {
-  return (
-    <WorkflowTile content={stage.content} status={stage.status} onClick={onOpen ? () => onOpen(stage) : undefined} />
-  );
-}
-
 /**
- * The page for one workflow: what it is, when it runs, its recent runs, and its stages in order.
- * Every workflow page uses it, so they all look the same.
+ * The page for one workflow: what it is, when it runs, who approves, where it sends, and its recent runs.
+ * Every workflow page uses it, so they all look the same. It is built from the same parts as
+ * SharedDataOverview (parts/OverviewParts.tsx). Its tiles live on the board, which Edit workflow opens.
  */
 export function WorkflowOverview({
-  name, summary, schedule, nextRun, approvers, sendTo, columns, onOpenStage, runs, editHref, onRunNow, onDelete,
+  name, summary, schedule, nextRun, approvers, sendTo, runs, editHref, onRunNow, onDelete,
   homeHref = '#home',
   isDraft = false,
   isInPanel = false,
 }: WorkflowOverviewProps) {
-  const isVertical = useMediaQuery('(max-width: 900px)');
   const [isDeleting, setIsDeleting] = useState(false);
   return (
     <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
@@ -96,40 +66,6 @@ export function WorkflowOverview({
 
       <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : `The first run is ${nextRun}.`} />
 
-      <VStack gap={2}>
-        <VStack gap={0.5}>
-          <Text type="label">How it runs</Text>
-          <Text type="supporting">
-            {`The tiles in the order they run. Tiles stacked together run side by side.${onOpenStage ? ' Click a tile to open it on the board.' : ''}`}
-          </Text>
-        </VStack>
-        {isVertical ? (
-          <VStack gap={2}>
-            {columns.map((col, i) => (
-              <VStack key={i} gap={2}>
-                {i > 0 && (
-                  <HStack hAlign="center">
-                    <Icon icon={ArrowDown} color="secondary" />
-                  </HStack>
-                )}
-                {col.map(st => <StageCard key={st.id} stage={st} onOpen={onOpenStage} />)}
-              </VStack>
-            ))}
-          </VStack>
-        ) : (
-          // Columns share the width, so a five-column workflow fits without scrolling on a laptop.
-          <HStack gap={2} vAlign="center" isScrollable>
-            {columns.map((col, i) => (
-              <Fragment key={i}>
-                {i > 0 && <Icon icon={ArrowRight} color="secondary" />}
-                <VStack gap={2} width={`${100 / columns.length}%`} maxWidth={STAGE_MAX_WIDTH}>
-                  {col.map(st => <StageCard key={st.id} stage={st} onOpen={onOpenStage} />)}
-                </VStack>
-              </Fragment>
-            ))}
-          </HStack>
-        )}
-      </VStack>
       <AlertDialog
         isOpen={isDeleting}
         onOpenChange={setIsDeleting}

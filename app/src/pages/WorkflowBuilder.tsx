@@ -1120,9 +1120,10 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
 }
 
 /**
- * The board as saved workflow columns, for the workflow page: this workflow's own tiles, with the same content
- * the board shows. Another workflow dropped in as a section isn't copied onto the page; each of its Handoffs
- * that feeds this workflow shows as one input from that workflow instead.
+ * The board as saved workflow columns: this workflow's own tiles in run order, with the same content the board
+ * shows. A workflow saved from the board keeps these, and its page reads who approves and where it sends from
+ * them. Another workflow dropped in as a section isn't copied; each of its Handoffs that feeds this workflow
+ * counts as one input from that workflow instead.
  */
 export function toColumns(board: BoardNode[], links: Link[], sections: Section[] = []): BuiltStage[][] {
   const own = board.filter(n => !n.sectionId);
