@@ -56,7 +56,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
       output: {columns: ['Region', 'Sales (USD)', 'Target', 'Gap %'], rows: [['Europe', '1,121,480', '1,240,000', '-9.6%'], ['US', '1,792,300', '1,850,000', '-3.1%'], ['Japan', '401,950', '420,000', '-4.3%']], total: '5 rows'},
       ticketId: 3,
     },
-    out: {status: 'waiting', numbers: [['Rows', '5'], ['Goes to', 'Slack: #finance-close, Google Drive']], problem: 'Waits for your approval on Step 3 before it is sent.'},
+    out: {status: 'waiting', numbers: [['Rows', '5'], ['Sends to', 'Slack: #finance-close, Google Drive']], problem: 'Waits for your approval on Step 3 before it is sent.'},
   },
   'September 2026': {
     's1-in-0': {status: 'done', numbers: [['Rows read', '5,118'], ['Columns', '5']]},

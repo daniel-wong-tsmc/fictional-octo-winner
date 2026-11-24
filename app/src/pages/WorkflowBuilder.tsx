@@ -516,41 +516,11 @@ function SectionPanel({section, openHref, onOpen, onRemove}: {section: Section; 
   );
 }
 
-/** A tile the selected tile is linked to, for the panel's Comes from and Goes to lists. */
-type PanelLink = {id: string; kind: StepKind; title: string};
-
-/** Tiles linked to the selected one. Clicking one selects it, so you can walk the workflow from the panel. */
-function LinkedTiles({label, items, emptyText, onSelect}: {label: string; items: PanelLink[]; emptyText: string; onSelect: (id: string) => void}) {
-  return (
-    <List header={<Text type="label">{label}</Text>} hasDividers edge="outset" density="compact">
-      {items.length ? (
-        items.map(l => (
-          <ListItem
-            key={l.id}
-            onClick={() => onSelect(l.id)}
-            startContent={<Icon icon={KIND_INFO[l.kind].icon} size="sm" color="secondary" />}
-            label={<Text>{l.title}</Text>}
-            description={KIND_INFO[l.kind].label}
-          />
-        ))
-      ) : (
-        <ListItem label={<Text type="supporting">{emptyText}</Text>} />
-      )}
-    </List>
-  );
-}
-
 /**
  * The side panel for a tile when the board shows a past run: how it went, the numbers it worked with, what the
  * agent did and why it stopped, a few rows of what it made, and the code it ran. Nothing here can be edited.
  */
-function RunTilePanel({step, title, run, comesFrom, onSelect}: {
-  step: Step | null;
-  title: string;
-  run?: TileRunDetail;
-  comesFrom: PanelLink[];
-  onSelect: (id: string) => void;
-}) {
+function RunTilePanel({step, title, run}: {step: Step | null; title: string; run?: TileRunDetail}) {
   if (!step) {
     return <EmptyState isCompact title="Select a tile" description="Click a tile to see how it did in this run." />;
   }
@@ -617,33 +587,24 @@ function RunTilePanel({step, title, run, comesFrom, onSelect}: {
         </HStack>
       )}
 
-      {step.kind !== 'input' && comesFrom.length > 0 && (
-        <>
-          <Divider />
-          <LinkedTiles label="Comes from" items={comesFrom} emptyText="" onSelect={onSelect} />
-        </>
-      )}
     </VStack>
   );
 }
 
 /**
- * The side panel for the selected tile: what flows in, its settings (for an LLM step, the agent's
- * instructions), what flows out, and its last run when it has a ticket.
+ * The side panel for the selected tile: its settings (for an LLM step, the agent's instructions) and its last
+ * run when it has a ticket. What it connects to shows on the board as lines, so the panel doesn't list it.
  */
-function StepPanel({tileId, step, title, comesFrom, goesTo, run, trial, onOpenTrial, onChange, onRemove, onSelect}: {
+function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRemove}: {
   /** The selected tile, so per-tile state such as a code edit in progress resets when the selection moves. */
   tileId: string;
   step: Step | null;
   title: string;
-  comesFrom: PanelLink[];
-  goesTo: PanelLink[];
   run?: TileRun;
   trial: TrialResult | null;
   onOpenTrial: () => void;
   onChange: (s: Step) => void;
   onRemove: () => void;
-  onSelect: (id: string) => void;
 }) {
   if (!step) {
     return <EmptyState isCompact title="Select a tile" description="Click a tile on the board to set it up." />;
@@ -679,10 +640,6 @@ function StepPanel({tileId, step, title, comesFrom, goesTo, run, trial, onOpenTr
           </VStack>
           <Divider />
         </>
-      )}
-
-      {step.kind !== 'input' && (
-        <LinkedTiles label="Comes from" items={comesFrom} emptyText="Nothing yet. Draw a line into this tile." onSelect={onSelect} />
       )}
 
       {trial && (
@@ -765,10 +722,6 @@ function StepPanel({tileId, step, title, comesFrom, goesTo, run, trial, onOpenTr
             onChange={shareWithWorkflows => onChange({...step, shareWithWorkflows})}
           />
         </>
-      )}
-
-      {step.kind === 'input' && (
-        <LinkedTiles label="Goes to" items={goesTo} emptyText="Nothing yet. Draw a line out of this tile." onSelect={onSelect} />
       )}
 
       <Divider />
@@ -1499,11 +1452,6 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     })),
     ...tileNodes,
   ];
-  const linkedTo = (ids: string[]): PanelLink[] =>
-    ids.flatMap(id => {
-      const n = board.find(b => b.id === id);
-      return n ? [{id, kind: n.step.kind, title: titleOf(id)}] : [];
-    });
   const titleOf = (id: string) => {
     const content = tileNodes.find(n => n.id === id)?.data.content;
     return content ? tileText(content).title : '';
@@ -1736,8 +1684,6 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
       run={selectedId ? viewRun?.tiles[selectedId] : undefined}
-      comesFrom={linkedTo(links.filter(l => l.target === selectedId).map(l => l.source))}
-      onSelect={id => setSelectedId(id)}
     />
   ) : selectedSection ? (
     <SectionPanel section={selectedSection} openHref={sectionItem?.href} onOpen={leaveTo} onRemove={() => removeSection(selectedSection.id)} />
@@ -1746,13 +1692,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       tileId={selectedId ?? ''}
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
-      comesFrom={linkedTo(links.filter(l => l.target === selectedId).map(l => l.source))}
-      goesTo={linkedTo(links.filter(l => l.source === selectedId).map(l => l.target))}
       run={selectedId ? editing?.runs?.[selectedId] : undefined}
-      onSelect={id => {
-        setSelectedId(id);
-        setSelectedLinkId(null);
-      }}
       trial={selected && isTried ? trialFor(selected, board, links) : null}
       onOpenTrial={() => selected && openTrial(selected.id)}
       onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
