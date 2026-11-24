@@ -18,6 +18,7 @@ export function dataProblems(): string[] {
 
   // Workflows: each step's ticket, each input's app or workflow, and each shared value they use or share.
   for (const w of PREFILLED_WORKFLOWS) {
+    if (!w.context.trim()) problems.push(`${w.name}: its Start tile has no workflow context.`);
     for (const s of w.steps) {
       if (s.ticketId !== undefined) {
         const t = TICKETS[s.ticketId];

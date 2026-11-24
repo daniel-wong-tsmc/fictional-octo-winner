@@ -36,6 +36,11 @@ export type Workflow = {
   nextRunAt: string;
   /** A draft hasn't been turned on: it has a schedule but doesn't run yet. */
   isDraft?: boolean;
+  /**
+   * The workflow's context, on its Start tile: what it's for and the rules every LLM step follows, like a
+   * system prompt.
+   */
+  context: string;
   approver: string;
   destinations: string[];
   /** File type of what the last step passes on, such as Excel sheet. */
@@ -61,6 +66,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   id: 1,
   name: 'Monthly sales close',
   description: 'Totals last month’s sales by region, compares them with targets, and sends the summary to Finance once approved.',
+  context: 'This workflow prepares the monthly sales close for the Finance team. Report every amount in US dollars, rounded to whole dollars. Use the five sales regions as Sales names them: US, Canada, Europe, UK and Japan. Never drop an order without saying why.',
   schedule: SCHEDULES[0],
   nextRun: 'Tuesday, December 1, 8:00',
   nextRunAt: '2026-12-01T08:00',
@@ -115,6 +121,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   id: 2,
   name: 'Weekly revenue report',
   description: 'Combines the week’s orders and refunds, converts them to USD, totals revenue by region, and shares total revenue with Monthly sales close.',
+  context: 'This workflow reports last week’s revenue, Monday to Sunday. Count an order once, net of its refunds. Convert to US dollars at the rate on the order date. If a file is missing a column you need, stop and say which one rather than guessing.',
   schedule: SCHEDULES[1],
   nextRun: 'Monday, November 23, 8:00',
   nextRunAt: '2026-11-23T08:00',
@@ -179,6 +186,7 @@ export const CUSTOMER_CHURN_LIST: Workflow = {
   id: 3,
   name: 'Customer churn list',
   description: 'Flags customers who may leave, groups them by account owner, and sends each owner their list. A draft: it runs once you try it and turn it on.',
+  context: 'This workflow helps account owners keep customers who may leave. Only flag a customer with a clear reason from their activity or support tickets. Write for a busy account owner: short, plain and specific.',
   schedule: SCHEDULES[1],
   nextRun: 'Not turned on yet',
   nextRunAt: '',
@@ -238,6 +246,7 @@ export const AT_RISK_FOLLOW_UPS: Workflow = {
   id: 4,
   name: 'At-risk account follow-ups',
   description: 'Takes the at-risk accounts Marco Ruiz’s Pipeline health check shares with you, adds what each account still owes, and sends Finance a ranked follow-up list.',
+  context: 'This workflow turns the at-risk accounts Sales shares with us into a follow-up list for Finance. Amounts are in US dollars. Rank by what each account still owes, highest first, and keep each account’s owner so Finance knows who to call.',
   schedule: SCHEDULES[1],
   nextRun: 'Monday, November 23, 8:00',
   nextRunAt: '2026-11-23T08:00',

@@ -7,7 +7,7 @@ export default {
   keywords: ['workflow node', 'workflow step', 'node card', 'flow tile', 'input tile', 'llm step', 'handoff', 'pass on to', 'output'],
   usage: {
     description:
-      'One tile of a workflow: an Input, an LLM step or a Handoff. The header shows the kind and an optional status. The body is a title plus labeled details, and each kind always shows the same details in the same order, each read from one setting of the tile: Input shows its source as the title, then From (Excel upload, App through MCP, Another workflow, or Shared with you) and Reads. LLM shows "Step N" (plus its name) as the title, then Instructions. Where a tile leads is shown by the lines or arrows around it, not in its text. Handoff shows the output name as the title, then Format, Approver and Sends to. Use it everywhere a workflow tile appears, such as the workflow board. Kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too.',
+      'One tile of a workflow: the Start, an Input, an LLM step or a Handoff. Start shows "Workflow context" as the title, then Context: what the workflow is for and the rules every LLM step follows, like a system prompt. A workflow has exactly one Start, first. The header shows the kind and an optional status. The body is a title plus labeled details, and each kind always shows the same details in the same order, each read from one setting of the tile: Input shows its source as the title, then From (Excel upload, App through MCP, Another workflow, or Shared with you) and Reads. LLM shows "Step N" (plus its name) as the title, then Instructions. Where a tile leads is shown by the lines or arrows around it, not in its text. Handoff shows the output name as the title, then Format, Approver and Sends to. Use it everywhere a workflow tile appears, such as the workflow board. Kind names and icons come from WORKFLOW_TILE_KINDS, which the board toolbar uses too.',
     bestPractices: [
       {guidance: true, description: 'Build content from the tile’s own settings and lines, with one function shared by every screen that shows the tile.'},
       {guidance: true, description: 'Put actions such as See output in the footer.'},
@@ -16,7 +16,7 @@ export default {
     ],
   },
   props: [
-    {name: 'content', type: 'WorkflowTileContent', description: 'What the tile says. Its kind (input, step or output) sets the title and which labeled details show.', required: true},
+    {name: 'content', type: 'WorkflowTileContent', description: 'What the tile says. Its kind (start, input, step or output) sets the title and which labeled details show.', required: true},
     {name: 'status', type: '{tone: WorkflowTileTone; label: string}', description: 'Status dot and label in the header, such as Ready or Needs approval.'},
     {name: 'footer', type: 'ReactNode', description: 'Actions or results at the bottom, such as a See output button.'},
     {name: 'detailMaxLines', type: 'number', description: 'Cuts each detail to this many lines, for small tiles such as those on a board.'},
@@ -29,7 +29,8 @@ export default {
   examples: [
     {
       label: 'One tile of each kind',
-      code: `<WorkflowTile content={{kind: 'input', source: 'Shopify', via: 'mcp', reads: 'Orders, last month'}} />
+      code: `<WorkflowTile content={{kind: 'start', context: 'This prepares the monthly sales close for Finance. Use US dollars and keep regions as Sales names them.'}} />
+<WorkflowTile content={{kind: 'input', source: 'Shopify', via: 'mcp', reads: 'Orders, last month'}} />
 <WorkflowTile content={{kind: 'step', number: 2, name: 'Convert to USD', instructions: 'Convert each order to US dollars.'}} />
 <WorkflowTile content={{kind: 'output', name: 'October summary', format: 'Excel sheet', approver: 'Daniel (you)', sendTo: ['Slack: #finance-close']}} />`,
     },
