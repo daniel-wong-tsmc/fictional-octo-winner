@@ -1233,7 +1233,10 @@ export type LibraryItem = {key: string; name: string; href: string; saved: Saved
 export type RunView = {
   title: string;
   status: {tone: 'success' | 'info' | 'error' | 'neutral'; label: string};
-  summary: string;
+  /** When it ran, such as "Nov 16, 08:00 to 09:12". */
+  ran: string;
+  /** Why it failed, in a few words, such as "Data input error". The failed tile has the details. */
+  why?: string;
   tiles: Record<string, TileRunDetail>;
   editHref: string;
 };
@@ -1594,7 +1597,19 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
       <Panel position="top-left">
         <VStack gap={2} maxWidth={420}>
-          {viewRun && <Banner status={viewRun.status.tone === 'neutral' ? 'info' : viewRun.status.tone} title={viewRun.status.label} description={viewRun.summary} collapsible={false} />}
+          {viewRun && (
+            <Banner
+              status={viewRun.status.tone === 'neutral' ? 'info' : viewRun.status.tone}
+              title={viewRun.status.label}
+              description={
+                <MetadataList orientation="horizontal">
+                  <MetadataListItem label="Ran">{viewRun.ran}</MetadataListItem>
+                  {viewRun.why && <MetadataListItem label="Why it failed">{viewRun.why}</MetadataListItem>}
+                </MetadataList>
+              }
+              collapsible={false}
+            />
+          )}
           {trial === 'done' && (
             <Banner
               status={allChecked ? 'success' : 'info'}
@@ -1632,7 +1647,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   );
   const actions = viewRun ? (
     <HStack gap={2} wrap="wrap">
-      <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href={viewRun.editHref} />
+      <Button label="Edit workflow" tooltip="Edit workflow" isIconOnly icon={<Icon icon={Pencil} />} href={viewRun.editHref} />
     </HStack>
   ) : (
     <HStack gap={2} wrap="wrap">

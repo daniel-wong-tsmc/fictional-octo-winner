@@ -13,7 +13,7 @@ import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun}
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {SHARED_DATA, sharedById} from './sharedData';
 import {SharedDataPage} from './pages/SharedDataPage';
-import {RUN_DETAILS, type TileRunDetail} from './runs';
+import {RUN_DETAILS, failureKind, ranBetween, type TileRunDetail} from './runs';
 import {HomePage} from './pages/HomePage';
 import {HomePanel} from './pages/HomePanel';
 import {TicketPage} from './pages/TicketPage';
@@ -271,7 +271,8 @@ export default function App() {
               tone: runData.result === 'stopped' ? 'error' : runData.result === 'review' ? 'info' : 'success',
               label: runData.result === 'stopped' ? 'Stopped' : runData.result === 'review' ? 'Waiting for approval' : 'Done',
             },
-            summary: `${runData.period}. ${runData.detail}. Started ${runData.started}, finished ${runData.finished}. Click a tile to see its numbers.`,
+            ran: ranBetween(runData.started, runData.finished),
+            why: runData.result === 'stopped' ? failureKind(runTiles) : undefined,
             tiles: runTiles,
             editHref: `#workflow-edit-${runOf.workflow.id}`,
           }}

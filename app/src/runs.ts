@@ -163,5 +163,26 @@ export const RUN_DETAILS: Record<number, Record<string, Record<string, TileRunDe
   4: AT_RISK_FOLLOW_UPS,
 };
 
+/**
+ * Why a run failed, in a few words: where the first failed tile sits. An Input means the data coming in was
+ * wrong or missing, an LLM step means the agent couldn't process it, a Handoff means the result couldn't be
+ * sent. The tile itself says exactly what went wrong.
+ */
+export function failureKind(tiles: Record<string, TileRunDetail>): string | undefined {
+  const failed = Object.keys(tiles).filter(id => tiles[id].status === 'failed');
+  if (failed.some(id => id.includes('-in-'))) return 'Data input error';
+  if (failed.some(id => id !== 'out')) return 'LLM processing error';
+  if (failed.includes('out')) return 'Handoff error';
+  return undefined;
+}
+
+/** "Nov 16, 08:00 to 09:12", with both dates when it ran into the next day, or one time when it stopped at once. */
+export const ranBetween = (started: string, finished: string) => {
+  const [startDay] = started.split(', ');
+  const [endDay, endTime] = finished.split(', ');
+  if (started === finished) return started;
+  return startDay === endDay ? `${started} to ${endTime}` : `${started} to ${finished}`;
+};
+
 /** #workflow-1-run-0: the newest run of workflow 1. */
 export const runHref = (workflowId: number, index: number) => `#workflow-${workflowId}-run-${index}`;
