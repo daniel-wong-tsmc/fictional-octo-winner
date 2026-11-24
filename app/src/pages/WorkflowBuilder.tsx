@@ -1555,8 +1555,9 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
       <Button
         label={trial === 'done' ? 'Try again' : 'Try on last month'}
         icon={<Icon icon={Play} />}
+        isIconOnly
         isDisabled={!allReady}
-        tooltip={allReady ? `Runs every tile on ${TRIAL_MONTH} data, without sending anything` : 'Finish the tiles first'}
+        tooltip={allReady ? `${trial === 'done' ? 'Try again' : 'Try on last month'}: runs every tile on ${TRIAL_MONTH} data, without sending anything` : 'Try on last month: finish the tiles first'}
         isLoading={trial === 'running'}
         onClick={() => {
           setTrial('running');
@@ -1568,8 +1569,9 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
           label="Save changes"
           variant="primary"
           icon={<Icon icon={Save} />}
+          isIconOnly
           isDisabled={!isDirty || !allReady}
-          tooltip={!isDirty ? 'Nothing has changed yet' : !allReady ? 'Finish the tiles first' : undefined}
+          tooltip={!isDirty ? 'Save changes: nothing has changed yet' : !allReady ? 'Save changes: finish the tiles first' : 'Save changes'}
           onClick={() => {
             onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
             toast({body: `Changes to ${finalName} are saved.`});
@@ -1580,8 +1582,9 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
           label="Save"
           variant="primary"
           icon={<Icon icon={Save} />}
+          isIconOnly
           isDisabled={!allReady}
-          tooltip={allReady ? 'Saves it to your library' : 'Finish the tiles first'}
+          tooltip={allReady ? 'Save: adds it to your library' : 'Save: finish the tiles first'}
           onClick={() => {
             onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
             toast({body: `${finalName} is saved to your library.`});
