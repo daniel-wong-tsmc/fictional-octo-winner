@@ -24,6 +24,7 @@ import {
   ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Pencil, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
 import {TICKETS, type DataSet, type Sheet} from '../data';
+import {PREFILLED_WORKFLOWS} from '../workflow';
 import {CHECK_LABEL, describeRule, shapeOf, type Handoff} from '../handoffs';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {RefLabel, StatusLabel} from './shared';
@@ -251,6 +252,8 @@ export function TicketPage({
   isInPanel?: boolean;
 }) {
   const t = TICKETS[id];
+  // The step's workflow, for the breadcrumb.
+  const workflowId = PREFILLED_WORKFLOWS.find(w => w.name === t.workflow)?.id;
   const toast = useToast();
   const [inputSheet, setInputSheet] = useState(t.inputs.find(d => d.sheet)?.sheet ?? '');
   const [outputSheet, setOutputSheet] = useState(t.outputs[0].sheet);
@@ -325,7 +328,7 @@ export function TicketPage({
         isInPanel ? undefined : <LayoutHeader hasDivider padding={4}>
           <Breadcrumbs>
             <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            {t.workflow === 'Monthly sales close' && <BreadcrumbItem href="#workflow-1">{t.workflow}</BreadcrumbItem>}
+            {workflowId !== undefined && <BreadcrumbItem href={`#workflow-${workflowId}`}>{t.workflow}</BreadcrumbItem>}
             <BreadcrumbItem isCurrent>{t.step}</BreadcrumbItem>
           </Breadcrumbs>
         </LayoutHeader>

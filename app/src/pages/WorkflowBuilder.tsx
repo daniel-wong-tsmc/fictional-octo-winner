@@ -516,6 +516,21 @@ function SectionPanel({section, openHref, onOpen, onRemove}: {section: Section; 
 }
 
 /**
+ * Opens a step's page: everything about its latest run, where you approve, fix or run it again. Every LLM step
+ * that has run has one. On an input, it opens the page of the step the input feeds and names that step.
+ */
+function StepPageButton({ticketId, forStep}: {ticketId: number; forStep?: string}) {
+  return (
+    <VStack gap={1}>
+      <HStack>
+        <Button label="Open step page" icon={<Icon icon={ArrowUpRight} />} href={`#ticket-${ticketId}`} />
+      </HStack>
+      {forStep && <Text type="supporting">{`For the step this feeds: ${forStep}`}</Text>}
+    </VStack>
+  );
+}
+
+/**
  * The side panel for a tile when the board shows a past run: how it went, the numbers it worked with, what the
  * agent did and why it stopped, a few rows of what it made, and the code it ran. Nothing here can be edited.
  */
@@ -540,6 +555,9 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
           </HStack>
         )}
       </VStack>
+      {run?.ticketId !== undefined && TICKETS[run.ticketId] && (
+        <StepPageButton ticketId={run.ticketId} forStep={step.kind === 'input' ? TICKETS[run.ticketId].step : undefined} />
+      )}
 
       {!run && <Text type="supporting">This tile wasn’t part of this run.</Text>}
       {run?.problem && (
@@ -578,12 +596,6 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
         <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text weight="medium">Show the code</Text>}>
           <CodeBlock code={step.python} language="python" width="100%" size="sm" isWrapped />
         </Collapsible>
-      )}
-
-      {run?.ticketId !== undefined && (
-        <HStack>
-          <Button label="Open ticket" size="sm" href={`#ticket-${run.ticketId}`} />
-        </HStack>
       )}
 
     </VStack>
@@ -633,9 +645,7 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
                 {run.summary.map(line => <ListItem key={line} label={<Text type="supporting">{line}</Text>} />)}
               </List>
             )}
-            <HStack>
-              <Button label="Open ticket" size="sm" href={`#ticket-${run.ticketId}`} />
-            </HStack>
+            <StepPageButton ticketId={run.ticketId} />
           </VStack>
           <Divider />
         </>

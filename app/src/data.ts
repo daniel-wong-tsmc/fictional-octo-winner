@@ -8,7 +8,7 @@ export const STATUS: Record<Status, {dot: 'error' | 'warning' | 'info' | 'neutra
   review: {dot: 'info', label: 'Needs approval'},
   stale: {dot: 'warning', label: 'Out of date'},
   draft: {dot: 'neutral', label: 'Draft'},
-  done: {dot: 'success', label: 'Approved'},
+  done: {dot: 'success', label: 'Done'},
 };
 
 /** A task on Home points at a ticket. Everything the row says is read from that ticket. */
@@ -103,7 +103,7 @@ export const TICKETS: Record<number, Ticket> = {
     },
   },
   2: {
-    workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'done', ran: 'Approved Nov 9 by Daniel', finishedAt: '2026-11-09T10:05',
+    workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'done', ran: 'Finished Nov 9 at 08:18', finishedAt: '2026-11-09T08:18',
     inputs: [
       {name: 'Net orders', source: ['step', 'From step: Combine orders and refunds'], stats: ['1,221 rows', '5 columns', "Last week's run"], sheet: 'Net orders'},
       {name: 'Exchange rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['Daily rates', 'Updated today 06:00'], sheet: 'Exchange rates'},
@@ -138,21 +138,100 @@ export const TICKETS: Record<number, Ticket> = {
     },
     canApprove: true,
   },
-  4: {
-    workflow: 'Customer churn list', step: 'Flag customers at risk', status: 'draft', ran: 'Not run yet',
+
+  // Monthly sales close, run of Nov 2 (October). Steps 1 and 2 finished; Step 3 waits for approval (ticket 3).
+  5: {
+    workflow: 'Monthly sales close', step: 'Collect last month’s orders', status: 'done', ran: 'Finished Nov 2 at 08:06', finishedAt: '2026-11-02T08:06',
     inputs: [
-      {name: 'Active customers', source: ['connection', 'From connection: Salesforce'], stats: ['2,310 rows', '4 columns', 'Synced 5h ago'], sheet: 'Active customers'},
-      {name: 'Support tickets, 90 days', source: ['connection', 'From connection: Zendesk'], stats: ['4,118 rows', '4 columns', 'Synced 5h ago'], sheet: 'Support tickets'},
+      {name: 'Orders, last month', source: ['connection', 'From connection: Shopify, Orders, last month'], stats: ['5,402 rows', '5 columns', 'Synced Nov 2, 08:01'], sheet: 'Shopify orders'},
     ],
-    instructions: "Flag customers who haven't ordered in 60 days, or who opened 3 or more support tickets in the last 90 days. Add a column that says which rule they hit.",
-    python: '# The agent writes this after the first run.',
-    outputs: [{name: 'Customers at risk', emptyNote: 'Not produced yet. Run the step to see the result here.', feedsInto: [['step', 'Group by account owner', '#workflow-3']], sheet: 'Customers at risk'}],
+    instructions: 'Pull every order placed last month, with its region and currency.',
+    agentSummary: ['Kept every order placed in October: 5,402', 'Kept each order’s region and currency', '1,968 orders are in other currencies, for Step 2 to convert'],
+    python: `orders = read_app("Shopify", "Orders, last month")\norders = orders[["Order ID", "Date", "Region", "Currency", "Amount"]]\nwrite_sheet("Orders this month", orders)`,
+    outputs: [{name: 'Orders this month', stats: ['5,402 rows', '5 columns'], feedsInto: [['step', 'Convert to USD', '#ticket-6']], sheet: 'Orders this month'}],
     sheets: {
-      'Active customers': {kind: 'Input', columns: ['Customer', 'Account owner', 'Last order', 'Plan'], rows: [['Lindqvist AB', 'M. Okafor', '2026-11-02', 'Pro'], ['Tanaka Trading', 'J. Weiss', '2026-08-21', 'Team'], ['Harper & Cole', 'M. Okafor', '2026-10-30', 'Pro'], ['Maison Ferrand', 'A. Dubois', '2026-07-14', 'Starter'], ['Northpeak Ltd', 'J. Weiss', '2026-11-10', 'Team']]},
-      'Support tickets': {kind: 'Input', columns: ['Ticket', 'Customer', 'Opened', 'Topic'], rows: [['ZD-9921', 'Tanaka Trading', '2026-10-03', 'Billing'], ['ZD-9988', 'Tanaka Trading', '2026-10-19', 'Login'], ['ZD-10102', 'Tanaka Trading', '2026-11-04', 'Billing'], ['ZD-10140', 'Harper & Cole', '2026-11-06', 'Export']]},
-      'Customers at risk': {kind: 'Output', isEmpty: true},
+      'Shopify orders': {kind: 'Input', columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount'], rows: [['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,120.00'], ['SO-47103', '2026-10-01', 'US', 'USD', '640.00'], ['SO-47109', '2026-10-02', 'Japan', 'JPY', '98,400'], ['SO-47115', '2026-10-02', 'UK', 'GBP', '455.20'], ['SO-47121', '2026-10-03', 'Canada', 'CAD', '1,310.00']]},
+      'Orders this month': {kind: 'Output', columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount'], rows: [['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,120.00'], ['SO-47103', '2026-10-01', 'US', 'USD', '640.00'], ['SO-47109', '2026-10-02', 'Japan', 'JPY', '98,400'], ['SO-47115', '2026-10-02', 'UK', 'GBP', '455.20'], ['SO-47121', '2026-10-03', 'Canada', 'CAD', '1,310.00']]},
     },
-    isDraft: true,
+  },
+  6: {
+    workflow: 'Monthly sales close', step: 'Convert to USD', status: 'done', ran: 'Finished Nov 2 at 08:14', finishedAt: '2026-11-02T08:14',
+    inputs: [
+      {name: 'Orders this month', source: ['step', 'From step: Collect last month’s orders'], stats: ['5,402 rows', '5 columns'], sheet: 'Orders this month'},
+      {name: 'Daily rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['31 days × 4 currencies', 'Updated Nov 2, 06:00'], sheet: 'Rates'},
+    ],
+    instructions: 'Convert each order to US dollars using the exchange rate on its order date.',
+    agentSummary: ['Looked up the rate for each order’s currency and date', 'Used Friday’s rate for 412 weekend orders', 'Added one column: Amount (USD)'],
+    python: `orders = read_sheet("Orders this month").sort_values("Date")\nrates = read_app("ECB exchange rates", "Daily rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency", direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
+    outputs: [{name: 'Orders in USD', stats: ['5,402 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Sales summary for Finance', '#ticket-3']], sheet: 'Orders in USD (October)'}],
+    sheets: {
+      'Orders this month': {kind: 'Input', columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount'], rows: [['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,120.00'], ['SO-47103', '2026-10-01', 'US', 'USD', '640.00'], ['SO-47109', '2026-10-02', 'Japan', 'JPY', '98,400']]},
+      Rates: {kind: 'Input', columns: ['Date', 'Currency', 'Rate to USD'], rows: [['2026-10-01', 'EUR', '1.0840'], ['2026-10-01', 'JPY', '0.00662'], ['2026-10-02', 'GBP', '1.2891']]},
+      'Orders in USD (October)': {kind: 'Output', columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'], addedColumns: [5], rows: [['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,120.00', '1,214.08'], ['SO-47103', '2026-10-01', 'US', 'USD', '640.00', '640.00'], ['SO-47109', '2026-10-02', 'Japan', 'JPY', '98,400', '651.42']]},
+    },
+  },
+  // Weekly revenue report, run of Nov 9 (week of Nov 2), the last time Steps 2 to 4 ran. Step 1 stopped on
+  // Nov 16 (ticket 1), so these steps didn't run that week.
+  7: {
+    workflow: 'Weekly revenue report', step: 'Revenue by region', status: 'done', ran: 'Finished Nov 9 at 08:22', finishedAt: '2026-11-09T08:22',
+    inputs: [
+      {name: 'Orders in USD', source: ['step', 'From step: Convert to USD'], stats: ['1,221 rows', '6 columns'], sheet: 'Orders in USD'},
+    ],
+    instructions: 'Total the week’s USD revenue for each region.',
+    agentSummary: ['Totaled Amount (USD) for each of the 5 regions', 'Every order had a region, so none were left out'],
+    python: `orders = read_sheet("Orders in USD")\nby_region = orders.groupby("Region")["Amount (USD)"].sum().round(2)\nwrite_sheet("Revenue by region", by_region.reset_index())`,
+    outputs: [{name: 'Revenue by region', stats: ['5 rows', '2 columns'], feedsInto: [['step', 'Total revenue', '#ticket-8']], sheet: 'Revenue by region'}],
+    sheets: {
+      'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
+      'Revenue by region': {kind: 'Output', columns: ['Region', 'Amount (USD)'], rows: [['US', '402,180.00'], ['Europe', '251,940.00'], ['UK', '146,300.00'], ['Canada', '118,520.00'], ['Japan', '93,510.00']]},
+    },
+  },
+  8: {
+    workflow: 'Weekly revenue report', step: 'Total revenue', status: 'done', ran: 'Finished Nov 9 at 08:23', finishedAt: '2026-11-09T08:23',
+    inputs: [
+      {name: 'Revenue by region', source: ['step', 'From step: Revenue by region'], stats: ['5 rows', '2 columns'], sheet: 'Revenue by region'},
+    ],
+    instructions: 'Add up all regions into one total revenue figure in USD.',
+    agentSummary: ['Added up all five regions: $1,012,450.00', 'Shared it with Monthly sales close as Total revenue (USD)'],
+    python: `by_region = read_sheet("Revenue by region")\ntotal = round(by_region["Amount (USD)"].sum(), 2)\nwrite_value("Total revenue (USD)", total)`,
+    outputs: [{name: 'Total revenue (USD)', stats: ['1 value'], feedsInto: [['workflow', 'Monthly sales close', '#workflow-1']], sheet: 'Total revenue (USD)'}],
+    sheets: {
+      'Revenue by region': {kind: 'Input', columns: ['Region', 'Amount (USD)'], rows: [['US', '402,180.00'], ['Europe', '251,940.00'], ['UK', '146,300.00'], ['Canada', '118,520.00'], ['Japan', '93,510.00']]},
+      'Total revenue (USD)': {kind: 'Output', columns: ['Total revenue (USD)'], rows: [['1,012,450.00']]},
+    },
+  },
+  // At-risk account follow-ups. Step 1 couldn't run on Nov 16: Marco Ruiz’s Pipeline health check didn't
+  // produce its at-risk accounts. Step 2 last ran on Nov 9.
+  9: {
+    workflow: 'At-risk account follow-ups', step: 'Add amounts owed', status: 'failed', ran: 'Couldn’t run Nov 16 at 08:00', finishedAt: '2026-11-16T08:00',
+    banner: {status: 'error', title: 'This step couldn’t run.', description: 'Marco Ruiz’s Pipeline health check failed on Nov 16 at 07:40, so the at-risk accounts it shares with you were never produced. Ask Marco to check his workflow, then run this step again.'},
+    inputs: [
+      {name: 'At-risk accounts', source: ['dataset', 'Shared with you: Marco Ruiz’s Pipeline health check'], stats: ['0 rows', 'Last ready Nov 9, 07:40'], warning: 'Not produced on Nov 16', sheet: 'At-risk accounts'},
+      {name: 'Orders, last month', source: ['connection', 'From connection: Shopify, Orders, last month'], stats: ['5,118 rows', 'Not read this run'], sheet: 'Shopify orders'},
+    ],
+    instructions: 'Match each at-risk account to its orders from last month and add the amount it still owes.',
+    agentSummary: ['Waited for At-risk accounts from Pipeline health check', 'Stopped before reading orders: there were no accounts to match'],
+    python: `accounts = read_shared("Pipeline health check", "At-risk accounts")\norders = read_app("Shopify", "Orders, last month")\nowed = orders[orders["Status"] != "Paid"].groupby("Account")["Amount"].sum().rename("Owed")\nwrite_sheet("At-risk accounts with amounts owed", accounts.join(owed, on="Account").fillna({"Owed": 0}))`,
+    outputs: [{name: 'At-risk accounts with amounts owed', emptyNote: 'Not produced. This step couldn’t run without the at-risk accounts.', feedsInto: [['step', 'Follow-up list for Finance', '#ticket-10']], sheet: 'Accounts with amounts owed'}],
+    sheets: {
+      'At-risk accounts': {kind: 'Input', isEmpty: true, emptyNote: 'Pipeline health check failed before it produced this.'},
+      'Shopify orders': {kind: 'Input', columns: ['Order ID', 'Account', 'Status', 'Amount'], rows: [['SO-46810', 'Bluefin Logistics', 'Unpaid', '71,200.00'], ['SO-46833', 'Northwind Traders', 'Unpaid', '48,950.00'], ['SO-46851', 'Harbor Health', 'Unpaid', '39,300.00']]},
+      'Accounts with amounts owed': {kind: 'Output', isEmpty: true},
+    },
+  },
+  10: {
+    workflow: 'At-risk account follow-ups', step: 'Follow-up list for Finance', status: 'done', ran: 'Finished Nov 9 at 08:12', finishedAt: '2026-11-09T08:12',
+    inputs: [
+      {name: 'At-risk accounts with amounts owed', source: ['step', 'From step: Add amounts owed'], stats: ['5 rows', '4 columns', 'Run of Nov 9'], sheet: 'Accounts with amounts owed'},
+    ],
+    instructions: 'Rank the accounts by amount owed and write one line on why each is at risk.',
+    agentSummary: ['Ranked 5 accounts by amount owed, highest first', 'Wrote one line on why each is at risk', 'Kept each account owner for Finance to call'],
+    python: `accounts = read_sheet("At-risk accounts with amounts owed").sort_values("Owed", ascending=False)\naccounts["Why"] = accounts.apply(lambda a: f"{a['Signal']}, owes {a['Owed']:,.0f}", axis=1)\nwrite_sheet("Follow-up list", accounts[["Account", "Owner", "Owed", "Why"]])`,
+    outputs: [{name: 'Follow-up list', stats: ['5 rows', '4 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home']], sheet: 'Follow-up list'}],
+    sheets: {
+      'Accounts with amounts owed': {kind: 'Input', columns: ['Account', 'Owner', 'Signal', 'Owed'], rows: [['Bluefin Logistics', 'Sam Okafor', 'Renewal in 14 days, no reply', '71,200'], ['Northwind Traders', 'Ana Lopez', 'Usage down 60% in 30 days', '48,950'], ['Harbor Health', 'Lee Tanaka', 'Invoice 45 days overdue', '39,300']]},
+      'Follow-up list': {kind: 'Output', columns: ['Account', 'Owner', 'Owed', 'Why'], addedColumns: [3], rows: [['Bluefin Logistics', 'Sam Okafor', '71,200', 'Renewal in 14 days, no reply, owes 71,200'], ['Northwind Traders', 'Ana Lopez', '48,950', 'Usage down 60% in 30 days, owes 48,950'], ['Harbor Health', 'Lee Tanaka', '39,300', 'Invoice 45 days overdue, owes 39,300']]},
+    },
   },
 };
 

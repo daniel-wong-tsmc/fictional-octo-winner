@@ -82,7 +82,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       output: 'Orders this month',
       status: 'done',
       trialResult: '4,988 orders from September',
-      python: `orders = read_app("Shopify", "Orders, last month")\norders = orders[["Order ID", "Date", "Region", "Currency", "Amount"]]\nwrite_sheet("Orders this month", orders)`,
+      ticketId: 5,
     },
     {
       id: 's2',
@@ -92,7 +92,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
       output: 'Orders in USD',
       status: 'done',
       trialResult: '4,988 orders converted, 112 used Friday’s rate',
-      python: `orders = read_sheet("Orders this month").sort_values("Date")\nrates = read_app("ECB exchange rates", "Daily rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency", direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
+      ticketId: 6,
     },
     {
       id: 's3',
@@ -160,7 +160,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       output: 'Revenue by region',
       status: 'waiting',
       trialResult: '5 regions',
-      python: `orders = read_sheet("Orders in USD")\nby_region = orders.groupby("Region")["Amount (USD)"].sum().round(2)\nwrite_sheet("Revenue by region", by_region.reset_index())`,
+      ticketId: 7,
     },
     {
       id: 'w4',
@@ -170,7 +170,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
       output: 'Total revenue (USD)',
       status: 'waiting',
       trialResult: '1,482,906.17 USD',
-      python: `by_region = read_sheet("Revenue by region")\ntotal = round(by_region["Amount (USD)"].sum(), 2)\nwrite_value("Total revenue (USD)", total)`,
+      ticketId: 8,
     },
   ],
   uses: [],
@@ -212,7 +212,6 @@ export const CUSTOMER_CHURN_LIST: Workflow = {
       output: 'Customers at risk',
       status: 'draft',
       trialResult: '148 customers flagged',
-      ticketId: 4,
     },
     {
       id: 'c3',
@@ -265,7 +264,7 @@ export const AT_RISK_FOLLOW_UPS: Workflow = {
       output: 'At-risk accounts with amounts owed',
       status: 'stopped',
       trialResult: '38 accounts, 112 orders',
-      python: `accounts = read_shared("Pipeline health check", "At-risk accounts")\norders = read_app("Shopify", "Orders, last month")\nowed = orders[orders["Status"] != "Paid"].groupby("Account")["Amount"].sum().rename("Owed")\nwrite_sheet("At-risk accounts with amounts owed", accounts.join(owed, on="Account").fillna({"Owed": 0}))`,
+      ticketId: 9,
     },
     {
       id: 'f2',
@@ -275,7 +274,7 @@ export const AT_RISK_FOLLOW_UPS: Workflow = {
       output: 'Follow-up list',
       status: 'waiting',
       trialResult: '38 accounts ranked',
-      python: `accounts = read_sheet("At-risk accounts with amounts owed").sort_values("Owed", ascending=False)\naccounts["Why"] = accounts.apply(lambda a: f"{a['Signal']}, owes {a['Owed']:,.0f}", axis=1)\nwrite_sheet("Follow-up list", accounts[["Account", "Owner", "Owed", "Why"]])`,
+      ticketId: 10,
     },
   ],
   uses: [],

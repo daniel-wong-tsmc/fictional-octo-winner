@@ -16,7 +16,10 @@ export type TileRunDetail = {
   problem?: string;
   /** A few rows of what it made. */
   output?: {columns: string[]; rows: string[][]; total: string};
-  /** The ticket for this step's run, when it has one (the newest run only). */
+  /**
+   * The step page for this run, when this is the run the page shows (each LLM step's latest run). On a failed
+   * input it is the page of the step the input feeds, so you can go straight to it.
+   */
   ticketId?: number;
 };
 
@@ -39,6 +42,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
       numbers: [['Rows in', '5,402'], ['Rows out', '5,402'], ['Orders in other currencies', '1,968']],
       did: ['Kept every order placed in October', 'Kept each order’s region and currency'],
       output: {columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount'], rows: [['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,120.00'], ['SO-47103', '2026-10-01', 'US', 'USD', '640.00'], ['SO-47109', '2026-10-02', 'Japan', 'JPY', '98,400']], total: '5,402 rows'},
+      ticketId: 5,
     },
     's2-in-0': {status: 'done', numbers: [['Rates read', '31 days × 4 currencies'], ['Updated', 'Nov 2, 06:00']]},
     s2: {
@@ -46,6 +50,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
       numbers: [['Rows in', '5,402'], ['Rows out', '5,402'], ['Weekend orders using Friday’s rate', '412']],
       did: ['Looked up the rate for each order’s currency and date', 'Added one column: Amount (USD)'],
       output: {columns: ['Order ID', 'Region', 'Amount', 'Amount (USD)'], rows: [['SO-47102', 'Europe', '1,120.00', '1,214.08'], ['SO-47103', 'US', '640.00', '640.00'], ['SO-47109', 'Japan', '98,400', '651.42']], total: '5,402 rows'},
+      ticketId: 6,
     },
     's3-in-0': {status: 'done', numbers: [['Rows read', '60'], ['October targets', '5 regions']]},
     's3-in-1': {status: 'done', numbers: [['Value', '$4,282,800'], ['From run', 'Weekly revenue report, Nov 2']]},
@@ -92,7 +97,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
 
 const WEEKLY_REVENUE_REPORT: Record<string, Record<string, TileRunDetail>> = {
   'Week of Nov 9': {
-    'w1-in-0': {status: 'failed', numbers: [['Rows read', '1,284'], ['Columns', '5 (6 expected)']], problem: 'The orders file has no Currency column.'},
+    'w1-in-0': {status: 'failed', numbers: [['Rows read', '1,284'], ['Columns', '5 (6 expected)']], problem: 'The orders file has no Currency column.', ticketId: 1},
     'w1-in-1': {status: 'done', numbers: [['Rows read', '63'], ['Columns', '3']]},
     w1: {
       status: 'failed',
@@ -119,8 +124,8 @@ const WEEKLY_REVENUE_REPORT: Record<string, Record<string, TileRunDetail>> = {
       output: {columns: ['Order ID', 'Currency', 'Amount', 'Amount (USD)'], rows: [['SO-48211', 'EUR', '1,240.00', '1,344.28'], ['SO-48212', 'JPY', '182,500', '1,208.15'], ['SO-48215', 'GBP', '860.50', '1,111.34']], total: '1,221 rows'},
       ticketId: 2,
     },
-    w3: {status: 'done', numbers: [['Rows in', '1,221'], ['Regions', '5']], did: ['Totaled Amount (USD) by region'], output: {columns: ['Region', 'Revenue (USD)'], rows: [['US', '402,180'], ['Europe', '251,940'], ['UK', '146,300']], total: '5 rows'}},
-    w4: {status: 'done', numbers: [['Regions in', '5'], ['Total revenue', '$1,012,450']], did: ['Added up all five regions']},
+    w3: {status: 'done', numbers: [['Rows in', '1,221'], ['Regions', '5']], did: ['Totaled Amount (USD) by region'], output: {columns: ['Region', 'Revenue (USD)'], rows: [['US', '402,180'], ['Europe', '251,940'], ['UK', '146,300']], total: '5 rows'}, ticketId: 7},
+    w4: {status: 'done', numbers: [['Regions in', '5'], ['Total revenue', '$1,012,450']], did: ['Added up all five regions'], ticketId: 8},
     out: {status: 'sent', numbers: [['Value', '$1,012,450'], ['Approved by', 'Daniel, Nov 9 10:05']]},
   },
   'Week of Oct 26': {
@@ -137,9 +142,9 @@ const WEEKLY_REVENUE_REPORT: Record<string, Record<string, TileRunDetail>> = {
 
 const AT_RISK_FOLLOW_UPS: Record<string, Record<string, TileRunDetail>> = {
   'Week of Nov 9': {
-    'f1-in-0': {status: 'failed', numbers: [['Rows read', '0']], problem: 'Marco Ruiz’s Pipeline health check failed on Nov 16 at 07:40, so there were no at-risk accounts to read.'},
+    'f1-in-0': {status: 'failed', numbers: [['Rows read', '0']], problem: 'Marco Ruiz’s Pipeline health check failed on Nov 16 at 07:40, so there were no at-risk accounts to read.', ticketId: 9},
     'f1-in-1': notRun('Not read, because the at-risk accounts never arrived.'),
-    f1: notRun('Didn’t process: its at-risk accounts weren’t produced. Ask Marco Ruiz to check Pipeline health check.'),
+    f1: {...notRun('Didn’t process: its at-risk accounts weren’t produced. Ask Marco Ruiz to check Pipeline health check.'), ticketId: 9},
     f2: notRun('Step 1 didn’t run, so this step didn’t either.'),
     out: notRun('Nothing was sent.'),
   },
@@ -152,7 +157,7 @@ const AT_RISK_FOLLOW_UPS: Record<string, Record<string, TileRunDetail>> = {
       did: ['Matched each account to its unpaid orders', 'Added Amount owed to each account'],
       output: {columns: ['Account', 'Risk', 'Amount owed'], rows: [['Bluefin Logistics', 'High', '$71,200'], ['Northwind Traders', 'High', '$48,950'], ['Harbor Health', 'Medium', '$39,300']], total: '5 rows'},
     },
-    f2: {status: 'done', numbers: [['Accounts in', '5'], ['On the list', '5']], did: ['Ranked accounts by amount owed', 'Added each account owner for follow-up']},
+    f2: {status: 'done', numbers: [['Accounts in', '5'], ['On the list', '5']], did: ['Ranked accounts by amount owed', 'Added each account owner for follow-up'], ticketId: 10},
     out: {status: 'sent', numbers: [['Rows', '5'], ['Approved by', 'Daniel, Nov 9 08:41']]},
   },
 };

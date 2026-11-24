@@ -30,6 +30,9 @@ export function dataProblems(): string[] {
       if (w.isDraft && s.python) problems.push(`${w.name}, ${s.name}: a draft step has code, but it has never run.`);
       if (!w.isDraft && !code?.trim()) problems.push(`${w.name}, ${s.name}: has run, but has no code to show.`);
       if (s.ticketId !== undefined && s.python) problems.push(`${w.name}, ${s.name}: code is on both the step and its ticket; keep it on the ticket.`);
+      // Every LLM step that has run has a step page for its latest run; a draft's steps have none yet.
+      if (!w.isDraft && s.ticketId === undefined) problems.push(`${w.name}, ${s.name}: has run, but has no step page.`);
+      if (w.isDraft && s.ticketId !== undefined) problems.push(`${w.name}, ${s.name}: a draft step has a step page, but it has never run.`);
       for (const input of s.inputs) {
         if (input.status === 'handoff') {
           if (!workflows.has(input.source)) problems.push(`${w.name}, ${s.name}: input from workflow "${input.source}", which doesn't exist.`);
@@ -129,6 +132,10 @@ export function dataProblems(): string[] {
       if (run.result === 'review' && !statuses.includes('review')) problems.push(`${w.name}, run ${run.period}: waiting for approval, but no step needs approval.`);
       for (const [id, t] of Object.entries(tiles)) {
         if (t.ticketId !== undefined && !TICKETS[t.ticketId]) problems.push(`${w.name}, run ${run.period}, ${id}: ticket ${t.ticketId} doesn't exist.`);
+        // A run links a tile to the step page of the step it is (or, for an input, the step it feeds).
+        const stepId = id.includes('-in-') ? id.split('-in-')[0] : id;
+        const stepName = w.steps.find(st => st.id === stepId)?.name;
+        if (t.ticketId !== undefined && TICKETS[t.ticketId] && TICKETS[t.ticketId].step !== stepName) problems.push(`${w.name}, run ${run.period}, ${id}: links to the step page for ${TICKETS[t.ticketId].step}, not ${stepName ?? 'a step'}.`);
         if (t.output) t.output.rows.forEach((row, i) => row.length !== t.output!.columns.length && problems.push(`${w.name}, run ${run.period}, ${id}: output row ${i + 1} doesn't fill its columns.`));
         if ((t.status === 'failed' || t.status === 'notRun') && !t.problem) problems.push(`${w.name}, run ${run.period}, ${id}: ${t.status === 'failed' ? 'failed' : 'didn’t run'} without saying why.`);
       }

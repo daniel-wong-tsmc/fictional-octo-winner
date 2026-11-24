@@ -96,7 +96,7 @@ export type TileRun = {
 
 const RUN_STATUS = {
   needsApproval: {tone: 'info', label: 'Needs approval'},
-  complete: {tone: 'success', label: 'Approved'},
+  complete: {tone: 'success', label: 'Done'},
   missingData: {tone: 'warning', label: 'Missing data'},
   notRun: {tone: 'neutral', label: 'Not run yet'},
 } as const;
