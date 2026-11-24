@@ -172,22 +172,20 @@ type TileNode = Node<TileData, 'tile'>;
 function Tile({id, data, selected}: NodeProps<TileNode>) {
   const {step} = data;
   const ready = isReady(step);
-  // Shared data whose workflow failed: the step can't get its data until the owner fixes it.
-  const isUpstreamFailed = step.kind === 'input' && step.source === 'shared' && sharedByName(step.resource)?.lastRun.result === 'failed';
-  // A past run shows how each tile did in it, and its first number under the tile.
+  // A past run shows how each tile did in it, and its first number under the tile. While editing, a tile only
+  // shows a status when it needs something (Needs setup, Not connected) or after a trial; a ready tile shows
+  // none. A shared input whose workflow failed says so in its side panel.
   const status = data.run
     ? TILE_RUN_STATUS[data.run.status]
-    : isUpstreamFailed
-    ? {tone: 'error' as const, label: 'Previous workflow failed'}
     : data.isUnchecked
     ? {tone: 'info' as const, label: 'Check output'}
     : data.trial
     ? {tone: 'success' as const, label: 'Tried'}
-    : ready && !data.isLinked
+    : !ready
+    ? {tone: 'warning' as const, label: 'Needs setup'}
+    : !data.isLinked
     ? {tone: 'warning' as const, label: 'Not connected'}
-    : ready
-      ? {tone: 'success' as const, label: 'Ready'}
-      : {tone: 'warning' as const, label: 'Needs setup'};
+    : undefined;
   const runLine = data.run?.numbers?.[0];
   // In a past run every tile shows its status at the top and its first number below, the same for each tile.
   // The tile where it failed is also red, and tiles that didn't run are greyed out; the side panel says why.
