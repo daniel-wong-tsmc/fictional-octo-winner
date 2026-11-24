@@ -47,6 +47,8 @@ export type WorkflowOverviewProps = {
   homeHref?: string;
   /** A draft hasn't been turned on: the page says Draft and shows no next run. */
   isDraft?: boolean;
+  /** Shown in a side panel, which has its own header: leaves out the breadcrumbs. */
+  isInPanel?: boolean;
 };
 
 /** Each column takes an equal share of the row, up to this width. Narrow screens stack the columns instead. */
@@ -66,11 +68,12 @@ export function WorkflowOverview({
   name, summary, schedule, nextRun, approvers, sendTo, columns, onOpenStage, runs, editHref, onRunNow, onDelete,
   homeHref = '#home',
   isDraft = false,
+  isInPanel = false,
 }: WorkflowOverviewProps) {
   const isVertical = useMediaQuery('(max-width: 900px)');
   const [isDeleting, setIsDeleting] = useState(false);
   return (
-    <OverviewFrame name={name} homeHref={homeHref}>
+    <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
         status={isDraft ? {tone: 'neutral', label: 'Draft'} : {tone: 'success', label: 'On'}}
         note={isDraft ? 'Not turned on yet' : `Next run: ${nextRun}`}

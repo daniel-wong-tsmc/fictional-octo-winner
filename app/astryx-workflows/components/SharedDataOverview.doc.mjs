@@ -27,6 +27,7 @@ export default {
     {name: 'runs', type: 'OverviewRun[]', description: 'Runs of the workflow that makes it, newest first, shown like a workflow’s Recent runs.', required: true},
     {name: 'useHref', type: 'string', description: 'Where Use in a new workflow goes.', required: true},
     {name: 'failure', type: '{message: string; askLabel: string; onAsk: () => void}', description: 'Set when the last run failed. Shows the message and a button to ask the owner instead of Use in a new workflow.'},
+    {name: 'isInPanel', type: 'boolean', description: 'Shown in a side panel, which has its own header: leaves out the breadcrumbs.', default: 'false'},
     {name: 'homeHref', type: 'string', description: 'Where the Home breadcrumb goes.', default: "'#home'"},
   ],
   examples: [

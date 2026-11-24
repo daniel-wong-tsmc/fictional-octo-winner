@@ -7,7 +7,7 @@ import {shortDateTime} from '../tasks';
  * The page for data someone else's workflow shares with you. It renders SharedDataOverview, which is built
  * from the same parts as every workflow page; this only maps the data into its props.
  */
-export function SharedDataPage({data: d}: {data: SharedData}) {
+export function SharedDataPage({data: d, isInPanel}: {data: SharedData; isInPanel?: boolean}) {
   const toast = useToast();
   const isReady = d.lastRun.result === 'ready';
   const owner = personName(d.owner);
@@ -31,6 +31,7 @@ export function SharedDataPage({data: d}: {data: SharedData}) {
         finished: shortDateTime(r.finished),
       }))}
       useHref={`#workflow-new?data=${d.id}`}
+      isInPanel={isInPanel}
       failure={
         isReady
           ? undefined

@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, type ReactElement} from 'react';
 import {AppShell} from '@astryxdesign/core/AppShell';
 import {SideNav, SideNavHeading, SideNavItem, SideNavSection} from '@astryxdesign/core/SideNav';
 import {NavIcon} from '@astryxdesign/core/NavIcon';
@@ -14,6 +14,7 @@ import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {SHARED_DATA, sharedById} from './sharedData';
 import {SharedDataPage} from './pages/SharedDataPage';
 import {HomePage} from './pages/HomePage';
+import {HomePanel} from './pages/HomePanel';
 import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
 import {CHATS} from './chats';
@@ -40,6 +41,8 @@ export default function App() {
   // A route can carry ?tile=<id>, which opens the board with that tile selected.
   const [route, query = ''] = useHashRoute().split('?');
   const selectTile = new URLSearchParams(query).get('tile') ?? undefined;
+  // #home?panel=<page> opens that page in Home's side panel, such as #home?panel=workflow-1.
+  const panelRoute = route === 'home' ? new URLSearchParams(query).get('panel') : null;
   // #workflow-new?data=<id> starts a new workflow with data someone shared as its first input.
   const startData = new URLSearchParams(query).get('data') ?? undefined;
   const openChat = CHATS.find(c => route === `chat-${c.id}`) ?? null;
@@ -55,8 +58,6 @@ export default function App() {
   const toast = useToast();
   const pageId = Number(route.match(/^workflow-(\d+)$/)?.[1] ?? NaN);
   const editId = Number(route.match(/^workflow-edit-(\d+)$/)?.[1] ?? NaN);
-  const openPrefilled = prefilled.find(p => p.workflow.id === pageId) ?? null;
-  const openBuilt = built.find(w => w.id === pageId) ?? null;
   const editingPrefilled = prefilled.find(p => p.workflow.id === editId) ?? null;
   const editingBuilt = built.find(w => w.id === editId) ?? null;
 
@@ -131,12 +132,52 @@ export default function App() {
     ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`, sharedInputs: sharedInputsOf(w.saved as SavedBoard)})),
   ];
   const homeItems = boardItems(tasks, approved, boardWorkflows, SHARED_DATA);
-  // #data-<id>: a page for data someone shares with you.
-  const openData = sharedById(route.match(/^data-(.+)$/)?.[1] ?? '');
   const openCount = attentionCount(homeItems);
   const isHome = route === 'home';
 
   const markApproved = (id: number) => setApproved(prev => (prev.includes(id) ? prev : [...prev, id]));
+
+  /**
+   * The page for a ticket, workflow or shared data route, as a full page or in Home's side panel. Both use
+   * this, so the panel always shows exactly the page. Null for any other route.
+   */
+  const detailPage = (r: string, isInPanel = false): {title: string; page: ReactElement} | null => {
+    const tid = Number(r.match(/^ticket-(\d+)$/)?.[1] ?? NaN);
+    if (TICKETS[tid]) {
+      return {
+        title: 'Task',
+        page: (
+          <TicketPage
+            key={tid}
+            id={tid}
+            code={ticketCode.get(tid)}
+            handoffs={handoffs}
+            onApprove={markApproved}
+            onUndoApprove={id => setApproved(prev => prev.filter(x => x !== id))}
+            onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
+            isInPanel={isInPanel}
+          />
+        ),
+      };
+    }
+    const wid = Number(r.match(/^workflow-(\d+)$/)?.[1] ?? NaN);
+    const p = prefilled.find(x => x.workflow.id === wid);
+    if (p) {
+      return {
+        title: 'Workflow',
+        page: <LiveWorkflowPage key={wid} workflow={p.workflow} name={p.name} saved={p.saved} approved={approved} onDelete={() => deletePrefilled(p)} isInPanel={isInPanel} />,
+      };
+    }
+    const b = built.find(x => x.id === wid);
+    if (b) return {title: 'Workflow', page: <BuiltWorkflowPage key={wid} workflow={b} onDelete={() => deleteBuilt(b)} isInPanel={isInPanel} />};
+    const d = sharedById(r.match(/^data-(.+)$/)?.[1] ?? '');
+    if (d) return {title: 'Shared data', page: <SharedDataPage key={d.id} data={d} isInPanel={isInPanel} />};
+    return null;
+  };
+  const fullPage = detailPage(route);
+  const panel = panelRoute ? detailPage(panelRoute, true) : null;
+  // Home's cards open their page in the side panel instead of leaving Home.
+  const panelItems = homeItems.map(item => (item.href?.startsWith('#') ? {...item, href: `#home?panel=${item.href.slice(1)}`} : item));
 
   return (
     <AppShell
@@ -197,16 +238,8 @@ export default function App() {
           </SideNavSection>
         </SideNav>
       }>
-      {ticketId !== null ? (
-        <TicketPage
-          key={ticketId}
-          id={ticketId}
-          code={ticketCode.get(ticketId)}
-          handoffs={handoffs}
-          onApprove={markApproved}
-          onUndoApprove={tid => setApproved(prev => prev.filter(x => x !== tid))}
-          onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
-        />
+      {fullPage ? (
+        fullPage.page
       ) : route === 'workflow-new' || editingPrefilled || editingBuilt ? (
         <WorkflowBuilderPage
           // A different ?tile= opens the board fresh with that tile selected.
@@ -223,21 +256,13 @@ export default function App() {
           library={library}
           onTurnOn={turnOn}
         />
-      ) : openPrefilled ? (
-        <LiveWorkflowPage
-          key={openPrefilled.workflow.id}
-          workflow={openPrefilled.workflow}
-          name={openPrefilled.name}
-          saved={openPrefilled.saved}
-          approved={approved}
-          onDelete={() => deletePrefilled(openPrefilled)}
-        />
-      ) : openData ? (
-        <SharedDataPage key={openData.id} data={openData} />
-      ) : openBuilt ? (
-        <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
+      ) : openChat ? (
+        <ChatPage key={openChat.id} chat={openChat} />
       ) : (
-        openChat ? <ChatPage key={openChat.id} chat={openChat} /> : <HomePage items={homeItems} />
+        <>
+          <HomePage items={panelItems} />
+          <HomePanel route={panel ? panelRoute : null} title={panel?.title ?? ''} page={panel?.page} onClose={() => (window.location.hash = 'home')} />
+        </>
       )}
     </AppShell>
   );

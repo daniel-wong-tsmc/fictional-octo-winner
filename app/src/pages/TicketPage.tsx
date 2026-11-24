@@ -238,7 +238,7 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, code, handoffs, onApprove, onUndoApprove, onRemoveHandoff,
+  id, code, handoffs, onApprove, onUndoApprove, onRemoveHandoff, isInPanel = false,
 }: {
   id: number;
   /** The step's current code from its workflow's saved board, so code edited on the board shows here too. */
@@ -247,6 +247,8 @@ export function TicketPage({
   onApprove: (id: number) => void;
   onUndoApprove: (id: number) => void;
   onRemoveHandoff: (handoffId: string) => void;
+  /** Shown in Home's side panel, which has its own header: leaves out the breadcrumbs. */
+  isInPanel?: boolean;
 }) {
   const t = TICKETS[id];
   const toast = useToast();
@@ -320,7 +322,7 @@ export function TicketPage({
       height="fill"
       contentWidth={1240}
       header={
-        <LayoutHeader hasDivider padding={4}>
+        isInPanel ? undefined : <LayoutHeader hasDivider padding={4}>
           <Breadcrumbs>
             <BreadcrumbItem href="#home">Home</BreadcrumbItem>
             {t.workflow === 'Monthly sales close' && <BreadcrumbItem href="#workflow-1">{t.workflow}</BreadcrumbItem>}

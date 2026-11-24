@@ -35,13 +35,15 @@ const runNow = (toast: ReturnType<typeof useToast>) => () => toast({body: 'Previ
  * come from its stored board, the same board Edit opens, so the page and the board always match. The last
  * run adds a status to the tiles it knows about; an approved ticket marks its step done.
  */
-export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}: {
+export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, isInPanel}: {
   workflow: Workflow;
   name: string;
   saved: SavedBoard;
   /** Tickets approved here. */
   approved: number[];
   onDelete: () => void;
+  /** Shown in Home's side panel. */
+  isInPanel?: boolean;
 }) {
   const toast = useToast();
   const isApproved = (s: WorkflowStep) => !!s.ticketId && approved.includes(s.ticketId);
@@ -81,11 +83,12 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete}:
       onRunNow={runNow(toast)}
       onDelete={onDelete}
       isDraft={w.isDraft}
+      isInPanel={isInPanel}
     />
   );
 }
 
-export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkflow; onDelete: () => void}) {
+export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel}: {workflow: BuiltWorkflow; onDelete: () => void; isInPanel?: boolean}) {
   const toast = useToast();
   const stages = w.columns.flat().map(st => st.content);
   const outputs = stages.flatMap(c => (c.kind === 'output' ? [c] : []));
@@ -107,6 +110,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete}: {workflow: BuiltWorkf
       editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}
       onDelete={onDelete}
+      isInPanel={isInPanel}
     />
   );
 }

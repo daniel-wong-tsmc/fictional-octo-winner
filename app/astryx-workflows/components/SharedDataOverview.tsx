@@ -31,6 +31,8 @@ export type SharedDataOverviewProps = {
   /** Set when the last run failed: the message to show and how to ask the owner. The page then offers no Use button. */
   failure?: {message: string; askLabel: string; onAsk: () => void};
   homeHref?: string;
+  /** Shown in a side panel, which has its own header: leaves out the breadcrumbs. */
+  isInPanel?: boolean;
 };
 
 /**
@@ -40,9 +42,10 @@ export type SharedDataOverviewProps = {
 export function SharedDataOverview({
   name, summary, updated, sharedBy, workflow, updates, format, sheet, sheetNote, runs, useHref, failure,
   homeHref = '#home',
+  isInPanel = false,
 }: SharedDataOverviewProps) {
   return (
-    <OverviewFrame name={name} homeHref={homeHref}>
+    <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
         status={failure ? {tone: 'error', label: 'Failed'} : {tone: 'success', label: 'Ready'}}
         note={failure ? `Last run failed ${updated}` : `Updated ${updated}`}
