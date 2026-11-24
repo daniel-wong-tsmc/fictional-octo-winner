@@ -13,7 +13,7 @@ import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun}
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {SHARED_DATA, sharedById} from './sharedData';
 import {SharedDataPage} from './pages/SharedDataPage';
-import {RUN_DETAILS, failureKind, ranBetween, type TileRunDetail} from './runs';
+import {RUN_DETAILS, failureKind, firstFailedTile, ranBetween, type TileRunDetail} from './runs';
 import {HomePage} from './pages/HomePage';
 import {HomePanel} from './pages/HomePanel';
 import {TicketPage} from './pages/TicketPage';
@@ -35,15 +35,9 @@ function useHashRoute(): string {
   return route;
 }
 
-/** The tile a run opens on: a failed step, else a failed input or Handoff, else a step waiting for approval. */
+/** The tile a run opens on: the red tile where it first broke, or else the step waiting for approval. */
 function firstRunTile(tiles: Record<string, TileRunDetail>): string | undefined {
-  const entries = Object.entries(tiles);
-  const isStep = (id: string) => id !== 'out' && !id.includes('-in-');
-  return (
-    entries.find(([id, t]) => t.status === 'failed' && isStep(id))?.[0] ??
-    entries.find(([, t]) => t.status === 'failed')?.[0] ??
-    entries.find(([, t]) => t.status === 'review')?.[0]
-  );
+  return firstFailedTile(tiles) ?? Object.entries(tiles).find(([, t]) => t.status === 'review')?.[0];
 }
 
 /** "Nov 17": the date of a chat's last message, for the sidebar. */
@@ -262,8 +256,7 @@ export default function App() {
         <WorkflowBuilderPage
           key={route}
           editing={{name: runOf.name, href: `#workflow-${runOf.workflow.id}`, saved: runOf.saved}}
-          // Opens on the step that failed (or the input that failed, when no step did), or else the one waiting
-          // for approval, so you see it first.
+          // Opens, zoomed in, on the red tile where the run first broke, or else the step waiting for approval.
           selectTile={firstRunTile(runTiles)}
           viewRun={{
             title: `Run of ${runData.started}`,

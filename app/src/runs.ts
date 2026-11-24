@@ -169,11 +169,18 @@ export const RUN_DETAILS: Record<number, Record<string, Record<string, TileRunDe
  * sent. The tile itself says exactly what went wrong.
  */
 export function failureKind(tiles: Record<string, TileRunDetail>): string | undefined {
+  const first = firstFailedTile(tiles);
+  if (!first) return undefined;
+  return first.includes('-in-') ? 'Data input error' : first === 'out' ? 'Handoff error' : 'LLM processing error';
+}
+
+/**
+ * The red tile where a run first broke, in run order: a failed Input before a failed LLM step, and those
+ * before the Handoff. A failed run opens on it, and failureKind names it.
+ */
+export function firstFailedTile(tiles: Record<string, TileRunDetail>): string | undefined {
   const failed = Object.keys(tiles).filter(id => tiles[id].status === 'failed');
-  if (failed.some(id => id.includes('-in-'))) return 'Data input error';
-  if (failed.some(id => id !== 'out')) return 'LLM processing error';
-  if (failed.includes('out')) return 'Handoff error';
-  return undefined;
+  return failed.find(id => id.includes('-in-')) ?? failed.find(id => id !== 'out') ?? failed.find(id => id === 'out');
 }
 
 /** "Nov 16, 08:00 to 09:12", with both dates when it ran into the next day, or one time when it stopped at once. */
