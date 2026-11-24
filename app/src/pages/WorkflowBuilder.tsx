@@ -39,7 +39,7 @@ import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
-import {XCircle, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -189,17 +189,10 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
       ? {tone: 'success' as const, label: 'Ready'}
       : {tone: 'warning' as const, label: 'Needs setup'};
   const runLine = data.run?.numbers?.[0];
-  // In a past run, the tile where it failed is red and says why; tiles that didn't run are greyed out.
+  // In a past run every tile shows its status at the top and its first number below, the same for each tile.
+  // The tile where it failed is also red, and tiles that didn't run are greyed out; the side panel says why.
   const isFailedHere = data.run?.status === 'failed';
-  const footer = isFailedHere ? (
-    <VStack gap={1}>
-      <HStack gap={1} vAlign="center">
-        <Icon icon={XCircle} size="sm" color="error" />
-        <Text weight="semibold">Failed here</Text>
-      </HStack>
-      {data.run?.problem && <Text type="supporting" maxLines={3}>{data.run.problem}</Text>}
-    </VStack>
-  ) : runLine ? (
+  const footer = runLine ? (
     <Text type="supporting">{`${runLine[0]}: ${runLine[1]}`}</Text>
   ) : data.trial ? (
     <VStack gap={1}>
