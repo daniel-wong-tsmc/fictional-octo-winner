@@ -3,6 +3,7 @@ import {WorkflowOverview} from '@workspace/astryx-workflows/components/WorkflowO
 import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 import type {BuiltWorkflow, Workflow} from '../workflow';
 import {toColumns, type SavedBoard} from './WorkflowBuilder';
+import {RUN_DETAILS, runHref} from '../runs';
 
 /* ---------- Workflow pages ----------
  * Every workflow page is the WorkflowOverview component from the app's Astryx integration
@@ -39,11 +40,13 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, 
   const toast = useToast();
   const last = w.steps[w.steps.length - 1];
   const isLastApproved = last.status === 'done' || (!!last.ticketId && approved.includes(last.ticketId));
-  const runs = w.runs.map(r =>
-    r.result === 'review' && isLastApproved
+  // Each run with recorded tile results opens on the board, showing what every step did in it.
+  const runs = w.runs.map((r, i) => ({
+    ...(r.result === 'review' && isLastApproved
       ? {period: r.period, started: r.started, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
-      : {period: r.period, started: r.started, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished},
-  );
+      : {period: r.period, started: r.started, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished}),
+    href: RUN_DETAILS[w.id]?.[r.period] ? runHref(w.id, i) : undefined,
+  }));
 
   return (
     <WorkflowOverview

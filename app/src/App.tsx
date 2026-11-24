@@ -13,6 +13,7 @@ import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun}
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {SHARED_DATA, sharedById} from './sharedData';
 import {SharedDataPage} from './pages/SharedDataPage';
+import {RUN_DETAILS, type TileRunDetail} from './runs';
 import {HomePage} from './pages/HomePage';
 import {HomePanel} from './pages/HomePanel';
 import {TicketPage} from './pages/TicketPage';
@@ -32,6 +33,17 @@ function useHashRoute(): string {
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
   return route;
+}
+
+/** The tile a run opens on: a failed step, else a failed input or Handoff, else a step waiting for approval. */
+function firstRunTile(tiles: Record<string, TileRunDetail>): string | undefined {
+  const entries = Object.entries(tiles);
+  const isStep = (id: string) => id !== 'out' && !id.includes('-in-');
+  return (
+    entries.find(([id, t]) => t.status === 'failed' && isStep(id))?.[0] ??
+    entries.find(([, t]) => t.status === 'failed')?.[0] ??
+    entries.find(([, t]) => t.status === 'review')?.[0]
+  );
 }
 
 /** "Nov 17": the date of a chat's last message, for the sidebar. */
@@ -60,6 +72,12 @@ export default function App() {
   const editId = Number(route.match(/^workflow-edit-(\d+)$/)?.[1] ?? NaN);
   const editingPrefilled = prefilled.find(p => p.workflow.id === editId) ?? null;
   const editingBuilt = built.find(w => w.id === editId) ?? null;
+  // #workflow-N-run-K: run K (0 is the newest) of a prefilled workflow, shown on its board.
+  const runMatch = route.match(/^workflow-(\d+)-run-(\d+)$/);
+  const runOf = runMatch ? prefilled.find(p => p.workflow.id === Number(runMatch[1])) ?? null : null;
+  const runIndex = runMatch ? Number(runMatch[2]) : -1;
+  const runData = runOf?.workflow.runs[runIndex];
+  const runTiles = runOf && runData ? RUN_DETAILS[runOf.workflow.id]?.[runData.period] : undefined;
 
   const turnOn = (name: string, columns: BuiltStage[][], saved: SavedBoard) => {
     if (editingPrefilled) {
@@ -216,7 +234,7 @@ export default function App() {
                   key={p.workflow.id}
                   label={p.name}
                   href={`#workflow-${p.workflow.id}`}
-                  isSelected={pageId === p.workflow.id || editId === p.workflow.id || (ticketId !== null && TICKETS[ticketId]?.workflow === p.workflow.name)}
+                  isSelected={pageId === p.workflow.id || editId === p.workflow.id || runOf === p || (ticketId !== null && TICKETS[ticketId]?.workflow === p.workflow.name)}
                 />
               ))}
               {built.map(w => (
@@ -240,6 +258,26 @@ export default function App() {
       }>
       {fullPage ? (
         fullPage.page
+      ) : runOf && runData && runTiles ? (
+        <WorkflowBuilderPage
+          key={route}
+          editing={{name: runOf.name, href: `#workflow-${runOf.workflow.id}`, saved: runOf.saved}}
+          // Opens on the step that failed (or the input that failed, when no step did), or else the one waiting
+          // for approval, so you see it first.
+          selectTile={firstRunTile(runTiles)}
+          viewRun={{
+            title: `Run of ${runData.started}`,
+            status: {
+              tone: runData.result === 'stopped' ? 'error' : runData.result === 'review' ? 'info' : 'success',
+              label: runData.result === 'stopped' ? 'Stopped' : runData.result === 'review' ? 'Waiting for approval' : 'Done',
+            },
+            summary: `${runData.period}. ${runData.detail}. Started ${runData.started}, finished ${runData.finished}. Click a tile to see its numbers.`,
+            tiles: runTiles,
+            editHref: `#workflow-edit-${runOf.workflow.id}`,
+          }}
+          library={library}
+          onTurnOn={turnOn}
+        />
       ) : route === 'workflow-new' || editingPrefilled || editingBuilt ? (
         <WorkflowBuilderPage
           // A different ?tile= opens the board fresh with that tile selected.

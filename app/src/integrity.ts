@@ -6,6 +6,7 @@ import {TASKS, TICKETS} from './data';
 import {SEED_HANDOFFS} from './handoffs';
 import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, stepPosition} from './workflow';
 import {SHARED_DATA} from './sharedData';
+import {RUN_DETAILS} from './runs';
 
 export function dataProblems(): string[] {
   const problems: string[] = [];
@@ -101,6 +102,36 @@ export function dataProblems(): string[] {
       if (row.length !== d.preview.columns.length) problems.push(`Shared data "${d.name}": row ${i + 1} has ${row.length} values for ${d.preview.columns.length} columns.`);
     });
     sharedNames.add(d.name);
+  }
+
+  // Past runs: each run of a workflow that has run records every tile of its board (each step, each input,
+  // the Handoff), and the tiles agree with how the run ended.
+  for (const w of PREFILLED_WORKFLOWS) {
+    const tileIds = [...w.steps.flatMap(st => [st.id, ...st.inputs.map((_, k) => `${st.id}-in-${k}`)]), 'out'];
+    const byPeriod = RUN_DETAILS[w.id] ?? {};
+    for (const period of Object.keys(byPeriod)) {
+      if (!w.runs.some(r => r.period === period)) problems.push(`${w.name}: run details for "${period}", which isn't one of its runs.`);
+    }
+    for (const run of w.runs) {
+      const tiles = byPeriod[run.period];
+      if (!tiles) {
+        problems.push(`${w.name}, run ${run.period}: no tile results, so it can't open on the board.`);
+        continue;
+      }
+      const missing = tileIds.filter(id => !tiles[id]);
+      const extra = Object.keys(tiles).filter(id => !tileIds.includes(id));
+      if (missing.length) problems.push(`${w.name}, run ${run.period}: no result for ${missing.join(', ')}.`);
+      if (extra.length) problems.push(`${w.name}, run ${run.period}: results for tiles it doesn't have: ${extra.join(', ')}.`);
+      const statuses = Object.values(tiles).map(t => t.status);
+      if (run.result === 'stopped' && !statuses.includes('failed')) problems.push(`${w.name}, run ${run.period}: stopped, but no tile failed.`);
+      if (run.result !== 'stopped' && statuses.some(st => st === 'failed' || st === 'notRun')) problems.push(`${w.name}, run ${run.period}: finished, but a tile failed or didn't run.`);
+      if (run.result === 'review' && !statuses.includes('review')) problems.push(`${w.name}, run ${run.period}: waiting for approval, but no step needs approval.`);
+      for (const [id, t] of Object.entries(tiles)) {
+        if (t.ticketId !== undefined && !TICKETS[t.ticketId]) problems.push(`${w.name}, run ${run.period}, ${id}: ticket ${t.ticketId} doesn't exist.`);
+        if (t.output) t.output.rows.forEach((row, i) => row.length !== t.output!.columns.length && problems.push(`${w.name}, run ${run.period}, ${id}: output row ${i + 1} doesn't fill its columns.`));
+        if ((t.status === 'failed' || t.status === 'notRun') && !t.problem) problems.push(`${w.name}, run ${run.period}, ${id}: ${t.status === 'failed' ? 'failed' : 'didn’t run'} without saying why.`);
+      }
+    }
   }
 
   // Home's tasks.

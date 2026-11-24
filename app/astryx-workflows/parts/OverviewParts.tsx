@@ -7,6 +7,10 @@ import {Card} from '@astryxdesign/core/Card';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Table, pixel, proportional, type TableColumn} from '@astryxdesign/core/Table';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
+import {Link} from '@astryxdesign/core/Link';
+import {Button} from '@astryxdesign/core/Button';
+import {Icon} from '@astryxdesign/core/Icon';
+import {ChevronRight} from 'lucide-react';
 import type {WorkflowTileTone} from '../components/WorkflowTile';
 
 /*
@@ -14,8 +18,11 @@ import type {WorkflowTileTone} from '../components/WorkflowTile';
  * someone shares with you). Both pages build from these, so a change here changes both and they stay alike.
  */
 
-/** One run. period identifies the row; started and finished are shown as date and time. */
-export type OverviewRun = {period: string; started: string; tone: WorkflowTileTone; result: string; finished: string};
+/**
+ * One run. period identifies the row; started and finished are shown as date and time. With href, the result
+ * links to that run and the row gets an open arrow.
+ */
+export type OverviewRun = {period: string; started: string; tone: WorkflowTileTone; result: string; finished: string; href?: string};
 
 /**
  * The page frame: breadcrumbs from Home, then the content at the same width and padding. In a side panel
@@ -96,19 +103,28 @@ const RUN_COLUMNS: TableColumn<RunRow>[] = [
     renderCell: r => (
       <HStack gap={1.5} vAlign="center">
         <StatusDot variant={r.tone} label={r.result} />
-        <Text>{r.result}</Text>
+        {r.href ? <Link href={r.href} color="primary">{r.result}</Link> : <Text>{r.result}</Text>}
       </HStack>
     ),
   },
   {key: 'finished', header: 'Finished', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.finished}</Text>},
 ];
 
-/** Recent runs, newest first. With none, says what's next. */
+const OPEN_COLUMN: TableColumn<RunRow> = {
+  key: 'open',
+  header: '',
+  width: pixel(56),
+  align: 'end',
+  renderCell: r => (r.href ? <Button label={`Open the run of ${r.started}`} tooltip="Open this run on the board" variant="ghost" size="sm" isIconOnly icon={<Icon icon={ChevronRight} />} href={r.href} /> : null),
+};
+
+/** Recent runs, newest first. Runs with an href open on the board. With none, says what's next. */
 export function OverviewRuns({runs, emptyTitle, emptyDescription}: {runs: OverviewRun[]; emptyTitle: string; emptyDescription: string}) {
+  const isLinked = runs.some(r => r.href);
   return (
-    <OverviewSection title="Recent runs">
+    <OverviewSection title="Recent runs" description={isLinked ? 'Open a run to see each step’s numbers on the board, and where it stopped.' : undefined}>
       {runs.length ? (
-        <Table data={runs as RunRow[]} columns={RUN_COLUMNS} idKey="period" density="balanced" />
+        <Table data={runs as RunRow[]} columns={isLinked ? [...RUN_COLUMNS, OPEN_COLUMN] : RUN_COLUMNS} idKey="period" density="balanced" />
       ) : (
         <EmptyState isCompact title={emptyTitle} description={emptyDescription} />
       )}

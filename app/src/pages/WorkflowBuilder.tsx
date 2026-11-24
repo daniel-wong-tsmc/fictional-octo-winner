@@ -43,6 +43,8 @@ import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Penci
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
+import {TILE_RUN_STATUS, type TileRunDetail} from '../runs';
+import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
@@ -161,6 +163,8 @@ type TileData = {
   /** Handoff tile whose trial output nobody has opened yet. */
   isUnchecked: boolean;
   onOpenTrial: (id: string) => void;
+  /** When the board shows a past run: how this tile did in it. */
+  run?: TileRunDetail;
 };
 type TileNode = Node<TileData, 'tile'>;
 
@@ -170,7 +174,10 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   const ready = isReady(step);
   // Shared data whose workflow failed: the step can't get its data until the owner fixes it.
   const isUpstreamFailed = step.kind === 'input' && step.source === 'shared' && sharedByName(step.resource)?.lastRun.result === 'failed';
-  const status = isUpstreamFailed
+  // A past run shows how each tile did in it, and its first number under the tile.
+  const status = data.run
+    ? TILE_RUN_STATUS[data.run.status]
+    : isUpstreamFailed
     ? {tone: 'error' as const, label: 'Previous workflow failed'}
     : data.isUnchecked
     ? {tone: 'info' as const, label: 'Check output'}
@@ -181,7 +188,10 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
     : ready
       ? {tone: 'success' as const, label: 'Ready'}
       : {tone: 'warning' as const, label: 'Needs setup'};
-  const footer = data.trial ? (
+  const runLine = data.run?.numbers?.[0];
+  const footer = runLine ? (
+    <Text type="supporting">{`${runLine[0]}: ${runLine[1]}`}</Text>
+  ) : data.trial ? (
     <VStack gap={1}>
       <Text weight="medium">{data.trial.line}</Text>
       {data.trial.sheet && (
@@ -527,6 +537,93 @@ function LinkedTiles({label, items, emptyText, onSelect}: {label: string; items:
         <ListItem label={<Text type="supporting">{emptyText}</Text>} />
       )}
     </List>
+  );
+}
+
+/**
+ * The side panel for a tile when the board shows a past run: how it went, the numbers it worked with, what the
+ * agent did and why it stopped, a few rows of what it made, and the code it ran. Nothing here can be edited.
+ */
+function RunTilePanel({step, title, run, comesFrom, onSelect}: {
+  step: Step | null;
+  title: string;
+  run?: TileRunDetail;
+  comesFrom: PanelLink[];
+  onSelect: (id: string) => void;
+}) {
+  if (!step) {
+    return <EmptyState isCompact title="Select a tile" description="Click a tile to see how it did in this run." />;
+  }
+  const info = KIND_INFO[step.kind];
+  const status = run ? TILE_RUN_STATUS[run.status] : null;
+  return (
+    <VStack gap={4}>
+      <VStack gap={1}>
+        <HStack gap={2} vAlign="center">
+          <Icon icon={info.icon} size="sm" color="secondary" />
+          <Text type="supporting" weight="medium">{info.label}</Text>
+        </HStack>
+        <Heading level={3}>{title}</Heading>
+        {status && (
+          <HStack gap={1.5} vAlign="center">
+            <StatusDot variant={status.tone} label={status.label} />
+            <Text weight="medium">{status.label}</Text>
+          </HStack>
+        )}
+      </VStack>
+
+      {!run && <Text type="supporting">This tile wasn’t part of this run.</Text>}
+      {run?.problem && (
+        <Banner
+          status={run.status === 'failed' ? 'error' : 'info'}
+          title={run.status === 'failed' ? 'Why it failed' : run.status === 'notRun' ? 'Why it didn’t run' : 'Waiting'}
+          description={run.problem}
+          collapsible={false}
+        />
+      )}
+
+      {run?.numbers && run.numbers.length > 0 && (
+        <MetadataList title={<Text type="label">Numbers</Text>}>
+          {run.numbers.map(([label, value]) => <MetadataListItem key={label} label={label}>{value}</MetadataListItem>)}
+        </MetadataList>
+      )}
+
+      {run?.did && run.did.length > 0 && (
+        <VStack gap={1.5}>
+          <Text type="label">What the agent did</Text>
+          <List hasDividers={false} density="compact" edge="outset">
+            {run.did.map(line => <ListItem key={line} label={<Text type="supporting">{line}</Text>} />)}
+          </List>
+        </VStack>
+      )}
+
+      {run?.output && (
+        <VStack gap={1.5}>
+          <Text type="label">What it made</Text>
+          <Text type="supporting">{`First ${run.output.rows.length} of ${run.output.total}.`}</Text>
+          <WorkflowSheetTable sheet={{columns: run.output.columns, rows: run.output.rows}} />
+        </VStack>
+      )}
+
+      {step.kind === 'instructions' && step.python && run && run.status !== 'notRun' && (
+        <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text weight="medium">Show the code</Text>}>
+          <CodeBlock code={step.python} language="python" width="100%" size="sm" isWrapped />
+        </Collapsible>
+      )}
+
+      {run?.ticketId !== undefined && (
+        <HStack>
+          <Button label="Open ticket" size="sm" href={`#ticket-${run.ticketId}`} />
+        </HStack>
+      )}
+
+      {step.kind !== 'input' && comesFrom.length > 0 && (
+        <>
+          <Divider />
+          <LinkedTiles label="Comes from" items={comesFrom} emptyText="" onSelect={onSelect} />
+        </>
+      )}
+    </VStack>
   );
 }
 
@@ -1165,7 +1262,18 @@ export type Editing = {name: string; href: string; saved?: SavedBoard; runs?: Re
 /** A saved workflow in the toolbar's Library: its name, where its board opens, and its saved board. */
 export type LibraryItem = {key: string; name: string; href: string; saved: SavedBoard; isCurrent: boolean};
 /** startData opens a new board whose first Input reads that shared data (an id in SHARED_DATA). */
-type BuilderProps = {editing?: Editing; selectTile?: string; startData?: string; library: LibraryItem[]; onTurnOn: TurnOn};
+/**
+ * A past run shown on the board: its name and how it went, and how each tile did (by tile id). The board is
+ * read only while it shows a run.
+ */
+export type RunView = {
+  title: string;
+  status: {tone: 'success' | 'info' | 'error' | 'neutral'; label: string};
+  summary: string;
+  tiles: Record<string, TileRunDetail>;
+  editHref: string;
+};
+type BuilderProps = {editing?: Editing; selectTile?: string; startData?: string; viewRun?: RunView; library: LibraryItem[]; onTurnOn: TurnOn};
 
 export function WorkflowBuilderPage(props: BuilderProps) {
   return (
@@ -1175,8 +1283,9 @@ export function WorkflowBuilderPage(props: BuilderProps) {
   );
 }
 
-function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderProps) {
+function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: BuilderProps) {
   const isEditing = !!editing;
+  const isRun = !!viewRun;
   const {screenToFlowPosition} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
@@ -1374,12 +1483,12 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
-        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial},
+        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, run: viewRun?.tiles[n.id]},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board, links, sections.length, selectedId, trial, checked, openTrial]);
+  }, [board, links, sections.length, selectedId, trial, checked, openTrial, viewRun]);
   // Sections come first: React Flow needs a parent before the tiles inside it.
   const nodes: BoardFlowNode[] = [
     ...sections.map((sec): SectionNode => ({
@@ -1450,6 +1559,7 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
         setSelectedLinkId(null);
       }}
       onEdgeClick={(_, edge) => {
+        if (isRun) return;
         setSelectedLinkId(edge.id);
         setSelectedId(null);
       }}
@@ -1457,7 +1567,10 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
         setSelectedId(null);
         setSelectedLinkId(null);
       }}
-      onConnect={connect}
+      onConnect={isRun ? undefined : connect}
+      // A past run is read only: tiles stay put and lines can't be drawn, moved or deleted.
+      nodesDraggable={!isRun}
+      nodesConnectable={!isRun}
       onReconnectStart={() => {
         reconnected.current = false;
       }}
@@ -1466,13 +1579,14 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
         if (!reconnected.current) removeLink(edge.id);
         reconnected.current = false;
       }}
-      edgesReconnectable
+      edgesReconnectable={!isRun}
       // A selected section would otherwise jump above the lines and hide them again.
       elevateNodesOnSelect={false}
       // The line being drawn shows above tiles and sections, so you can see where it is going.
       connectionLineContainerStyle={DRAWING_LINE_LAYER}
-      deleteKeyCode={['Backspace', 'Delete']}
+      deleteKeyCode={isRun ? null : ['Backspace', 'Delete']}
       onDragOver={e => {
+        if (isRun) return;
         if (![DRAG_TYPE, DRAG_WORKFLOW, DRAG_DATA].some(t => e.dataTransfer.types.includes(t))) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
@@ -1512,6 +1626,7 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
       <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
       <Panel position="top-left">
         <VStack gap={2} maxWidth={420}>
+          {viewRun && <Banner status={viewRun.status.tone === 'neutral' ? 'info' : viewRun.status.tone} title={viewRun.status.label} description={viewRun.summary} collapsible={false} />}
           {trial === 'done' && (
             <Banner
               status={allChecked ? 'success' : 'info'}
@@ -1524,11 +1639,11 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
               collapsible={false}
             />
           )}
-          {!allReady && <Text type="supporting" weight="medium">{nextHint}</Text>}
+          {!allReady && !isRun && <Text type="supporting" weight="medium">{nextHint}</Text>}
         </VStack>
       </Panel>
       <Panel position="bottom-center">
-        <BoardToolbar onAdd={kind => place(kind)} library={library} onAddWorkflow={item => addWorkflow(item)} onAddData={d => place('input', undefined, undefined, sharedInput(d))} onOpen={leaveTo} />
+        {isRun ? null : <BoardToolbar onAdd={kind => place(kind)} library={library} onAddWorkflow={item => addWorkflow(item)} onAddData={d => place('input', undefined, undefined, sharedInput(d))} onOpen={leaveTo} />}
       </Panel>
     </ReactFlow>
   );
@@ -1538,12 +1653,20 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
       <Breadcrumbs>
         <BreadcrumbItem href="#home">Home</BreadcrumbItem>
         {editing && <BreadcrumbItem href={editing.href}>{editing.name}</BreadcrumbItem>}
-        <BreadcrumbItem isCurrent>{isEditing ? 'Edit' : 'New workflow'}</BreadcrumbItem>
+        <BreadcrumbItem isCurrent>{viewRun ? viewRun.title : isEditing ? 'Edit' : 'New workflow'}</BreadcrumbItem>
       </Breadcrumbs>
-      <TextInput label="Workflow name" isLabelHidden value={name} onChange={setName} width={isPhone ? '100%' : 320} />
+      {viewRun ? (
+        <Heading level={5} accessibilityLevel={1}>{`${name}: ${viewRun.title}`}</Heading>
+      ) : (
+        <TextInput label="Workflow name" isLabelHidden value={name} onChange={setName} width={isPhone ? '100%' : 320} />
+      )}
     </VStack>
   );
-  const actions = (
+  const actions = viewRun ? (
+    <HStack gap={2} wrap="wrap">
+      <Button label="Edit workflow" icon={<Icon icon={Pencil} />} href={viewRun.editHref} />
+    </HStack>
+  ) : (
     <HStack gap={2} wrap="wrap">
       {editing && (
         <Button
@@ -1608,7 +1731,15 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
   );
 
   const sectionItem = selectedSection ? library.find(w => w.key === selectedSection.key) : undefined;
-  const panel = selectedSection ? (
+  const panel = isRun ? (
+    <RunTilePanel
+      step={selected?.step ?? null}
+      title={selected ? titleOf(selected.id) : ''}
+      run={selectedId ? viewRun?.tiles[selectedId] : undefined}
+      comesFrom={linkedTo(links.filter(l => l.target === selectedId).map(l => l.source))}
+      onSelect={id => setSelectedId(id)}
+    />
+  ) : selectedSection ? (
     <SectionPanel section={selectedSection} openHref={sectionItem?.href} onOpen={leaveTo} onRemove={() => removeSection(selectedSection.id)} />
   ) : (
     <StepPanel
@@ -1669,7 +1800,7 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
         <Dialog isOpen={!!selected || !!selectedSection} onOpenChange={open => !open && setSelectedId(null)} variant="fullscreen" purpose="form" padding={0}>
           <Layout
             height="fill"
-            header={<DialogHeader title="Set up tile" onOpenChange={open => !open && setSelectedId(null)} />}
+            header={<DialogHeader title={isRun ? 'How this tile did' : 'Set up tile'} onOpenChange={open => !open && setSelectedId(null)} />}
             content={<LayoutContent padding={4}>{panel}</LayoutContent>}
           />
         </Dialog>
