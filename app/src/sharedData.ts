@@ -1,7 +1,7 @@
 // Data other people's workflows hand to you. Their workflows aren't yours, so they aren't in your sidebar:
-// you only see what they produce. Home's "New data ready for use" lane, each data's own page (#data-<id>),
-// the board's Library ("Data ready for use") and the Input tile ("Shared with you") all read this list, so
-// a shared output looks the same everywhere.
+// you only see what they produce. Home's "New data ready for use" lane, each data's own page (#data-<id>)
+// and the board's Input tile ("Data shared with you") all read this list, so a shared output looks the same
+// everywhere.
 
 import {upstreamFailedLine} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {PEOPLE} from './workflow';

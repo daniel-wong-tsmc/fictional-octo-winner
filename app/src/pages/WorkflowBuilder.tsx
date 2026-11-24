@@ -26,7 +26,6 @@ import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {Token} from '@astryxdesign/core/Token';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
-import {Tab, TabList} from '@astryxdesign/core/TabList';
 import {Popover} from '@astryxdesign/core/Popover';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
@@ -37,7 +36,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
-import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
+import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
 import {ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
@@ -79,8 +78,6 @@ const KINDS: StepKind[] = ['input', 'instructions', 'output'];
 const DRAG_TYPE = 'application/x-workflow-node';
 /** Drag type used when a saved workflow is dragged from the Library onto the board. */
 const DRAG_WORKFLOW = 'application/x-saved-workflow';
-/** Drag type used when shared data is dragged from the Library onto the board. */
-const DRAG_DATA = 'application/x-shared-data';
 
 const appInfo = (name: string) => MCP_APPS.find(a => a.name === name);
 
@@ -984,22 +981,19 @@ function ContextButton({context, onChange}: {context: string; onChange?: (contex
 }
 
 /**
- * The bar at the bottom of the board. Nodes on the left add tiles; Library, set apart by a divider, has two
- * tabs: saved workflows to drop onto the board as sections, or open, and data shared with you to drop on as
- * an Input. Zoom controls on the right.
+ * The bar at the bottom of the board. Nodes on the left add tiles; Library, set apart by a divider, lists
+ * saved workflows to drop onto the board as sections, or open. Data shared with you is added from an Input
+ * tile instead. Zoom controls on the right.
  */
-function BoardToolbar({onAdd, library, onAddWorkflow, onAddData, onOpen}: {
+function BoardToolbar({onAdd, library, onAddWorkflow, onOpen}: {
   onAdd: (kind: StepKind) => void;
   /** Saved workflows. The one on the board now is shown but can't be added or reopened. */
   library: LibraryItem[];
   /** Adds a saved workflow to the board as a section. */
   onAddWorkflow: (item: LibraryItem) => void;
-  /** Adds an Input that reads this shared data. */
-  onAddData: (d: SharedData) => void;
   onOpen: (href: string) => void;
 }) {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [libraryTab, setLibraryTab] = useState<'workflows' | 'data'>('workflows');
   const {zoomIn, zoomOut, fitView} = useReactFlow();
   const {zoom} = useViewport();
   // On a phone the node buttons drop their words so the bar fits; tooltips and labels still name them.
@@ -1044,59 +1038,6 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onAddData, onOpen}: {
               label="Library"
               content={
                 <VStack gap={2}>
-                  <TabList value={libraryTab} onChange={v => setLibraryTab(v as 'workflows' | 'data')} size="sm" layout="fill" hasDivider aria-label="Library">
-                    <Tab value="workflows" label="Workflows" />
-                    <Tab value="data" label="Data ready for use" />
-                  </TabList>
-                  {libraryTab === 'data' ? (
-                    <VStack gap={2}>
-                      <Text type="supporting">Data other people’s workflows share with you. Drag one onto the board, or click to add it as an Input.</Text>
-                      {SHARED_DATA.map(d => {
-                        const isReady = d.lastRun.result === 'ready';
-                        return (
-                          <HStack key={d.id} gap={1} vAlign="center">
-                            <ClickableCard
-                              label={isReady ? `Add ${d.name} as an Input` : `${d.name} isn’t ready`}
-                              padding={2}
-                              width="100%"
-                              isDisabled={!isReady}
-                              draggable={isReady}
-                              onDragStart={e => {
-                                e.dataTransfer.setData(DRAG_DATA, d.id);
-                                e.dataTransfer.effectAllowed = 'copy';
-                              }}
-                              onClick={() => {
-                                onAddData(d);
-                                setIsLibraryOpen(false);
-                              }}>
-                              <VStack gap={0.5}>
-                                <HStack gap={1.5} vAlign="center">
-                                  <Icon icon={Inbox} size="sm" color="secondary" />
-                                  <Text weight="medium">{d.name}</Text>
-                                </HStack>
-                                <Text type="supporting">{sharedFrom(d)}</Text>
-                                <HStack gap={1} vAlign="center">
-                                  <StatusDot variant={isReady ? 'success' : 'error'} label={isReady ? 'Ready' : 'Failed'} />
-                                  <Text type="supporting">{isReady ? `Ready · ${shortDateTime(d.lastRun.at)}` : failedMessage(d)}</Text>
-                                </HStack>
-                              </VStack>
-                            </ClickableCard>
-                            <IconButton
-                              label={`Open ${d.name}`}
-                              tooltip="Open its page"
-                              variant="ghost"
-                              size="sm"
-                              icon={<Icon icon={ArrowUpRight} />}
-                              onClick={() => {
-                                setIsLibraryOpen(false);
-                                onOpen(sharedHref(d));
-                              }}
-                            />
-                          </HStack>
-                        );
-                      })}
-                    </VStack>
-                  ) : (
                   <VStack gap={2}>
                   <Text type="supporting">Saved workflows. Drag one onto the board, or click to add it.</Text>
                   {library.length === 0 && <Text type="supporting">No saved workflows yet.</Text>}
@@ -1139,10 +1080,9 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onAddData, onOpen}: {
                     </HStack>
                   ))}
                   </VStack>
-                  )}
                 </VStack>
               }>
-              <Button label="Library" variant="ghost" icon={<Icon icon={Library} />} isIconOnly={isSmall} tooltip="Saved workflows and data shared with you" />
+              <Button label="Library" variant="ghost" icon={<Icon icon={Library} />} isIconOnly={isSmall} tooltip="Saved workflows" />
             </Popover>
           </HStack>
         }
@@ -1366,7 +1306,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
    * Adds a tile. A dropped tile (`at`) lands unconnected where it was dropped. A clicked one is placed
    * in the flow and wired in: after the tile it came from, or after the last LLM step.
    */
-  const place = (kind: StepKind, at?: {x: number; y: number}, fromId?: string, step?: Step) => {
+  const place = (kind: StepKind, at?: {x: number; y: number}, fromId?: string) => {
     const id = newId();
     // Tiles inside sections belong to other workflows; new tiles attach only to this workflow's own.
     const own = board.filter(n => !n.sectionId);
@@ -1391,7 +1331,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       const sameKind = prev.filter(n => n.step.kind === kind).length;
       // Make room: when a step slots in, everything to its right moves one column over.
       const shifted = isInsert ? prev.map(n => (!n.sectionId && n.position.x >= position.x ? {...n, position: {...n.position, x: n.position.x + COL}} : n)) : prev;
-      return [...shifted, {id, step: step ?? blankStep(kind, sameKind), position}];
+      return [...shifted, {id, step: blankStep(kind, sameKind), position}];
     });
     setLinks(nextLinks);
     if (!at) setFitKey(k => k + 1);
@@ -1594,7 +1534,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       deleteKeyCode={isRun ? null : ['Backspace', 'Delete']}
       onDragOver={e => {
         if (isRun) return;
-        if (![DRAG_TYPE, DRAG_WORKFLOW, DRAG_DATA].some(t => e.dataTransfer.types.includes(t))) return;
+        if (![DRAG_TYPE, DRAG_WORKFLOW].some(t => e.dataTransfer.types.includes(t))) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
       }}
@@ -1605,13 +1545,6 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           e.preventDefault();
           const p = screenToFlowPosition({x: e.clientX, y: e.clientY});
           addWorkflow(item, {x: p.x - SECTION_PAD, y: p.y - SECTION_PAD});
-          return;
-        }
-        const data = SHARED_DATA.find(d => d.id === e.dataTransfer.getData(DRAG_DATA) && d.lastRun.result === 'ready');
-        if (data) {
-          e.preventDefault();
-          const p = screenToFlowPosition({x: e.clientX, y: e.clientY});
-          place('input', {x: p.x - 125, y: p.y - 60}, undefined, sharedInput(data));
           return;
         }
         const kind = e.dataTransfer.getData(DRAG_TYPE) as StepKind;
@@ -1665,7 +1598,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
         </VStack>
       </Panel>
       <Panel position="bottom-center">
-        {isRun ? null : <BoardToolbar onAdd={kind => place(kind)} library={library} onAddWorkflow={item => addWorkflow(item)} onAddData={d => place('input', undefined, undefined, sharedInput(d))} onOpen={leaveTo} />}
+        {isRun ? null : <BoardToolbar onAdd={kind => place(kind)} library={library} onAddWorkflow={item => addWorkflow(item)} onOpen={leaveTo} />}
       </Panel>
     </ReactFlow>
   );
