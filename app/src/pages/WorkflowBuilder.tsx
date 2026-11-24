@@ -35,6 +35,7 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
+import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
@@ -1180,6 +1181,14 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const isPhone = useMediaQuery('(max-width: 640px)');
+  // The tile panel on the right can be dragged wider or narrower by its left edge, like Home's side panel.
+  // The board keeps room for its toolbar (about 640 wide, next to the 260 sidebar), and the width is remembered.
+  const panelSize = useResizable({
+    defaultSize: 360,
+    minSize: 320,
+    maxSize: Math.max(360, window.innerWidth - 260 - 640),
+    autoSaveId: 'board-panel-width',
+  });
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(startData));
   const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
@@ -1628,9 +1637,12 @@ function Builder({editing, selectTile, startData, library, onTurnOn}: BuilderPro
         end={
           // The side panel only opens for a selected tile, so the board gets the full width otherwise.
           isNarrow || (!selected && !selectedSection) ? undefined : (
-            <LayoutPanel hasDivider padding={4} width={360} label="Selected tile">
-              {panel}
-            </LayoutPanel>
+            <>
+              <ResizeHandle resizable={panelSize.props} isReversed hasDivider label="Drag to resize the panel" />
+              <LayoutPanel padding={4} width={panelSize.size} label="Selected tile">
+                {panel}
+              </LayoutPanel>
+            </>
           )
         }
       />
