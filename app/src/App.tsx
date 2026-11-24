@@ -11,7 +11,8 @@ import {
 import {TASKS, TICKETS, type Task} from './data';
 import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun} from './tasks';
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
-import {SHARED_DATA} from './sharedData';
+import {SHARED_DATA, sharedById} from './sharedData';
+import {SharedDataPage} from './pages/SharedDataPage';
 import {HomePage} from './pages/HomePage';
 import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
@@ -130,6 +131,9 @@ export default function App() {
     ...built.map(w => ({key: `b${w.id}`, name: w.name, schedule: w.schedule, nextRunAt: w.nextRunAt, href: `#workflow-${w.id}`, sharedInputs: sharedInputsOf(w.saved as SavedBoard)})),
   ];
   const homeItems = boardItems(tasks, approved, boardWorkflows, SHARED_DATA);
+  // #data-<id>: a page for data someone shares with you, listing which of your workflows read it.
+  const openData = sharedById(route.match(/^data-(.+)$/)?.[1] ?? '');
+  const dataUsedBy = openData ? boardWorkflows.filter(w => w.sharedInputs.includes(openData.name)).map(w => ({name: w.name, href: w.href})) : [];
   const openCount = attentionCount(homeItems);
   const isHome = route === 'home';
 
@@ -229,6 +233,8 @@ export default function App() {
           approved={approved}
           onDelete={() => deletePrefilled(openPrefilled)}
         />
+      ) : openData ? (
+        <SharedDataPage key={openData.id} data={openData} usedBy={dataUsedBy} />
       ) : openBuilt ? (
         <BuiltWorkflowPage key={openBuilt.id} workflow={openBuilt} onDelete={() => deleteBuilt(openBuilt)} />
       ) : (

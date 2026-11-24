@@ -1,7 +1,7 @@
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
 import {SCHEDULES, stepPosition} from './workflow';
-import {personName, type SharedData} from './sharedData';
+import {personName, sharedHref, type SharedData} from './sharedData';
 
 /** "Nov 2, 08:30": a date and time as Home's board shows it. */
 export function shortDateTime(iso: string): string {
@@ -31,7 +31,7 @@ const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
  * each workflow's last finished run (Done), and data other people's workflows hand you that none of your
  * workflows reads yet (New data ready for use, or a failed run). A workflow that reads shared data whose run
  * failed goes to Needs attention, since it can't process. Tasks whose step isn't in their workflow's step list
- * are left out. Ready data opens a new workflow on the board with that data as its first input.
+ * are left out. Shared data opens its own page, which shows its rows and can start a workflow with it.
  */
 export function boardItems(tasks: Task[], approved: number[], workflows: BoardWorkflow[], shared: SharedData[]): WorkflowBoardItem[] {
   const next: WorkflowBoardItem[] = [...workflows]
@@ -68,7 +68,7 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
     owner: personName(d.owner),
     state: d.lastRun.result === 'ready' ? 'dataReady' : 'dataFailed',
     at: shortDateTime(d.lastRun.at),
-    href: d.lastRun.result === 'ready' ? `#workflow-new?data=${d.id}` : undefined,
+    href: sharedHref(d),
   }));
   const blocked: WorkflowBoardItem[] = workflows.flatMap(w => {
     const failed = shared.find(d => w.sharedInputs.includes(d.name) && d.lastRun.result === 'failed');

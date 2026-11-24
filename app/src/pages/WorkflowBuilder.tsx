@@ -36,7 +36,7 @@ import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 import {useToast} from '@astryxdesign/core/Toast';
-import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type SharedData} from '../sharedData';
+import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
 import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
@@ -959,33 +959,45 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onAddData, onOpen}: {
                       {SHARED_DATA.map(d => {
                         const isReady = d.lastRun.result === 'ready';
                         return (
-                          <ClickableCard
-                            key={d.id}
-                            label={isReady ? `Add ${d.name} as an Input` : `${d.name} isn’t ready`}
-                            padding={2}
-                            width="100%"
-                            isDisabled={!isReady}
-                            draggable={isReady}
-                            onDragStart={e => {
-                              e.dataTransfer.setData(DRAG_DATA, d.id);
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            onClick={() => {
-                              onAddData(d);
-                              setIsLibraryOpen(false);
-                            }}>
-                            <VStack gap={0.5}>
-                              <HStack gap={1.5} vAlign="center">
-                                <Icon icon={Inbox} size="sm" color="secondary" />
-                                <Text weight="medium">{d.name}</Text>
-                              </HStack>
-                              <Text type="supporting">{sharedFrom(d)}</Text>
-                              <HStack gap={1} vAlign="center">
-                                <StatusDot variant={isReady ? 'success' : 'error'} label={isReady ? 'Ready' : 'Failed'} />
-                                <Text type="supporting">{isReady ? `Ready · ${shortDateTime(d.lastRun.at)}` : failedMessage(d)}</Text>
-                              </HStack>
-                            </VStack>
-                          </ClickableCard>
+                          <HStack key={d.id} gap={1} vAlign="center">
+                            <ClickableCard
+                              label={isReady ? `Add ${d.name} as an Input` : `${d.name} isn’t ready`}
+                              padding={2}
+                              width="100%"
+                              isDisabled={!isReady}
+                              draggable={isReady}
+                              onDragStart={e => {
+                                e.dataTransfer.setData(DRAG_DATA, d.id);
+                                e.dataTransfer.effectAllowed = 'copy';
+                              }}
+                              onClick={() => {
+                                onAddData(d);
+                                setIsLibraryOpen(false);
+                              }}>
+                              <VStack gap={0.5}>
+                                <HStack gap={1.5} vAlign="center">
+                                  <Icon icon={Inbox} size="sm" color="secondary" />
+                                  <Text weight="medium">{d.name}</Text>
+                                </HStack>
+                                <Text type="supporting">{sharedFrom(d)}</Text>
+                                <HStack gap={1} vAlign="center">
+                                  <StatusDot variant={isReady ? 'success' : 'error'} label={isReady ? 'Ready' : 'Failed'} />
+                                  <Text type="supporting">{isReady ? `Ready · ${shortDateTime(d.lastRun.at)}` : failedMessage(d)}</Text>
+                                </HStack>
+                              </VStack>
+                            </ClickableCard>
+                            <IconButton
+                              label={`Open ${d.name}`}
+                              tooltip="Open its page"
+                              variant="ghost"
+                              size="sm"
+                              icon={<Icon icon={ArrowUpRight} />}
+                              onClick={() => {
+                                setIsLibraryOpen(false);
+                                onOpen(sharedHref(d));
+                              }}
+                            />
+                          </HStack>
                         );
                       })}
                     </VStack>

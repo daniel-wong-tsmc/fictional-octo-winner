@@ -88,6 +88,13 @@ export function dataProblems(): string[] {
     if (workflows.has(d.workflow)) problems.push(`Shared data "${d.name}": "${d.workflow}" is one of your workflows, not someone else's.`);
     if (sharedNames.has(d.name)) problems.push(`Shared data "${d.name}" is listed twice.`);
     if (Number.isNaN(new Date(d.lastRun.at).getTime())) problems.push(`Shared data "${d.name}": last run time "${d.lastRun.at}" isn't a date.`);
+    // Its page shows the rows: each row fills every column, from the last run that worked.
+    const asOf = new Date(d.preview.asOf).getTime();
+    if (Number.isNaN(asOf)) problems.push(`Shared data "${d.name}": preview time "${d.preview.asOf}" isn't a date.`);
+    else if (d.lastRun.result === 'ready' ? d.preview.asOf !== d.lastRun.at : asOf >= new Date(d.lastRun.at).getTime()) problems.push(`Shared data "${d.name}": its rows should come from ${d.lastRun.result === 'ready' ? 'the last run' : 'a run before the one that failed'}.`);
+    d.preview.rows.forEach((row, i) => {
+      if (row.length !== d.preview.columns.length) problems.push(`Shared data "${d.name}": row ${i + 1} has ${row.length} values for ${d.preview.columns.length} columns.`);
+    });
     sharedNames.add(d.name);
   }
 
