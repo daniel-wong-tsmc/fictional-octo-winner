@@ -52,7 +52,7 @@ export function HomePanel({route, title, page, onClose}: {route: string | null; 
           <DrawerHeader
             title={shown?.title ?? ''}
             onOpenChange={open => !open && onClose()}
-            hasDivider
+            hasDivider={false}
             endContent={shown && <Button label="Open full page" size="sm" variant="ghost" isIconOnly={isSmall} tooltip="Open full page" icon={<Icon icon={Maximize2} />} href={`#${shown.route}`} />}
           />
         }
