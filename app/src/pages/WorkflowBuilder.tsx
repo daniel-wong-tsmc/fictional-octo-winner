@@ -39,7 +39,7 @@ import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
-import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -50,7 +50,7 @@ import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, t
 
 /* ---------- Steps ---------- */
 
-type StepKind = 'start' | 'input' | 'instructions' | 'output';
+type StepKind = 'input' | 'instructions' | 'output';
 
 /**
  * source 'workflow' reads a value another of your workflows hands over: app is that workflow, resource the value.
@@ -66,21 +66,14 @@ type InstructionsStep = {kind: 'instructions'; name: string; text: string; pytho
 /** Settings a new LLM step starts with: no code yet, and low temperature, since these steps work on numbers. */
 const LLM_DEFAULTS = {python: '', isCodeEdited: false, topP: 1, temperature: 0.2};
 type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
-/**
- * The Start tile: every workflow has exactly one, first. context is what the workflow is for and the rules
- * every LLM step follows, like a system prompt. It can't be added from the toolbar or removed.
- */
-type StartStep = {kind: 'start'; context: string};
-type Step = StartStep | InputStep | InstructionsStep | OutputStep;
+type Step = InputStep | InstructionsStep | OutputStep;
 
 /** The board's step kinds, named and drawn from the shared WORKFLOW_TILE_KINDS. */
 const KIND_INFO: Record<StepKind, (typeof WORKFLOW_TILE_KINDS)[WorkflowTileKind]> = {
-  start: WORKFLOW_TILE_KINDS.start,
   input: WORKFLOW_TILE_KINDS.input,
   instructions: WORKFLOW_TILE_KINDS.step,
   output: WORKFLOW_TILE_KINDS.output,
 };
-/** Kinds the toolbar can add. The Start tile is always there, once, so it isn't one of them. */
 const KINDS: StepKind[] = ['input', 'instructions', 'output'];
 /** Drag type used when a node is dragged from the toolbar onto the board. */
 const DRAG_TYPE = 'application/x-workflow-node';
@@ -103,14 +96,12 @@ const SEND_OPTIONS = [
 const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Orders', 'Rates']};
 
 function blankStep(kind: StepKind, n: number): Step {
-  if (kind === 'start') return {kind, context: ''};
   if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
   if (kind === 'instructions') return {kind, name: '', text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1], ...LLM_DEFAULTS};
   return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
 }
 
 function isReady(s: Step): boolean {
-  if (s.kind === 'start') return !!s.context.trim();
   if (s.kind === 'input') return s.source === 'upload' ? !!s.fileName : s.source ? !!s.app && !!s.resource : false;
   if (s.kind === 'instructions') return !!s.text.trim();
   return !!s.name.trim();
@@ -141,7 +132,6 @@ type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
 /** What each tile produced on the trial. The last LLM step and every Handoff tile end with the summary. */
 function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
-  if (node.step.kind === 'start') return {line: 'Every LLM step followed this context'};
   if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'shared' ? '5 rows read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
   if (node.step.kind === 'instructions') {
     const feedsOutput = links.some(l => l.source === node.id && board.find(n => n.id === l.target)?.step.kind === 'output');
@@ -226,8 +216,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   ) : undefined;
   return (
     <>
-      {/* An Input's left dot only takes the line from the Start tile, which the board draws itself. */}
-      {step.kind !== 'start' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} isConnectable={step.kind !== 'input'} />}
+      {step.kind !== 'input' && <Handle type="target" position={Position.Left} style={HANDLE_STYLE} />}
       <WorkflowTile
         content={data.content}
         detailMaxLines={2}
@@ -238,7 +227,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         elevation={selected ? 'high' : 'low'}
         emphasis={isFailedHere ? 'failed' : data.run?.status === 'notRun' ? 'muted' : undefined}
       />
-      {(step.kind !== 'output' || data.canFeedOtherWorkflow) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} isConnectable={step.kind !== 'start'} />}
+      {(step.kind !== 'output' || data.canFeedOtherWorkflow) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </>
   );
 }
@@ -557,14 +546,7 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
         )}
       </VStack>
 
-      {step.kind === 'start' && (
-        <VStack gap={1.5}>
-          <Text type="label">Workflow context</Text>
-          <Text type="supporting">{step.context || 'No context was given.'}</Text>
-          <Text type="supporting">Every LLM step followed this on this run.</Text>
-        </VStack>
-      )}
-      {!run && step.kind !== 'start' && <Text type="supporting">This tile wasn’t part of this run.</Text>}
+      {!run && <Text type="supporting">This tile wasn’t part of this run.</Text>}
       {run?.problem && (
         <Banner
           status={run.status === 'failed' ? 'error' : 'info'}
@@ -680,17 +662,6 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
         </>
       )}
 
-      {step.kind === 'start' && (
-        <TextArea
-          label="Context"
-          description="Like a system prompt: what this workflow is for, who it’s for, and rules every LLM step should follow."
-          placeholder="For example: This prepares the monthly sales close for Finance. Report amounts in US dollars and keep regions as Sales names them."
-          value={step.context}
-          onChange={context => onChange({...step, context})}
-          rows={8}
-        />
-      )}
-
       {step.kind === 'input' && <InputPanel step={step} onChange={onChange} />}
 
       {step.kind === 'instructions' && (
@@ -704,7 +675,7 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
           />
           <TextArea
             label="What should the AI do?"
-            description="Plain words, like you’d tell a colleague. It can use everything that flows into this tile, and it follows the workflow context on the Start tile."
+            description="Plain words, like you’d tell a colleague. It can use everything that flows into this tile, and it follows the workflow context (top right)."
             value={step.text}
             onChange={text => onChange({...step, text})}
             rows={6}
@@ -757,14 +728,10 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
         </>
       )}
 
-      {step.kind !== 'start' && (
-        <>
-          <Divider />
-          <HStack>
-            <Button label="Remove tile" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
-          </HStack>
-        </>
-      )}
+      <Divider />
+      <HStack>
+        <Button label="Remove tile" variant="ghost" icon={<Icon icon={Trash2} />} onClick={onRemove} />
+      </HStack>
     </VStack>
   );
 }
@@ -837,18 +804,12 @@ const ROW = 260;
 /** A new board: one Input, already reading shared data when the board was opened from Home's data card. */
 function startingBoard(startData?: string): BoardNode[] {
   const d = SHARED_DATA.find(x => x.id === startData);
-  return [
-    {id: START_ID, step: blankStep('start', 0), position: {x: -COL, y: 0}},
-    {id: newId(), step: d ? sharedInput(d) : blankStep('input', 0), position: {x: 0, y: 0}},
-  ];
+  return [{id: newId(), step: d ? sharedInput(d) : blankStep('input', 0), position: {x: 0, y: 0}}];
 }
-/** The Start tile's id. A workflow has one, so the id is fixed. */
-const START_ID = 'start';
-const isStart = (n: BoardNode) => n.step.kind === 'start';
 
 /**
- * A workflow's steps laid out as a board: its Start tile, its inputs in the next column, each step in its own
- * column, then the Handoff. Its page and its Edit board both read this, so they always show the same tiles.
+ * A workflow's steps laid out as a board: its inputs in the first column, each step in its own column, then
+ * the Handoff. Its page and its Edit board both read this, so they always show the same tiles.
  */
 export function boardFromWorkflow(w: Workflow): SavedBoard {
   const inputs: BoardNode[] = w.steps.flatMap(st => st.inputs.map((input, k) => ({id: `${st.id}-in-${k}`, input})))
@@ -881,8 +842,7 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
     ...w.steps.slice(1).map((st, i) => link(w.steps[i].id, st.id)),
     link(w.steps[w.steps.length - 1].id, 'out'),
   ];
-  const start: BoardNode = {id: START_ID, position: {x: -COL, y: middle}, step: {kind: 'start', context: w.context}};
-  return {board: [start, ...inputs, ...steps, output], links};
+  return {board: [...inputs, ...steps, output], links, context: w.context};
 }
 
 /** A line between two tiles. People draw these; the app only draws them for tiles added with a click. */
@@ -907,7 +867,6 @@ function linkProblem(board: BoardNode[], links: Link[], source: string | null, t
   const from = board.find(n => n.id === source);
   const to = board.find(n => n.id === target);
   if (!from || !to || from.id === to.id) return 'Pick two different tiles.';
-  if (from.step.kind === 'start' || to.step.kind === 'start') return 'The Start tile leads into the inputs on its own.';
   // A Handoff ends its workflow. Its only line out goes into a step of another workflow on the board.
   if (from.step.kind === 'output' && !(to.step.kind === 'instructions' && from.sectionId !== to.sectionId)) {
     return 'A Handoff only connects into an LLM step of another workflow.';
@@ -923,7 +882,6 @@ function linkProblem(board: BoardNode[], links: Link[], source: string | null, t
 }
 
 function isLinked(n: BoardNode, links: Link[]): boolean {
-  if (n.step.kind === 'start') return true;
   const out = links.some(l => l.source === n.id);
   const into = links.some(l => l.target === n.id);
   return n.step.kind === 'input' ? out : n.step.kind === 'output' ? into : into && out;
@@ -983,6 +941,48 @@ function boardSummary(saved: SavedBoard): string {
   const n = (k: StepKind) => saved.board.filter(b => b.step.kind === k).length;
   const plural = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
   return `${plural(n('input'), 'input', 'inputs')}, ${plural(n('instructions'), 'LLM step', 'LLM steps')}, ${plural(n('output'), 'handoff', 'handoffs')}`;
+}
+
+/**
+ * The workflow context button in the board's header, beside Try and Save: what the workflow is for and the
+ * rules every LLM step follows, like a system prompt. Its box opens below it. On a past run it only shows the
+ * context.
+ */
+function ContextButton({context, onChange}: {context: string; onChange?: (context: string) => void}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isEmpty = !context.trim();
+  return (
+    <Popover
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      placement="below"
+      width={420}
+      label="Workflow context"
+      content={
+        onChange ? (
+          <TextArea
+            label="Workflow context"
+            description="Like a system prompt: what this workflow is for, who it’s for, and rules every LLM step should follow."
+            placeholder="For example: This prepares the monthly sales close for Finance. Report amounts in US dollars and keep regions as Sales names them."
+            value={context}
+            onChange={onChange}
+            rows={8}
+          />
+        ) : (
+          <VStack gap={1.5}>
+            <Text type="label">Workflow context</Text>
+            <Text type="supporting">{isEmpty ? 'No context was given.' : context}</Text>
+          </VStack>
+        )
+      }>
+      <Button
+        label="Workflow context"
+        tooltip={isEmpty ? 'Workflow context: not set yet' : 'Workflow context'}
+        isIconOnly
+        icon={<Icon icon={ScrollText} />}
+      />
+    </Popover>
+  );
 }
 
 /**
@@ -1200,9 +1200,7 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
   const contents = new Map<string, WorkflowTileContent>();
   for (const n of board) {
     const s = n.step;
-    if (s.kind === 'start') {
-      contents.set(n.id, {kind: 'start', context: s.context});
-    } else if (s.kind === 'input') {
+    if (s.kind === 'input') {
       contents.set(n.id, {
         kind: 'input',
         source: s.source === 'upload' ? s.fileName : s.source ? s.app : '',
@@ -1225,8 +1223,7 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
  * counts as one input from that workflow instead.
  */
 export function toColumns(board: BoardNode[], links: Link[], sections: Section[] = []): BuiltStage[][] {
-  // The Start tile isn't a stage: it holds the context every step follows.
-  const own = board.filter(n => !n.sectionId && !isStart(n));
+  const own = board.filter(n => !n.sectionId);
   const isOwn = (id: string) => own.some(n => n.id === id);
   const contents = tileContents(board, links);
   const columns: BuiltStage[][] = runOrder(own, links.filter(l => isOwn(l.source) && isOwn(l.target))).map(col =>
@@ -1247,7 +1244,8 @@ export function toColumns(board: BoardNode[], links: Link[], sections: Section[]
 /* ---------- Page ---------- */
 
 /** The board as it was when the workflow was turned on, so Edit can reopen it. */
-export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]};
+/** context is the workflow context: what it's for and the rules every LLM step follows, like a system prompt. */
+export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]; context?: string};
 
 /** Names of the shared data a saved board's own Input tiles read (tiles inside a dropped section don't count). */
 export const sharedInputsOf = (saved: SavedBoard): string[] =>
@@ -1304,6 +1302,8 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     autoSaveId: 'board-panel-width',
   });
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
+  // The workflow context, set from the header's context button. Every LLM step follows it.
+  const [context, setContext] = useState(editing?.saved?.context ?? '');
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(startData));
   const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
   // A Handoff's right dot comes and goes with other workflows on the board. React Flow only learns a tile's
@@ -1317,10 +1317,10 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   }, [hasOtherWorkflows]);
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
-  const snapshot = (n: string, b: BoardNode[], l: Link[], sec: Section[]) =>
-    JSON.stringify([n.trim(), b.map(({id, step, position}) => ({id, step, position})), l, sec.map(({id, position}) => ({id, position}))]);
-  const [original] = useState(() => snapshot(name, board, links, sections));
-  const isDirty = snapshot(name, board, links, sections) !== original;
+  const snapshot = (n: string, c: string, b: BoardNode[], l: Link[], sec: Section[]) =>
+    JSON.stringify([n.trim(), c.trim(), b.map(({id, step, position}) => ({id, step, position})), l, sec.map(({id, position}) => ({id, position}))]);
+  const [original] = useState(() => snapshot(name, context, board, links, sections));
+  const isDirty = snapshot(name, context, board, links, sections) !== original;
   // Where the person asked to go while the board has unsaved changes. Set, it opens the discard check.
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   const leaveTo = (href: string) => (isDirty ? setLeavingTo(href) : (window.location.hash = href.slice(1)));
@@ -1354,10 +1354,8 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const allChecked = outputs.every(o => checked.includes(o.id));
   const allLinked = board.every(n => isLinked(n, links));
   const allReady = board.every(n => isReady(n.step)) && allLinked && count('input') > 0 && count('instructions') > 0 && count('output') > 0;
-  const nextHint = !board.some(n => isStart(n) && isReady(n.step))
-    ? 'Start here: select the Start tile and give the workflow some context.'
-    : !board.some(n => n.step.kind === 'input' && isReady(n.step))
-    ? 'Next: select the Input tile and add your data.'
+  const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
+    ? 'Start here: select the Input tile and add your data.'
     : !count('instructions')
       ? 'Next: drag an LLM node from the toolbar.'
       : !count('output')
@@ -1416,8 +1414,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       const parent = item.saved.sections?.find(x => x.id === n.sectionId);
       return parent ? {x: parent.position.x + n.position.x, y: parent.position.y + n.position.y} : n.position;
     };
-    // The dropped workflow's own context stays with it; only this workflow's Start tile is on the board.
-    const src = item.saved.board.filter(n => !isStart(n));
+    const src = item.saved.board;
     const minX = Math.min(...src.map(n => abs(n).x));
     const minY = Math.min(...src.map(n => abs(n).y));
     const idOf = (id: string) => `${sid}-${id}`;
@@ -1487,8 +1484,6 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     [isNarrow],
   );
   const remove = (id: string) => {
-    // Every workflow keeps its Start tile.
-    if (id === START_ID) return;
     setBoard(prev => prev.filter(n => n.id !== id));
     setLinks(prev => prev.filter(l => l.source !== id && l.target !== id));
     setSelectedId(null);
@@ -1501,7 +1496,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       const result = trial === 'done' ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
-        id: n.id, type: 'tile' as const, deletable: !isStart(n), position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
+        id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
         data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, run: viewRun?.tiles[n.id]},
       };
     });
@@ -1523,12 +1518,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     return content ? tileText(content).title : '';
   };
   const viewing = board.find(n => n.id === viewingId) ?? null;
-  // The Start tile leads into this workflow's own inputs. These lines come from the board itself, so they
-  // can't be selected, moved or deleted.
-  const startLines: LinkEdge[] = board.filter(n => !n.sectionId && n.step.kind === 'input').flatMap(n =>
-    board.some(b => b.id === START_ID) ? [{id: `${START_ID}-${n.id}`, source: START_ID, target: n.id, type: 'link' as const, selectable: false, deletable: false, focusable: false, data: {onRemove: () => {}}}] : [],
-  );
-  const edges: LinkEdge[] = [...startLines, ...links.map(l => ({...l, type: 'link' as const, selected: l.id === selectedLinkId, data: {onRemove: removeLink}}))];
+  const edges: LinkEdge[] = links.map(l => ({...l, type: 'link', selected: l.id === selectedLinkId, data: {onRemove: removeLink}}));
   // Delete or Backspace removes a selected line. Selection itself lives in our own state.
   const onEdgesChange = (changes: EdgeChange<LinkEdge>[]) => {
     const gone = changes.filter(c => c.type === 'remove').map(c => c.id);
@@ -1671,6 +1661,9 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
             />
           )}
           {!allReady && !isRun && <Text type="supporting" weight="medium">{nextHint}</Text>}
+          {allReady && !isRun && !context.trim() && (
+            <Text type="supporting" weight="medium">Tip: add the workflow context with the button at the top right, so every LLM step knows what this workflow is for.</Text>
+          )}
         </VStack>
       </Panel>
       <Panel position="bottom-center">
@@ -1695,6 +1688,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   );
   const actions = viewRun ? (
     <HStack gap={2} wrap="wrap">
+      <ContextButton context={context} />
       <Button label="Edit workflow" tooltip="Edit workflow" isIconOnly icon={<Icon icon={Pencil} />} href={viewRun.editHref} />
     </HStack>
   ) : (
@@ -1706,6 +1700,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           onClick={() => leaveTo(editing.href)}
         />
       )}
+      <ContextButton context={context} onChange={setContext} />
       <Button
         label={trial === 'done' ? 'Try again' : 'Try on last month'}
         icon={<Icon icon={Play} />}
@@ -1727,7 +1722,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           isDisabled={!isDirty || !allReady}
           tooltip={!isDirty ? 'Save changes: nothing has changed yet' : !allReady ? 'Save changes: finish the tiles first' : 'Save changes'}
           onClick={() => {
-            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
+            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context});
             toast({body: `Changes to ${finalName} are saved.`});
           }}
         />
@@ -1740,7 +1735,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           isDisabled={!allReady}
           tooltip={allReady ? 'Save: adds it to your library' : 'Save: finish the tiles first'}
           onClick={() => {
-            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections});
+            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context});
             toast({body: `${finalName} is saved to your library.`});
           }}
         />

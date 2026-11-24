@@ -6,10 +6,10 @@ import {ClickableCard} from '@astryxdesign/core/ClickableCard';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Icon} from '@astryxdesign/core/Icon';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
-import {Database, Flag, Send, WandSparkles} from 'lucide-react';
+import {Database, Send, WandSparkles} from 'lucide-react';
 
-/** The kinds of tile a workflow is made of: one Start, then inputs, LLM steps and Handoffs. */
-export type WorkflowTileKind = 'start' | 'input' | 'step' | 'output';
+/** The three kinds of tile a workflow is made of. */
+export type WorkflowTileKind = 'input' | 'step' | 'output';
 
 export type WorkflowTileTone = 'success' | 'info' | 'warning' | 'error' | 'neutral';
 
@@ -18,7 +18,6 @@ export type WorkflowTileTone = 'success' | 'info' | 'warning' | 'error' | 'neutr
  * read from here, so a kind is named and drawn the same way everywhere.
  */
 export const WORKFLOW_TILE_KINDS: Record<WorkflowTileKind, {label: string; icon: typeof Send; hint: string}> = {
-  start: {label: 'Start', icon: Flag, hint: 'Context for the whole workflow. Every LLM step follows it'},
   input: {label: 'Input', icon: Database, hint: 'Excel upload, an app through MCP, or data shared with you'},
   step: {label: 'LLM', icon: WandSparkles, hint: 'Tell the AI what to do with the data'},
   output: {label: 'Handoff', icon: Send, hint: 'Who gets the result, and who approves it'},
@@ -30,18 +29,12 @@ export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow' | 'shared';
 /**
  * What a tile says, by kind. Each field is one setting of the tile, and each kind always shows the same
  * details in the same order:
- * - Start: title "Workflow context"; details Context (like a system prompt every LLM step follows).
  * - Input: title is the source; details From, Reads.
  * - LLM: title is "Step N" (plus its name when it has one); details Instructions.
  * Where a tile leads is shown by the lines or arrows around it, not in its text.
  * - Handoff: title is the output's name; details Format, Approver, Sends to.
  */
 export type WorkflowTileContent =
-  | {
-      kind: 'start';
-      /** What the workflow is for and the rules every LLM step follows, like a system prompt. */
-      context: string;
-    }
   | {
       kind: 'input';
       /** The file or app the data comes from. Empty until it is chosen. */
@@ -80,9 +73,6 @@ const LABEL_WIDTH = 84;
 
 /** The title and labeled details for a tile. Exported so text versions (search, tooltips) match the tile. */
 export function tileText(c: WorkflowTileContent): {title: string; details: {label: string; value: string}[]} {
-  if (c.kind === 'start') {
-    return {title: 'Workflow context', details: [{label: 'Context', value: c.context || NOT_SET}]};
-  }
   if (c.kind === 'input') {
     return {
       title: c.source || 'Add your data',

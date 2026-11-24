@@ -37,8 +37,8 @@ export type Workflow = {
   /** A draft hasn't been turned on: it has a schedule but doesn't run yet. */
   isDraft?: boolean;
   /**
-   * The workflow's context, on its Start tile: what it's for and the rules every LLM step follows, like a
-   * system prompt.
+   * The workflow context, set from the board's header: what the workflow is for and the rules every LLM step
+   * follows, like a system prompt.
    */
   context: string;
   approver: string;
