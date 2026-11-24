@@ -39,7 +39,7 @@ import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, sharedHref, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
-import {Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {XCircle, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -189,7 +189,17 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
       ? {tone: 'success' as const, label: 'Ready'}
       : {tone: 'warning' as const, label: 'Needs setup'};
   const runLine = data.run?.numbers?.[0];
-  const footer = runLine ? (
+  // In a past run, the tile where it failed is red and says why; tiles that didn't run are greyed out.
+  const isFailedHere = data.run?.status === 'failed';
+  const footer = isFailedHere ? (
+    <VStack gap={1}>
+      <HStack gap={1} vAlign="center">
+        <Icon icon={XCircle} size="sm" color="error" />
+        <Text weight="semibold">Failed here</Text>
+      </HStack>
+      {data.run?.problem && <Text type="supporting" maxLines={3}>{data.run.problem}</Text>}
+    </VStack>
+  ) : runLine ? (
     <Text type="supporting">{`${runLine[0]}: ${runLine[1]}`}</Text>
   ) : data.trial ? (
     <VStack gap={1}>
@@ -222,6 +232,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         footer={footer}
         width={250}
         elevation={selected ? 'high' : 'low'}
+        emphasis={isFailedHere ? 'failed' : data.run?.status === 'notRun' ? 'muted' : undefined}
       />
       {(step.kind !== 'output' || data.canFeedOtherWorkflow) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </>
@@ -1239,7 +1250,7 @@ export function WorkflowBuilderPage(props: BuilderProps) {
 function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: BuilderProps) {
   const isEditing = !!editing;
   const isRun = !!viewRun;
-  const {screenToFlowPosition} = useReactFlow();
+  const {screenToFlowPosition, setCenter} = useReactFlow();
   const toast = useToast();
   const isNarrow = useMediaQuery('(max-width: 1100px)');
   const isPhone = useMediaQuery('(max-width: 640px)');
@@ -1288,6 +1299,15 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
 
   const selected = board.find(n => n.id === selectedId) ?? null;
   const selectedSection = sections.find(sec => sec.id === selectedId) ?? null;
+  // A past run that failed opens zoomed in on the tile where it failed, after the board has fitted itself.
+  useEffect(() => {
+    const failed = viewRun && board.find(n => n.id === selectTile && viewRun.tiles[n.id]?.status === 'failed');
+    if (!failed || failed.sectionId) return;
+    const t = window.setTimeout(() => setCenter(failed.position.x + TILE_W / 2, failed.position.y + TILE_H / 2, {zoom: 0.7, duration: 500}), 350);
+    return () => window.clearTimeout(t);
+    // Only when the run opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const count = (k: StepKind) => board.filter(n => n.step.kind === k).length;
   const outputs = board.filter(n => n.step.kind === 'output');
   const allChecked = outputs.every(o => checked.includes(o.id));

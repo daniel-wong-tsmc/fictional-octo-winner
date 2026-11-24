@@ -113,6 +113,11 @@ export type WorkflowTileProps = {
   width?: number | string;
   /** Raised for a tile that is selected or needs attention. */
   elevation?: 'none' | 'low' | 'high';
+  /**
+   * How much the tile stands out. failed turns it red and raises it, for the tile where a run stopped; muted
+   * greys it, for tiles that didn't run. Leave it out for a normal tile.
+   */
+  emphasis?: 'failed' | 'muted';
   /** Makes the whole tile a button. Leave it out when something else, such as a board, handles clicks. */
   onClick?: () => void;
 };
@@ -121,7 +126,9 @@ export type WorkflowTileProps = {
  * One tile of a workflow: an Input, an LLM step or a Handoff. Used for every tile on the workflow board,
  * so a tile looks and reads the same wherever it appears.
  */
-export function WorkflowTile({content, status, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', onClick}: WorkflowTileProps) {
+export function WorkflowTile({content, status, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', emphasis, onClick}: WorkflowTileProps) {
+  const variant = emphasis === 'failed' ? 'red' : emphasis === 'muted' ? 'muted' : 'default';
+  const raised = emphasis === 'failed' ? 'high' : elevation;
   const info = WORKFLOW_TILE_KINDS[content.kind];
   const {title, details} = tileText(content);
   const body = (
@@ -151,11 +158,11 @@ export function WorkflowTile({content, status, footer, detailMaxLines, detailLay
     </VStack>
   );
   return onClick ? (
-    <ClickableCard label={`Open ${info.label}: ${title}`} onClick={onClick} padding={3} width={width} elevation={elevation}>
+    <ClickableCard label={`Open ${info.label}: ${title}`} onClick={onClick} padding={3} width={width} elevation={raised} variant={variant}>
       {body}
     </ClickableCard>
   ) : (
-    <Card padding={3} width={width} elevation={elevation}>
+    <Card padding={3} width={width} elevation={raised} variant={variant}>
       {body}
     </Card>
   );
