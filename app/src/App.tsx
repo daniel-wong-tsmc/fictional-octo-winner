@@ -22,8 +22,8 @@ import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
 import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
-import {timing} from './schedule';
-import {SCHEDULE_PRESETS, PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
+import {DEFAULT_SCHEDULE, timing} from './schedule';
+import {PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
 import {WorkflowBuilderPage, boardFromWorkflow, sharedInputsOf, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
 
@@ -94,7 +94,7 @@ export default function App() {
     }
     const id = Math.max(...PREFILLED_WORKFLOWS.map(w => w.id), ...built.map(w => w.id)) + 1;
     const createdOn = longDate(new Date());
-    setBuilt(prev => [...prev, {id, name, columns, saved, ...timing(saved.when ?? SCHEDULE_PRESETS[3]), createdOn}]);
+    setBuilt(prev => [...prev, {id, name, columns, saved, ...timing(saved.when ?? DEFAULT_SCHEDULE), createdOn}]);
     window.location.hash = `workflow-${id}`;
   };
   const deleteBuilt = (w: BuiltWorkflow) => {

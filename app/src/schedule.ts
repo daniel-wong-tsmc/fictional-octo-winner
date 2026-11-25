@@ -1,4 +1,4 @@
-// When a workflow runs: a recurring day and time, or only when someone runs it. Every schedule the app shows
+// When a workflow runs: a recurring day and time. Every workflow has one. Every schedule the app shows
 // (the workflow page's Starts, Home's Scheduled cards, the board's Schedule button) is written by scheduleText
 // and timed by nextRunOf, so the words and the next run always agree.
 
@@ -12,8 +12,10 @@ export type MonthDay = number | 'firstBusinessDay' | 'lastDay';
 export type Schedule =
   | {repeat: 'daily'; time: string}
   | {repeat: 'weekly'; days: Weekday[]; time: string}
-  | {repeat: 'monthly'; day: MonthDay; time: string}
-  | {repeat: 'manual'};
+  | {repeat: 'monthly'; day: MonthDay; time: string};
+
+/** What a new schedule starts as: weekly on Monday at 8:00, the most common example. */
+export const DEFAULT_SCHEDULE: Schedule = {repeat: 'weekly', days: ['Monday'], time: '08:00'};
 
 /** The prototype's "now": between the last runs in the example data (Nov 16) and the next ones. */
 export const NOW = new Date('2026-11-18T09:00');
@@ -32,7 +34,6 @@ const joinWords = (words: string[]) =>
 
 /** The schedule in words, such as "Every Monday, 8:00" or "First business day of each month, 8:00". */
 export function scheduleText(s: Schedule): string {
-  if (s.repeat === 'manual') return 'When I run it';
   if (s.repeat === 'daily') return `Every day, ${clock(s.time)}`;
   if (s.repeat === 'weekly') {
     const days = WEEKDAYS.filter(d => s.days.includes(d));
@@ -45,7 +46,7 @@ export function scheduleText(s: Schedule): string {
 /** Monday is 0, matching WEEKDAYS. */
 const weekdayIndex = (d: Date) => (d.getDay() + 6) % 7;
 
-function runsOn(s: Exclude<Schedule, {repeat: 'manual'}>, d: Date): boolean {
+function runsOn(s: Schedule, d: Date): boolean {
   if (s.repeat === 'daily') return true;
   if (s.repeat === 'weekly') return s.days.includes(WEEKDAYS[weekdayIndex(d)]);
   if (s.day === 'lastDay') return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getDate() === 1;
@@ -57,9 +58,9 @@ function runsOn(s: Exclude<Schedule, {repeat: 'manual'}>, d: Date): boolean {
   return d.getDate() === s.day;
 }
 
-/** The next time it runs after `from`. Undefined when it only runs when someone runs it, or no day is picked. */
+/** The next time it runs after `from`. Undefined when a weekly schedule has no day picked. */
 export function nextRunOf(s: Schedule, from: Date = NOW): Date | undefined {
-  if (s.repeat === 'manual' || (s.repeat === 'weekly' && !s.days.length)) return undefined;
+  if (s.repeat === 'weekly' && !s.days.length) return undefined;
   const [h, m] = s.time.split(':').map(Number);
   for (let i = 0; i < 400; i++) {
     const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i, h, m);
@@ -79,5 +80,5 @@ const isoMinute = (d: Date) =>
 /** A workflow's schedule fields from its Schedule: the words, the next run in words, and the next run's time. */
 export function timing(when: Schedule): {when: Schedule; schedule: string; nextRun: string; nextRunAt: string} {
   const next = nextRunOf(when);
-  return {when, schedule: scheduleText(when), nextRun: next ? nextRunText(next) : 'When you run it', nextRunAt: next ? isoMinute(next) : ''};
+  return {when, schedule: scheduleText(when), nextRun: next ? nextRunText(next) : 'Not set', nextRunAt: next ? isoMinute(next) : ''};
 }

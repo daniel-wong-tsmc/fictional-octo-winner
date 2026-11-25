@@ -32,7 +32,7 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {TimeInput, type ISOTimeString} from '@astryxdesign/core/TimeInput';
-import {WEEKDAYS, monthDayLabel, nextRunOf, nextRunText, scheduleText, type MonthDay, type Schedule} from '../schedule';
+import {DEFAULT_SCHEDULE, WEEKDAYS, monthDayLabel, nextRunOf, nextRunText, scheduleText, type MonthDay, type Schedule} from '../schedule';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
@@ -1002,13 +1002,10 @@ function ContextButton({context, onChange}: {context: string; onChange?: (contex
   );
 }
 
-/** What a new schedule starts as: weekly on Monday at 8:00, the most common example. */
-const DEFAULT_SCHEDULE: Schedule = {repeat: 'weekly', days: ['Monday'], time: '08:00'};
 const REPEATS = [
   {value: 'daily', label: 'Every day'},
   {value: 'weekly', label: 'Every week'},
   {value: 'monthly', label: 'Every month'},
-  {value: 'manual', label: 'Only when I run it'},
 ] as const;
 const MONTH_DAYS: MonthDay[] = ['firstBusinessDay', ...Array.from({length: 28}, (_, i) => i + 1), 'lastDay'];
 
@@ -1018,11 +1015,10 @@ const MONTH_DAYS: MonthDay[] = ['firstBusinessDay', ...Array.from({length: 28}, 
  * on Save both use it.
  */
 function ScheduleFields({value, onChange}: {value: Schedule; onChange: (s: Schedule) => void}) {
-  const time = value.repeat === 'manual' ? '08:00' : value.time;
+  const {time} = value;
   const setRepeat = (repeat: string) =>
     onChange(
-      repeat === 'manual' ? {repeat}
-      : repeat === 'daily' ? {repeat, time}
+      repeat === 'daily' ? {repeat, time}
       : repeat === 'weekly' ? {repeat, time, days: value.repeat === 'weekly' ? value.days : ['Monday']}
       : {repeat: 'monthly', time, day: value.repeat === 'monthly' ? value.day : 1},
     );
@@ -1061,13 +1057,9 @@ function ScheduleFields({value, onChange}: {value: Schedule; onChange: (s: Sched
           onChange={d => onChange({...value, day: /^\d+$/.test(d) ? Number(d) : (d as MonthDay)})}
         />
       )}
-      {value.repeat !== 'manual' && (
-        <TimeInput label="At" value={value.time as ISOTimeString} hourFormat="24h" increment={15} onChange={t => t && onChange({...value, time: t.slice(0, 5)})} />
-      )}
+      <TimeInput label="At" value={value.time as ISOTimeString} hourFormat="24h" increment={15} onChange={t => t && onChange({...value, time: t.slice(0, 5)})} />
       <Text type="supporting">
-        {value.repeat === 'manual'
-          ? 'It runs only when someone presses Run now.'
-          : noDays
+        {noDays
           ? 'Pick at least one day.'
           : `${scheduleText(value)}. Next run: ${next ? nextRunText(next) : 'none'}.`}
       </Text>
@@ -1084,10 +1076,16 @@ const isScheduleComplete = (s: Schedule) => !(s.repeat === 'weekly' && !s.days.l
  */
 function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Schedule) => void}) {
   const [isOpen, setIsOpen] = useState(false);
+  // Changes stay in the box until Save; closing it without saving drops them.
+  const [draft, setDraft] = useState<Schedule>(when ?? DEFAULT_SCHEDULE);
+  const open = (next: boolean) => {
+    if (next) setDraft(when ?? DEFAULT_SCHEDULE);
+    setIsOpen(next);
+  };
   return (
     <Popover
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={open}
       placement="below"
       width={420}
       label="Schedule"
@@ -1095,7 +1093,20 @@ function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Sched
         onChange ? (
           <VStack gap={3}>
             <Text type="label">When should it run?</Text>
-            <ScheduleFields value={when ?? DEFAULT_SCHEDULE} onChange={onChange} />
+            <ScheduleFields value={draft} onChange={setDraft} />
+            <HStack gap={2} hAlign="end">
+              <Button label="Cancel" variant="ghost" size="sm" onClick={() => open(false)} />
+              <Button
+                label="Save"
+                variant="primary"
+                size="sm"
+                isDisabled={!isScheduleComplete(draft)}
+                onClick={() => {
+                  onChange(draft);
+                  open(false);
+                }}
+              />
+            </HStack>
           </VStack>
         ) : (
           <VStack gap={1.5}>
@@ -1109,7 +1120,6 @@ function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Sched
         tooltip={when ? `Schedule: ${scheduleText(when)}` : 'Schedule: not set yet'}
         isIconOnly
         icon={<Icon icon={CalendarClock} />}
-        onClick={() => !when && onChange?.(DEFAULT_SCHEDULE)}
       />
     </Popover>
   );

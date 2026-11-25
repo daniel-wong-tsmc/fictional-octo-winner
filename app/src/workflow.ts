@@ -1,4 +1,4 @@
-import {scheduleText, timing, type Schedule} from './schedule';
+import {timing, type Schedule} from './schedule';
 import type {WorkflowDataFormat, WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 // Example workflow for the UI prototype. Nothing here runs.
 
@@ -57,14 +57,12 @@ export type Workflow = {
   runs: {period: string; started: string; result: 'review' | 'approved' | 'rerun' | 'stopped'; detail: string; finished: string}[];
 };
 
-/** Example schedules: monthly close, weekly report, a daily one, and one that only runs when started. */
+/** Example schedules: monthly close, weekly report and a daily one. */
 export const SCHEDULE_PRESETS: Schedule[] = [
   {repeat: 'monthly', day: 'firstBusinessDay', time: '08:00'},
   {repeat: 'weekly', days: ['Monday'], time: '08:00'},
   {repeat: 'daily', time: '07:00'},
-  {repeat: 'manual'},
 ];
-export const SCHEDULES = SCHEDULE_PRESETS.map(scheduleText);
 export const PEOPLE = ['Daniel (you)', 'Priya Shah, Finance lead', 'Marco Ruiz, Sales ops'];
 /** First name of a PEOPLE entry ("Daniel (you)" gives "Daniel"). Defined here because sharedData.ts, which has personName, imports this file. */
 export const firstName = (person: string) => person.split(/[ ,(]/)[0];

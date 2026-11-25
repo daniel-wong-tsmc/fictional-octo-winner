@@ -1,7 +1,7 @@
 import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
-import {SCHEDULES, stepPosition} from './workflow';
+import {stepPosition} from './workflow';
 import {shortDateTime} from './dates';
 import {personName, sharedHref, type SharedData} from './sharedData';
 
@@ -37,8 +37,6 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
     .map(w =>
       w.isDraft
         ? {id: `next-${w.key}`, workflow: w.name, state: 'draft', href: w.href}
-        : w.schedule === SCHEDULES[3]
-        ? {id: `next-${w.key}`, workflow: w.name, state: 'unscheduled', href: w.href}
         : {id: `next-${w.key}`, workflow: w.name, state: 'scheduled', schedule: w.schedule, at: shortDateTime(w.nextRunAt), href: w.href},
     );
   const fromTickets: WorkflowBoardItem[] = tasks.flatMap(task => {
