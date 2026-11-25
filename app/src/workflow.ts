@@ -1,3 +1,4 @@
+import {scheduleText, timing, type Schedule} from './schedule';
 import type {WorkflowDataFormat, WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 // Example workflow for the UI prototype. Nothing here runs.
 
@@ -30,6 +31,8 @@ export type Workflow = {
   id: number;
   name: string;
   description: string;
+  /** When it runs. schedule, nextRun and nextRunAt are read from it with timing() in src/schedule.ts. */
+  when: Schedule;
   schedule: string;
   nextRun: string;
   /** The next run as an ISO date and time, for Home's board. */
@@ -54,12 +57,14 @@ export type Workflow = {
   runs: {period: string; started: string; result: 'review' | 'approved' | 'rerun' | 'stopped'; detail: string; finished: string}[];
 };
 
-export const SCHEDULES = [
-  'First business day of each month, 8:00',
-  'Every Monday, 8:00',
-  'Every day, 7:00',
-  'When I run it',
+/** Example schedules: monthly close, weekly report, a daily one, and one that only runs when started. */
+export const SCHEDULE_PRESETS: Schedule[] = [
+  {repeat: 'monthly', day: 'firstBusinessDay', time: '08:00'},
+  {repeat: 'weekly', days: ['Monday'], time: '08:00'},
+  {repeat: 'daily', time: '07:00'},
+  {repeat: 'manual'},
 ];
+export const SCHEDULES = SCHEDULE_PRESETS.map(scheduleText);
 export const PEOPLE = ['Daniel (you)', 'Priya Shah, Finance lead', 'Marco Ruiz, Sales ops'];
 /** First name of a PEOPLE entry ("Daniel (you)" gives "Daniel"). Defined here because sharedData.ts, which has personName, imports this file. */
 export const firstName = (person: string) => person.split(/[ ,(]/)[0];
@@ -71,9 +76,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   name: 'Monthly sales close',
   description: 'Totals last month’s sales by region, compares them with targets, and sends the summary to Finance once approved.',
   context: 'This workflow prepares the monthly sales close for the Finance team. Report every amount in US dollars, rounded to whole dollars. Use the five sales regions as Sales names them: US, Canada, Europe, UK and Japan. Never drop an order without saying why.',
-  schedule: SCHEDULES[0],
-  nextRun: 'Tuesday, December 1, 8:00',
-  nextRunAt: '2026-12-01T08:00',
+  ...timing(SCHEDULE_PRESETS[0]),
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close', 'Google Drive: Finance close pack'],
   outputFormat: 'Excel sheet',
@@ -126,9 +129,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   name: 'Weekly revenue report',
   description: 'Combines the week’s orders and refunds, converts them to USD, totals revenue by region, and shares total revenue with Monthly sales close.',
   context: 'This workflow reports last week’s revenue, Monday to Sunday. Count an order once, net of its refunds. Convert to US dollars at the rate on the order date. If a file is missing a column you need, stop and say which one rather than guessing.',
-  schedule: SCHEDULES[1],
-  nextRun: 'Monday, November 23, 8:00',
-  nextRunAt: '2026-11-23T08:00',
+  ...timing(SCHEDULE_PRESETS[1]),
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close'],
   outputFormat: 'Single value',
@@ -191,7 +192,7 @@ export const CUSTOMER_CHURN_LIST: Workflow = {
   name: 'Customer churn list',
   description: 'Flags customers who may leave, groups them by account owner, and sends each owner their list. A draft: it runs once you try it and turn it on.',
   context: 'This workflow helps account owners keep customers who may leave. Only flag a customer with a clear reason from their activity or support tickets. Write for a busy account owner: short, plain and specific.',
-  schedule: SCHEDULES[1],
+  ...timing(SCHEDULE_PRESETS[1]),
   nextRun: 'Not turned on yet',
   nextRunAt: '',
   isDraft: true,
@@ -250,9 +251,7 @@ export const AT_RISK_FOLLOW_UPS: Workflow = {
   name: 'At-risk account follow-ups',
   description: 'Takes the at-risk accounts Marco Ruiz’s Pipeline health check shares with you, adds what each account still owes, and sends Finance a ranked follow-up list.',
   context: 'This workflow turns the at-risk accounts Sales shares with us into a follow-up list for Finance. Amounts are in US dollars. Rank by what each account still owes, highest first, and keep each account’s owner so Finance knows who to call.',
-  schedule: SCHEDULES[1],
-  nextRun: 'Monday, November 23, 8:00',
-  nextRunAt: '2026-11-23T08:00',
+  ...timing(SCHEDULE_PRESETS[1]),
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close'],
   outputFormat: 'Excel sheet',
@@ -330,6 +329,7 @@ export type BuiltStage = {id: string; content: WorkflowTileContent};
 export type BuiltWorkflow = {
   id: number;
   name: string;
+  when: Schedule;
   schedule: string;
   nextRun: string;
   nextRunAt: string;

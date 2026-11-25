@@ -22,7 +22,8 @@ import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
 import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
-import {SCHEDULES, PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
+import {timing} from './schedule';
+import {SCHEDULE_PRESETS, PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
 import {WorkflowBuilderPage, boardFromWorkflow, sharedInputsOf, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
 
@@ -63,6 +64,14 @@ export default function App() {
   const toast = useToast();
   const pageId = Number(route.match(/^workflow-(\d+)$/)?.[1] ?? NaN);
   const editId = Number(route.match(/^workflow-edit-(\d+)$/)?.[1] ?? NaN);
+  /**
+   * A prefilled workflow's schedule as last saved from its board. A draft keeps its schedule but has no next
+   * run until it's turned on.
+   */
+  const scheduleOf = (p: (typeof prefilled)[number]) => {
+    const t = timing(p.saved.when ?? p.workflow.when);
+    return p.workflow.isDraft ? {...t, nextRun: p.workflow.nextRun, nextRunAt: p.workflow.nextRunAt} : t;
+  };
   const editingPrefilled = prefilled.find(p => p.workflow.id === editId) ?? null;
   const editingBuilt = built.find(w => w.id === editId) ?? null;
   // #workflow-N-run-K: run K (0 is the newest) of a prefilled workflow, shown on its board.
@@ -79,13 +88,13 @@ export default function App() {
       return;
     }
     if (editingBuilt) {
-      setBuilt(prev => prev.map(w => (w.id === editingBuilt.id ? {...w, name, columns, saved} : w)));
+      setBuilt(prev => prev.map(w => (w.id === editingBuilt.id ? {...w, name, columns, saved, ...timing(saved.when ?? w.when)} : w)));
       window.location.hash = `workflow-${editingBuilt.id}`;
       return;
     }
     const id = Math.max(...PREFILLED_WORKFLOWS.map(w => w.id), ...built.map(w => w.id)) + 1;
     const createdOn = longDate(new Date());
-    setBuilt(prev => [...prev, {id, name, columns, saved, schedule: SCHEDULES[0], nextRun: PREFILLED_WORKFLOWS[0].nextRun, nextRunAt: PREFILLED_WORKFLOWS[0].nextRunAt, createdOn}]);
+    setBuilt(prev => [...prev, {id, name, columns, saved, ...timing(saved.when ?? SCHEDULE_PRESETS[3]), createdOn}]);
     window.location.hash = `workflow-${id}`;
   };
   const deleteBuilt = (w: BuiltWorkflow) => {
@@ -132,8 +141,7 @@ export default function App() {
     ...prefilled.map(p => ({
       key: `p${p.workflow.id}`,
       name: p.name,
-      schedule: p.workflow.schedule,
-      nextRunAt: p.workflow.nextRunAt,
+      ...scheduleOf(p),
       href: `#workflow-${p.workflow.id}`,
       lastFinished: p.workflow.runs.find(r => r.result === 'approved' || r.result === 'rerun')?.finished,
       isDraft: p.workflow.isDraft,
@@ -175,7 +183,7 @@ export default function App() {
     if (p) {
       return {
         title: 'Workflow',
-        page: <LiveWorkflowPage key={wid} workflow={p.workflow} name={p.name} saved={p.saved} approved={approved} onDelete={() => deletePrefilled(p)} isInPanel={isInPanel} />,
+        page: <LiveWorkflowPage key={wid} workflow={{...p.workflow, ...scheduleOf(p)}} name={p.name} saved={p.saved} approved={approved} onDelete={() => deletePrefilled(p)} isInPanel={isInPanel} />,
       };
     }
     const b = built.find(x => x.id === wid);

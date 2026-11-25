@@ -29,6 +29,10 @@ import {Popover} from '@astryxdesign/core/Popover';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
+import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
+import {ToggleButton} from '@astryxdesign/core/ToggleButton';
+import {TimeInput, type ISOTimeString} from '@astryxdesign/core/TimeInput';
+import {WEEKDAYS, monthDayLabel, nextRunOf, nextRunText, scheduleText, type MonthDay, type Schedule} from '../schedule';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
@@ -36,7 +40,7 @@ import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
-import {ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
+import {CalendarClock, ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
@@ -822,7 +826,7 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
     ...w.steps.slice(1).map((st, i) => link(w.steps[i].id, st.id)),
     link(w.steps[w.steps.length - 1].id, 'out'),
   ];
-  return {board: [...inputs, ...steps, output], links, context: w.context};
+  return {board: [...inputs, ...steps, output], links, context: w.context, when: w.when};
 }
 
 /** A line between two tiles. People draw these; the app only draws them for tiles added with a click. */
@@ -962,6 +966,141 @@ function ContextButton({context, onChange}: {context: string; onChange?: (contex
         icon={<Icon icon={ScrollText} />}
       />
     </Popover>
+  );
+}
+
+/** What a new schedule starts as: weekly on Monday at 8:00, the most common example. */
+const DEFAULT_SCHEDULE: Schedule = {repeat: 'weekly', days: ['Monday'], time: '08:00'};
+const REPEATS = [
+  {value: 'daily', label: 'Every day'},
+  {value: 'weekly', label: 'Every week'},
+  {value: 'monthly', label: 'Every month'},
+  {value: 'manual', label: 'Only when I run it'},
+] as const;
+const MONTH_DAYS: MonthDay[] = ['firstBusinessDay', ...Array.from({length: 28}, (_, i) => i + 1), 'lastDay'];
+
+/**
+ * When a workflow runs: how often, on which days of the week or which date of the month, and at what time.
+ * The line under it says the schedule in words and when the next run is. The Schedule button and the prompt
+ * on Save both use it.
+ */
+function ScheduleFields({value, onChange}: {value: Schedule; onChange: (s: Schedule) => void}) {
+  const time = value.repeat === 'manual' ? '08:00' : value.time;
+  const setRepeat = (repeat: string) =>
+    onChange(
+      repeat === 'manual' ? {repeat}
+      : repeat === 'daily' ? {repeat, time}
+      : repeat === 'weekly' ? {repeat, time, days: value.repeat === 'weekly' ? value.days : ['Monday']}
+      : {repeat: 'monthly', time, day: value.repeat === 'monthly' ? value.day : 1},
+    );
+  const next = nextRunOf(value);
+  const noDays = value.repeat === 'weekly' && !value.days.length;
+  return (
+    <VStack gap={3}>
+      <VStack gap={1}>
+        <Text type="label">Repeats</Text>
+        <SegmentedControl label="Repeats" value={value.repeat} onChange={setRepeat} size="sm">
+          {REPEATS.map(r => <SegmentedControlItem key={r.value} value={r.value} label={r.label} />)}
+        </SegmentedControl>
+      </VStack>
+      {value.repeat === 'weekly' && (
+        <VStack gap={1}>
+          <Text type="label">On these days</Text>
+          <HStack gap={1} wrap="wrap">
+            {WEEKDAYS.map(d => (
+              <ToggleButton
+                key={d}
+                label={d.slice(0, 3)}
+                tooltip={d}
+                size="sm"
+                isPressed={value.days.includes(d)}
+                onPressedChange={on => onChange({...value, days: on ? [...value.days, d] : value.days.filter(x => x !== d)})}
+              />
+            ))}
+          </HStack>
+        </VStack>
+      )}
+      {value.repeat === 'monthly' && (
+        <Selector
+          label="On this date"
+          options={MONTH_DAYS.map(d => ({value: String(d), label: monthDayLabel(d)}))}
+          value={String(value.day)}
+          onChange={d => onChange({...value, day: /^\d+$/.test(d) ? Number(d) : (d as MonthDay)})}
+        />
+      )}
+      {value.repeat !== 'manual' && (
+        <TimeInput label="At" value={value.time as ISOTimeString} hourFormat="24h" increment={15} onChange={t => t && onChange({...value, time: t.slice(0, 5)})} />
+      )}
+      <Text type="supporting">
+        {value.repeat === 'manual'
+          ? 'It runs only when someone presses Run now.'
+          : noDays
+          ? 'Pick at least one day.'
+          : `${scheduleText(value)}. Next run: ${next ? nextRunText(next) : 'none'}.`}
+      </Text>
+    </VStack>
+  );
+}
+
+/** A schedule that can be saved: a weekly one needs at least one day. */
+const isScheduleComplete = (s: Schedule) => !(s.repeat === 'weekly' && !s.days.length);
+
+/**
+ * The Schedule button in the board's header, beside the workflow context: when the workflow runs. On a past
+ * run it only shows the schedule.
+ */
+function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Schedule) => void}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Popover
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      placement="below"
+      width={420}
+      label="Schedule"
+      content={
+        onChange ? (
+          <VStack gap={3}>
+            <Text type="label">When should it run?</Text>
+            <ScheduleFields value={when ?? DEFAULT_SCHEDULE} onChange={onChange} />
+          </VStack>
+        ) : (
+          <VStack gap={1.5}>
+            <Text type="label">Schedule</Text>
+            <Text type="supporting">{when ? scheduleText(when) : 'No schedule'}</Text>
+          </VStack>
+        )
+      }>
+      <Button
+        label="Schedule"
+        tooltip={when ? `Schedule: ${scheduleText(when)}` : 'Schedule: not set yet'}
+        isIconOnly
+        icon={<Icon icon={CalendarClock} />}
+        onClick={() => !when && onChange?.(DEFAULT_SCHEDULE)}
+      />
+    </Popover>
+  );
+}
+
+/** Asks when a new workflow should run, the first time it is saved. Save is the only way out besides Cancel. */
+function ScheduleDialog({name, initial, onSave, onClose}: {name: string; initial: Schedule; onSave: (s: Schedule) => void; onClose: () => void}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <Dialog isOpen onOpenChange={open => !open && onClose()} width={480} purpose="form">
+      <Layout
+        height="auto"
+        header={<DialogHeader title="When should it run?" subtitle={`Pick a schedule for ${name}. You can change it later from the Schedule button.`} onOpenChange={open => !open && onClose()} />}
+        content={<LayoutContent padding={4}><ScheduleFields value={value} onChange={setValue} /></LayoutContent>}
+        footer={
+          <LayoutFooter padding={4}>
+            <HStack gap={2} hAlign="end">
+              <Button label="Cancel" variant="ghost" onClick={onClose} />
+              <Button label="Save" variant="primary" isDisabled={!isScheduleComplete(value)} onClick={() => onSave(value)} />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </Dialog>
   );
 }
 
@@ -1171,7 +1310,8 @@ export function toColumns(board: BoardNode[], links: Link[], sections: Section[]
 
 /** The board as it was when the workflow was turned on, so Edit can reopen it. */
 /** context is the workflow context: what it's for and the rules every LLM step follows, like a system prompt. */
-export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]; context?: string};
+/** when: the schedule picked from the board's Schedule button. A new workflow is saved only once it has one. */
+export type SavedBoard = {board: BoardNode[]; links: Link[]; sections?: Section[]; context?: string; when?: Schedule};
 
 /** Names of the shared data a saved board's own Input tiles read (tiles inside a dropped section don't count). */
 export const sharedInputsOf = (saved: SavedBoard): string[] =>
@@ -1230,6 +1370,10 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const [name, setName] = useState(editing?.name ?? 'Untitled workflow');
   // The workflow context, set from the header's context button. Every LLM step follows it.
   const [context, setContext] = useState(editing?.saved?.context ?? '');
+  // When it runs, set from the header's Schedule button. A new workflow has none until it's picked.
+  const [when, setWhen] = useState<Schedule | undefined>(editing?.saved?.when);
+  // Set while Save asks a new workflow when it should run.
+  const [isAskingSchedule, setIsAskingSchedule] = useState(false);
   const [board, setBoard] = useState<BoardNode[]>(() => editing?.saved?.board ?? startingBoard(startData));
   const [sections, setSections] = useState<Section[]>(() => editing?.saved?.sections ?? []);
   // A Handoff's right dot comes and goes with other workflows on the board. React Flow only learns a tile's
@@ -1243,10 +1387,10 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   }, [hasOtherWorkflows]);
   const [links, setLinks] = useState<Link[]>(() => editing?.saved?.links ?? startingLinks(board));
   // What the workflow looked like when editing started. Tile sizes are left out: the board measures them itself.
-  const snapshot = (n: string, c: string, b: BoardNode[], l: Link[], sec: Section[]) =>
-    JSON.stringify([n.trim(), c.trim(), b.map(({id, step, position}) => ({id, step, position})), l, sec.map(({id, position}) => ({id, position}))]);
-  const [original] = useState(() => snapshot(name, context, board, links, sections));
-  const isDirty = snapshot(name, context, board, links, sections) !== original;
+  const snapshot = (n: string, c: string, b: BoardNode[], l: Link[], sec: Section[], s?: Schedule) =>
+    JSON.stringify([n.trim(), c.trim(), s ?? null, b.map(({id, step, position}) => ({id, step, position})), l, sec.map(({id, position}) => ({id, position}))]);
+  const [original] = useState(() => snapshot(name, context, board, links, sections, when));
+  const isDirty = snapshot(name, context, board, links, sections, when) !== original;
   // Where the person asked to go while the board has unsaved changes. Set, it opens the discard check.
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   const leaveTo = (href: string) => (isDirty ? setLeavingTo(href) : (window.location.hash = href.slice(1)));
@@ -1260,6 +1404,12 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const [checked, setChecked] = useState<string[]>([]);
   const isTried = trial === 'done';
   const finalName = name.trim() || 'Untitled workflow';
+  const saveNew = (s: Schedule) => {
+    setWhen(s);
+    setIsAskingSchedule(false);
+    onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context, when: s});
+    toast({body: `${finalName} is saved to your library. Schedule: ${scheduleText(s)}.`});
+  };
   useEffect(() => {
     if (trial !== 'done') setChecked([]);
   }, [trial]);
@@ -1607,6 +1757,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   );
   const actions = viewRun ? (
     <HStack gap={2} wrap="wrap">
+      <ScheduleButton when={when} />
       <ContextButton context={context} />
       <Button label="Edit workflow" tooltip="Edit workflow" isIconOnly icon={<Icon icon={Pencil} />} href={viewRun.editHref} />
     </HStack>
@@ -1619,6 +1770,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           onClick={() => leaveTo(editing.href)}
         />
       )}
+      <ScheduleButton when={when} onChange={setWhen} />
       <ContextButton context={context} onChange={setContext} />
       <Button
         label={trial === 'done' ? 'Try again' : 'Try on last month'}
@@ -1641,7 +1793,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           isDisabled={!isDirty || !allReady}
           tooltip={!isDirty ? 'Save changes: nothing has changed yet' : !allReady ? 'Save changes: finish the tiles first' : 'Save changes'}
           onClick={() => {
-            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context});
+            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context, when});
             toast({body: `Changes to ${finalName} are saved.`});
           }}
         />
@@ -1653,10 +1805,8 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           isIconOnly
           isDisabled={!allReady}
           tooltip={allReady ? 'Save: adds it to your library' : 'Save: finish the tiles first'}
-          onClick={() => {
-            onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context});
-            toast({body: `${finalName} is saved to your library.`});
-          }}
+          // A new workflow is saved once it knows when to run: without a schedule, Save asks first.
+          onClick={() => (when && isScheduleComplete(when) ? saveNew(when) : setIsAskingSchedule(true))}
         />
       )}
     </HStack>
@@ -1717,6 +1867,9 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           )
         }
       />
+      {isAskingSchedule && (
+        <ScheduleDialog name={finalName} initial={when ?? DEFAULT_SCHEDULE} onSave={saveNew} onClose={() => setIsAskingSchedule(false)} />
+      )}
       <AlertDialog
         isOpen={leavingTo !== null}
         onOpenChange={open => !open && setLeavingTo(null)}
