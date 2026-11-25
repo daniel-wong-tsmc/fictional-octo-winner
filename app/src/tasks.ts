@@ -1,8 +1,9 @@
-import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
+import {STATUSES, type StatusTone} from '@workspace/astryx-workflows/components/StatusText';
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
 import {stepPosition} from './workflow';
 import {shortDateTime} from './dates';
+import {NOT_SCHEDULED} from './schedule';
 import {personName, sharedHref, type SharedData} from './sharedData';
 
 export {shortDateTime};
@@ -17,6 +18,7 @@ export type BoardWorkflow = {
 };
 
 const LANE_OF: Record<TicketCondition, WorkflowBoardState> = {
+  failed: 'failed',
   needsApproval: 'needsApproval',
   missingData: 'missingData',
   complete: 'complete',
@@ -36,7 +38,7 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
     .sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt))
     .map(w =>
       w.isDraft
-        ? {id: `next-${w.key}`, workflow: w.name, state: 'draft', href: w.href}
+        ? {id: `next-${w.key}`, workflow: w.name, state: 'draft', schedule: w.nextRunAt || w.schedule === NOT_SCHEDULED ? undefined : w.schedule, href: w.href}
         : !w.nextRunAt
         ? {id: `next-${w.key}`, workflow: w.name, state: 'unscheduled', href: w.href}
         : {id: `next-${w.key}`, workflow: w.name, state: 'scheduled', schedule: w.schedule, at: shortDateTime(w.nextRunAt), href: w.href},
@@ -79,12 +81,12 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
 
 /** How many cards are in Needs attention: the number Home shows in the sidebar. */
 export const attentionCount = (items: WorkflowBoardItem[]) =>
-  items.filter(i => i.state === 'needsApproval' || i.state === 'missingData' || i.state === 'upstreamFailed').length;
+  items.filter(i => i.state === 'failed' || i.state === 'needsApproval' || i.state === 'missingData' || i.state === 'upstreamFailed').length;
 
 /** The last run of a tile that has a ticket, as the board's side panel shows it. */
 export type TileRun = {
   ticketId: number;
-  tone: 'info' | 'success' | 'warning' | 'neutral';
+  tone: StatusTone;
   label: string;
   /** When it ran, or who approved it. */
   ran: string;
@@ -95,6 +97,7 @@ export type TileRun = {
 // A step's last run, in the shared statuses: a step that has never run is "Not run yet".
 const RUN_STATUS = {
   needsApproval: STATUSES.needsApproval,
+  failed: STATUSES.failed,
   complete: STATUSES.done,
   missingData: STATUSES.missingData,
   notRun: STATUSES.neverRun,

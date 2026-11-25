@@ -5,6 +5,7 @@
 
 import {upstreamFailedLine} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {PEOPLE, PREFILLED_WORKFLOWS} from './workflow';
+import {scheduleText} from './schedule';
 import type {WorkflowDataFormat} from '@workspace/astryx-workflows/components/WorkflowTile';
 
 
@@ -50,10 +51,11 @@ const ENTRIES: Omit<SharedData, 'lastRun'>[] = [
       asOf: '2026-11-17T09:30',
       columns: ['Region', 'Q4 target (USD)', 'Q3 actual (USD)', 'Change'],
       rows: [
-        ['North America', '4,200,000', '3,850,000', '+9.1%'],
-        ['Europe', '3,100,000', '2,960,000', '+4.7%'],
-        ['APAC', '2,400,000', '2,050,000', '+17.1%'],
-        ['LATAM', '900,000', '870,000', '+3.4%'],
+        ['US', '5,600,000', '5,420,000', '+3.3%'],
+        ['Europe', '3,750,000', '3,520,000', '+6.5%'],
+        ['UK', '1,850,000', '1,760,000', '+5.1%'],
+        ['Japan', '1,270,000', '1,170,000', '+8.5%'],
+        ['Canada', '920,000', '880,000', '+4.5%'],
       ],
     },
   },
@@ -69,15 +71,16 @@ const ENTRIES: Omit<SharedData, 'lastRun'>[] = [
       {started: '2026-11-02T07:00', finished: '2026-11-02T07:14', result: 'ready'},
     ],
     description: 'Every open sales deal in the CRM, totalled by region, with the value expected to close this quarter.',
-    updates: 'Every Monday at 07:00',
+    updates: scheduleText({repeat: 'weekly', days: ['Monday'], time: '07:00'}),
     preview: {
       asOf: '2026-11-16T07:15',
       columns: ['Region', 'Open deals', 'Pipeline (USD)', 'Closing this quarter (USD)'],
       rows: [
-        ['North America', '142', '6,850,000', '2,310,000'],
+        ['US', '142', '6,850,000', '2,310,000'],
         ['Europe', '118', '4,920,000', '1,480,000'],
-        ['APAC', '97', '3,760,000', '1,290,000'],
-        ['LATAM', '41', '1,180,000', '390,000'],
+        ['UK', '64', '2,140,000', '720,000'],
+        ['Japan', '39', '1,620,000', '540,000'],
+        ['Canada', '35', '1,180,000', '390,000'],
       ],
     },
   },
@@ -93,7 +96,7 @@ const ENTRIES: Omit<SharedData, 'lastRun'>[] = [
       {started: '2026-11-02T07:30', finished: '2026-11-02T07:38', result: 'ready'},
     ],
     description: 'Customer accounts likely to cancel or not renew, with the reason they were flagged and who owns each account.',
-    updates: 'Every Monday at 07:30',
+    updates: scheduleText({repeat: 'weekly', days: ['Monday'], time: '07:30'}),
     preview: {
       asOf: '2026-11-09T07:40',
       columns: ['Account', 'Account owner', 'Risk', 'Reason'],

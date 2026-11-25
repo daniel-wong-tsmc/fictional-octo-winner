@@ -10,7 +10,7 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, CircleAlert, CircleCheck, Clock, Inbox} from 'lucide-react';
 
 /** Where a workflow run stands. The board picks the lane and the wording from this. */
-export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'draft' | 'dataReady' | 'dataFailed' | 'upstreamFailed' | 'needsApproval' | 'missingData' | 'complete';
+export type WorkflowBoardState = 'scheduled' | 'unscheduled' | 'draft' | 'dataReady' | 'dataFailed' | 'upstreamFailed' | 'failed' | 'needsApproval' | 'missingData' | 'complete';
 
 /**
  * One card on the board: a workflow's next run, data someone else's workflow handed you, or a run that needs
@@ -28,7 +28,7 @@ export type WorkflowBoardItem = {
   /** The step the card is about, counting from 1, and how many steps the workflow has. */
   stepNumber?: number;
   stepCount?: number;
-  /** For a scheduled run: when the workflow runs, such as "Every Monday, 8:00". */
+  /** For a scheduled run or a draft: when the workflow runs, such as "Every Monday, 8:00". */
   schedule?: string;
   /** The date and time that goes with the state, such as "Nov 2, 08:30". */
   at?: string;
@@ -40,13 +40,19 @@ export type WorkflowBoardProps = {
   items: WorkflowBoardItem[];
 };
 
+/** What a workflow without a schedule says, here and on its page. */
+export const NOT_SCHEDULED = 'Not scheduled';
+/** How a workflow without a schedule runs, here and on its page. */
+export const RUNS_WHEN_STARTED = 'Runs when you press Run now';
+
 const STATE: Record<WorkflowBoardState, {dot: 'info' | 'success' | 'warning' | 'error' | 'neutral'; step: string; when: string}> = {
-  scheduled: {dot: 'neutral', step: '', when: 'Next run'},
-  unscheduled: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
-  draft: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
+  scheduled: {dot: STATUSES.on.tone, step: '', when: 'Next run'},
+  unscheduled: {dot: STATUSES.on.tone, step: '', when: NOT_SCHEDULED},
+  draft: {dot: STATUSES.draft.tone, step: '', when: NOT_SCHEDULED},
   dataReady: {dot: STATUSES.ready.tone, step: '', when: STATUSES.ready.label},
   dataFailed: {dot: STATUSES.failed.tone, step: '', when: STATUSES.failed.label},
-  upstreamFailed: {dot: STATUSES.failed.tone, step: '', when: STATUSES.notRun.label},
+  upstreamFailed: {dot: STATUSES.failed.tone, step: '', when: STATUSES.failed.label},
+  failed: {dot: STATUSES.failed.tone, step: 'failed', when: STATUSES.failed.label},
   needsApproval: {dot: 'info', step: 'needs approval', when: 'Notified'},
   missingData: {dot: 'warning', step: 'is missing data', when: 'Notified'},
   complete: {dot: 'success', step: 'ran completely', when: 'Finished'},
@@ -68,7 +74,7 @@ const LANES: {title: string; icon: typeof Clock; empty: string; groups: {title?:
     ],
   },
   {title: 'New data ready for use', icon: Inbox, empty: 'No new data has been shared with you.', groups: [{states: ['dataReady', 'dataFailed']}]},
-  {title: 'Needs attention', icon: CircleAlert, empty: 'Nothing needs you right now.', groups: [{states: ['upstreamFailed', 'needsApproval', 'missingData']}]},
+  {title: 'Needs attention', icon: CircleAlert, empty: 'Nothing needs you right now.', groups: [{states: ['failed', 'upstreamFailed', 'needsApproval', 'missingData']}]},
   {title: 'Done', icon: CircleCheck, empty: 'Finished runs show here.', groups: [{states: ['complete']}]},
 ];
 
@@ -83,12 +89,13 @@ export function boardLine(item: WorkflowBoardItem): string {
   const s = STATE[item.state];
   if (item.stepNumber && item.stepCount) return `Step ${item.stepNumber} of ${item.stepCount} ${s.step}`;
   if (item.state === 'draft') return 'Draft, not turned on yet';
-  return item.state === 'unscheduled' ? 'Runs when you start it' : item.state === 'complete' ? 'Ran completely' : s.step;
+  return item.state === 'unscheduled' ? RUNS_WHEN_STARTED : item.state === 'complete' ? 'Ran completely' : s.step;
 }
 
-/** "Next run Dec 1, 08:00", "Notified Nov 2, 08:30", or "Not scheduled". */
+/** "Next run Dec 1, 08:00", "Notified Nov 2, 08:30", "Every Monday, 8:00 once turned on" or "Not scheduled". */
 export function boardWhen(item: WorkflowBoardItem): string {
   const s = STATE[item.state];
+  if (item.state === 'draft' && item.schedule) return `${item.schedule}, once turned on`;
   return item.at ? `${s.when} ${item.at}` : s.when;
 }
 

@@ -4,17 +4,19 @@ import {Heading, Text} from '@astryxdesign/core/Text';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {Sparkles} from 'lucide-react';
 import {useState} from 'react';
+import {NOW} from '../schedule';
 import {WorkflowBoard, type WorkflowBoardItem} from '@workspace/astryx-workflows/components/WorkflowBoard';
 
 function greeting(): string {
-  const h = new Date().getHours();
+  const h = NOW.getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
 /** Home: the agent box, then the board of workflow runs in four lanes. */
 export function HomePage({items}: {items: WorkflowBoardItem[]}) {
   const [ask, setAsk] = useState('');
-  const today = new Date().toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
+  // The prototype's today, the same one every schedule and next run counts from.
+  const today = NOW.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric'});
 
   return (
     <Layout

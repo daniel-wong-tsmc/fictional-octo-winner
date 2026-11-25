@@ -24,13 +24,13 @@ export default {
     {name: 'detailLayout', type: "'inline' | 'stacked'", description: 'inline puts each label beside its value, for wide tiles such as those on a board; stacked puts it above, for narrow ones. Labels and order stay the same.', default: "'stacked'"},
     {name: 'width', type: 'number | string', description: 'Tile width.', default: "'100%'"},
     {name: 'elevation', type: "'none' | 'low' | 'high'", description: 'Raised for a tile that is selected or needs attention.', default: "'none'"},
-    {name: 'emphasis', type: "'failed' | 'muted'", description: 'How much the tile stands out. failed turns it red and raises it, for the tile where a run stopped; muted greys it, for tiles that didn’t run. Leave it out for a normal tile.'},
+    {name: 'emphasis', type: "'failed' | 'muted'", description: 'How much the tile stands out. failed turns it red and raises it, for the tile where a run failed; muted greys it, for tiles that didn’t run. Leave it out for a normal tile.'},
     {name: 'onClick', type: '() => void', description: 'Makes the whole tile a button.'},
   ],
   examples: [
     {
       label: 'One tile of each kind',
-      code: `<WorkflowTile content={{kind: 'input', source: 'Shopify', via: 'mcp', reads: 'Orders, last month'}} />
+      code: `<WorkflowTile content={{kind: 'input', source: 'Shopify', via: 'mcp', reads: 'Orders, last month'}} /> {/* shows Data type: Table from Shopify, Name: Orders, last month */}
 <WorkflowTile content={{kind: 'step', number: 2, name: 'Convert to USD', instructions: 'Convert each order to US dollars.'}} />
 <WorkflowTile content={{kind: 'output', name: 'October summary', format: 'Excel sheet', approver: 'Daniel (you)', sendTo: ['Priya Shah']}} />`,
     },

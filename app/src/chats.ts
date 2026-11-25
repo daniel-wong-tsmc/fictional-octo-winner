@@ -38,7 +38,7 @@ export const CHATS: Chat[] = [
     updatedAt: '2026-11-12T14:22',
     turns: [
       {sender: 'user', text: 'Which exchange rate does the Convert to USD step use?'},
-      {sender: 'assistant', text: 'The ECB rate on each order’s date. For orders on weekends it uses Friday’s rate, because the ECB does not publish on weekends. In October that applied to 112 orders.'},
+      {sender: 'assistant', text: 'The ECB rate on each order’s date. For orders on weekends it uses Friday’s rate, because the ECB does not publish on weekends. In October that applied to 412 orders.'},
     ],
   },
   {
@@ -47,7 +47,7 @@ export const CHATS: Chat[] = [
     updatedAt: '2026-10-01T09:30',
     turns: [
       {sender: 'user', text: 'Which regions missed target in September?'},
-      {sender: 'assistant', text: 'Europe and Japan. Europe was 4.1% below and Japan 2.3% below. The US, UK and Canada were above target.'},
+      {sender: 'assistant', text: 'Japan and Europe. Japan was 5.3% below and Europe 1.7% below. The US, UK and Canada were above target.'},
     ],
   },
 ];

@@ -122,7 +122,7 @@ function OutputUserRow({workflow, owner, values}: {workflow: string; owner: stri
           <Text type="supporting">{`Belongs to ${owner === PEOPLE[0] ? 'you' : owner}`}</Text>
           <Text type="supporting" hasTabularNumbers>{`Uses ${values.map(v => `${v.name} (${v.value ?? 'no value yet'})`).join(', ')}`}</Text>
           {failed && (
-            <StatusText status={{tone: 'error', label: 'Check failed'}} note={`${CHECK_LABEL[failed.check]}. ${failed.checkFailure} It waits until this passes.`} />
+            <StatusText status={{tone: 'error', label: 'Check failed'}} note={`${CHECK_LABEL[failed.check]}. ${failed.checkFailure} It can’t run until this passes.`} />
           )}
         </VStack>
       }
@@ -375,7 +375,7 @@ export function TicketPage({
               <Banner
                 status="error"
                 title={`${failedChecks.length === 1 ? 'A shared value check failed' : `${failedChecks.length} shared value checks failed`}.`}
-                description={`${failedChecks.map(h => `${h.name}: ${h.checkFailure}`).join(' ')} Workflows that use it are waiting.`}
+                description={`${failedChecks.map(h => `${h.name}: ${h.checkFailure}`).join(' ')} Workflows that use it can’t run until it passes.`}
                 collapsible={false}
               />
             )}
@@ -433,7 +433,7 @@ export function TicketPage({
               <Region title="Outputs" isFullHeight>
                 {/* Step 1: the result, always passed on */}
                 <VStack gap={1.5}>
-                  <Text type="label">Result</Text>
+                  <Text type="label">Output</Text>
                   <Text type="supporting">The full output. Always passed on to the next step in this workflow.</Text>
                 </VStack>
                 <List edge="outset">
@@ -460,7 +460,7 @@ export function TicketPage({
 
             {/* Sheets: output first (what you approve), inputs collapsed */}
             <Workbook
-              title="Output results"
+              title="Output data"
               description="What the agent writes. Read only; change the instructions to change these."
               sheets={outputSheets}
               selected={outputSheet}

@@ -10,7 +10,7 @@ export default {
       'The full page for one workflow: on/off state and next run, schedule, approvers and destinations, then its recent runs. It includes Run now, Edit workflow and Delete workflow (with a confirm step). Its tiles are not shown here; Edit workflow opens them on the board. It is built from the same parts as SharedDataOverview, so the two pages read alike. Use it for every workflow page, prefilled or user-built, so they all look the same. Use the workflow builder board to create or change a workflow.',
     bestPractices: [
       {guidance: true, description: 'Read approvers and sendTo from the workflow’s Handoff tiles, so the page matches the board.'},
-      {guidance: true, description: 'Pass runs newest first, with a result that says what happened, such as where a run stopped.'},
+      {guidance: true, description: 'Pass runs newest first, with a result that says what happened, such as the step where a run failed.'},
       {guidance: false, description: 'Build a workflow page by hand. Map the workflow into these props instead.'},
     ],
   },

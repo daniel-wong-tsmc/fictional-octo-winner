@@ -33,7 +33,7 @@ import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {SegmentedControl, SegmentedControlItem} from '@astryxdesign/core/SegmentedControl';
 import {ToggleButton} from '@astryxdesign/core/ToggleButton';
 import {TimeInput, type ISOTimeString} from '@astryxdesign/core/TimeInput';
-import {DEFAULT_SCHEDULE, WEEKDAYS, monthDayLabel, nextRunOf, nextRunText, scheduleText, type MonthDay, type Schedule} from '../schedule';
+import {DEFAULT_SCHEDULE, NOT_SCHEDULED, RUNS_WHEN_STARTED, WEEKDAYS, monthDayLabel, nextRunOf, nextRunText, scheduleText, type MonthDay, type Schedule} from '../schedule';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
@@ -43,7 +43,7 @@ import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type S
 import {shortDateTime} from '../tasks';
 import {CalendarClock, ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
 import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, type BuiltStage, type Workflow} from '../workflow';
-import {TICKETS, type Sheet} from '../data';
+import {ORDERS_USD_OCTOBER, TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
 import {TILE_RUN_STATUS, type TileRunDetail} from '../runs';
 import {AgentDidList, ShowCode} from './runParts';
@@ -116,39 +116,24 @@ function isReady(s: Step): boolean {
 
 /** "Try on last month" runs on the last full month. Today is in November 2026. */
 const TRIAL_MONTH = 'October 2026';
-const TRIAL_ORDERS: Sheet = {
-  kind: 'Output',
-  columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'],
-  addedColumns: [5],
-  rows: [
-    ['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,240.00', '1,344.28'],
-    ['SO-47118', '2026-10-02', 'Japan', 'JPY', '182,500', '1,208.15'],
-    ['SO-47240', '2026-10-06', 'UK', 'GBP', '860.50', '1,111.34'],
-    ['SO-47311', '2026-10-09', 'Europe', 'EUR', '312.00', '337.96'],
-    ['SO-47506', '2026-10-15', 'Canada', 'CAD', '2,045.75', '1,487.46'],
-    ['SO-47622', '2026-10-20', 'US', 'USD', '975.00', '975.00'],
-    ['SO-47815', '2026-10-27', 'UK', 'GBP', '4,120.00', '5,327.16'],
-    ['SO-47930', '2026-10-31', 'Europe', 'EUR', '58.90', '64.00'],
-  ],
-};
 const TRIAL_SUMMARY: Sheet = TICKETS[3].sheets['October summary'];
 
 type TrialResult = {line: string; sheet?: Sheet; rowsShown?: string};
 
 /** What each tile produced on the trial. The last LLM step and every Handoff tile end with the summary. */
 function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResult {
-  if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'shared' ? '5 rows read' : node.step.source === 'mcp' ? '60 rows read' : '4,988 rows read'};
+  if (node.step.kind === 'input') return {line: node.step.source === 'workflow' ? '1 value read' : node.step.source === 'shared' ? '5 rows read' : node.step.source === 'mcp' ? '60 rows read' : '5,402 rows read'};
   if (node.step.kind === 'instructions') {
     const feedsOutput = links.some(l => l.source === node.id && board.find(n => n.id === l.target)?.step.kind === 'output');
     return feedsOutput
       ? {line: '5 rows: sales by region against target', sheet: TRIAL_SUMMARY}
-      : {line: '4,988 rows, 1 column added', sheet: TRIAL_ORDERS, rowsShown: `First ${TRIAL_ORDERS.rows!.length} of 4,988 rows`};
+      : {line: '5,402 rows, 1 column added', sheet: ORDERS_USD_OCTOBER, rowsShown: `First ${ORDERS_USD_OCTOBER.rows!.length} of 5,402 rows`};
   }
   return {line: `${node.step.name || 'Output'}, 5 rows`, sheet: TRIAL_SUMMARY};
 }
 
 /** The button that opens a tile's trial output. Same words on the tile and in the side panel. */
-const trialButtonLabel = (step: Step) => (step.kind === 'output' ? 'See output' : 'See result');
+const trialButtonLabel = (_step: Step) => 'See output';
 
 function sendSentence(s: OutputStep): string {
   const to = s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet (type who gets it in the tile)';
@@ -207,8 +192,8 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   const action = step.kind === 'instructions' && data.onRunStep ? (
     <Button
       className="nodrag"
-      label="Run this step"
-      tooltip={canRunStep ? `Run only this step on ${TRIAL_MONTH} data. Nothing is sent.` : 'Run this step: give it instructions and connect both sides first'}
+      label="Try this step"
+      tooltip={canRunStep ? `Try this step: runs only this step on ${TRIAL_MONTH} data, without sending anything` : 'Try this step: give it instructions and connect both sides first'}
       variant="ghost"
       size="sm"
       isIconOnly
@@ -384,7 +369,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
                   <Button
                     label={`Ask ${personName(d.owner)}`}
                     size="sm"
-                    onClick={() => toast({body: `Asked ${personName(d.owner)} to check ${d.workflow}. Your step waits until it produces an output.`})}
+                    onClick={() => toast({body: `Asked ${personName(d.owner)} to check ${d.workflow}. Your step can’t run until it produces an output.`})}
                   />
                 </HStack>
               </VStack>
@@ -392,7 +377,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
           </VStack>
         )}
         <HStack>
-          <Button label="Use a file or app instead" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
+          <Button label="Use a different source" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
         </HStack>
       </VStack>
     );
@@ -407,7 +392,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
           <Text type="supporting">That workflow hands this value over each time it runs. Change it from that workflow’s output.</Text>
         </VStack>
         <HStack>
-          <Button label="Use a file or app instead" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
+          <Button label="Use a different source" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
         </HStack>
       </VStack>
     );
@@ -438,7 +423,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
           </VStack>
         )}
         <HStack>
-          <Button label="Connect an app instead" variant="ghost" icon={<Icon icon={Plug} />} onClick={chooseApp} />
+          <Button label="Use a different source" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
         </HStack>
       </VStack>
     );
@@ -458,7 +443,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
         <HStack gap={1.5} vAlign="center" hAlign="between" wrap="wrap">
           <StatusText
             status={app.isConnected ? {tone: 'success', label: 'Connected'} : {tone: 'warning', label: 'App not connected'}}
-            note={app.isConnected ? 'through MCP. Read only.' : 'This app isn’t connected yet. The step waits until it is.'}
+            note={app.isConnected ? 'through MCP. Read only.' : 'This app isn’t connected yet. The step can’t run until it is.'}
           />
           {!app.isConnected && (
             <Button label="Request access" size="sm" onClick={() => toast({body: `Asked your workspace admin to connect ${app.name}. You can keep building meanwhile.`})} />
@@ -467,7 +452,7 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
       )}
       {app && <Selector label="What to read" options={app.reads} value={step.resource} onChange={resource => onChange({...step, resource})} />}
       <HStack>
-        <Button label="Upload a file instead" variant="ghost" icon={<Icon icon={Upload} />} onClick={chooseUpload} />
+        <Button label="Use a different source" variant="ghost" onClick={() => onChange({...step, source: null, app: '', resource: ''})} />
       </HStack>
     </VStack>
   );
@@ -577,11 +562,20 @@ function StepPageButton({ticketId, forStep}: {ticketId: number; forStep?: string
   );
 }
 
+/** A tile's details under the same labels the tile uses, such as Data type and Name, so tile and panel agree. */
+function TileDetails({content}: {content: WorkflowTileContent}) {
+  return (
+    <MetadataList>
+      {tileText(content).details.map(d => <MetadataListItem key={d.label} label={d.label}>{d.value}</MetadataListItem>)}
+    </MetadataList>
+  );
+}
+
 /**
  * The side panel for a tile when the board shows a past run: how it went, the numbers it worked with, what the
  * agent did and why it stopped, a few rows of what it made, and the code it ran. Nothing here can be edited.
  */
-function RunTilePanel({step, title, run}: {step: Step | null; title: string; run?: TileRunDetail}) {
+function RunTilePanel({step, title, content, run}: {step: Step | null; title: string; content?: WorkflowTileContent; run?: TileRunDetail}) {
   if (!step) {
     return <EmptyState isCompact title="Select a tile" description="Click a tile to see how it did in this run." />;
   }
@@ -596,11 +590,12 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
         <StepPageButton ticketId={run.ticketId} forStep={step.kind === 'input' ? TICKETS[run.ticketId].step : undefined} />
       )}
 
+      {content && <TileDetails content={content} />}
       {!run && <Text type="supporting">This tile wasn’t part of this run.</Text>}
       {run?.problem && (
         <Banner
           status={run.status === 'failed' ? 'error' : 'info'}
-          title={run.status === 'failed' ? 'Why it failed' : run.status === 'notRun' ? 'Why it didn’t run' : 'Waiting'}
+          title={run.status === 'failed' ? 'Why it failed' : run.status === 'notRun' ? 'Why it didn’t run' : STATUSES[TILE_RUN_STATUS[run.status]].label}
           description={run.problem}
           collapsible={false}
         />
@@ -636,11 +631,17 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
  * The side panel for the selected tile: its settings (for an LLM step, the agent's instructions) and its last
  * run when it has a ticket. What it connects to shows on the board as lines, so the panel doesn't list it.
  */
-function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRemove}: {
+function StepPanel({tileId, step, title, content, stepTrial, sectionTitle, run, trial, onOpenTrial, onChange, onRemove}: {
   /** The selected tile, so per-tile state such as a code edit in progress resets when the selection moves. */
   tileId: string;
   step: Step | null;
   title: string;
+  /** What the tile shows, so the panel can show the same details under the same labels. */
+  content?: WorkflowTileContent;
+  /** How trying only this step went, from its play button. */
+  stepTrial?: StepTrial;
+  /** Set for a tile inside a saved workflow dropped on the board: it's a copy. */
+  sectionTitle?: string;
   run?: TileRun;
   trial: TrialResult | null;
   onOpenTrial: () => void;
@@ -654,6 +655,12 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
   return (
     <VStack gap={4}>
       <TileHeading icon={info.icon} kind={info.label} title={title} />
+      {sectionTitle && (
+        <Text type="supporting">{`A copy of a tile from ${sectionTitle}. Changes here change only this board, not the saved workflow.`}</Text>
+      )}
+      {stepTrial === 'failed' && (
+        <Banner status="error" title={STATUSES.failed.label} description="Please run previous step." collapsible={false} />
+      )}
 
       {run && (
         <>
@@ -670,7 +677,7 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
       {trial && (
         <>
           <VStack gap={1.5}>
-            <Text type="label">{`Trial result, ${TRIAL_MONTH}`}</Text>
+            <Text type="label">{`Tried on ${TRIAL_MONTH}`}</Text>
             <Text>{trial.line}</Text>
             {step.kind === 'output' && <Text type="supporting">{`Not sent. ${sendSentence(step)}`}</Text>}
             {trial.sheet && (
@@ -683,11 +690,17 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
         </>
       )}
 
-      {step.kind === 'input' && <InputPanel step={step} onChange={onChange} />}
+      {step.kind === 'input' && (
+        <>
+          <Text type="label">Data</Text>
+          {content && step.source && <TileDetails content={content} />}
+          <InputPanel step={step} onChange={onChange} />
+        </>
+      )}
 
       {step.kind === 'instructions' && (
         <>
-          <Text type="label">Agent instructions</Text>
+          <Text type="label">Instructions</Text>
           <TextInput
             label="Step name"
             description="Optional. A short name shows on the tile next to the step number."
@@ -695,7 +708,7 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
             onChange={name => onChange({...step, name})}
           />
           <TextArea
-            label="What should the AI do?"
+            label="What should the agent do?"
             description="Plain words, like you’d tell a colleague. It can use everything that flows into this tile, and it follows the workflow context (top right)."
             value={step.text}
             onChange={text => onChange({...step, text})}
@@ -729,9 +742,9 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
           <Divider />
           <Text type="label">Who gets it</Text>
           <Switch label="Needs approval before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
-          {step.needsOk && <Selector label="Who approves it" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
+          {step.needsOk && <Selector label="Approver" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
           <Tokenizer
-            label="Send it to"
+            label="Sends to"
             description="Type a person’s name or email, then press Enter."
             placeholder="Name or email"
             searchSource={SEND_SOURCE}
@@ -762,8 +775,8 @@ function TrialDialog({title, step, trial, onClose}: {title: string; step: Step; 
         height="auto"
         header={
           <DialogHeader
-            title={isOutput ? `Output: ${title}` : `Result: ${title}`}
-            subtitle={`Trial on ${TRIAL_MONTH} data. ${trial.rowsShown ?? trial.line}.`}
+            title={`Output: ${title}`}
+            subtitle={`Tried on ${TRIAL_MONTH} data. ${trial.rowsShown ?? trial.line}.`}
             onOpenChange={open => !open && onClose()}
           />
         }
@@ -966,24 +979,44 @@ function boardSummary(saved: SavedBoard): string {
  */
 function ContextButton({context, onChange}: {context: string; onChange?: (context: string) => void}) {
   const [isOpen, setIsOpen] = useState(false);
+  // Like the Schedule box: changes stay in the box until Save, and closing it drops them.
+  const [draft, setDraft] = useState(context);
+  const open = (next: boolean) => {
+    if (next) setDraft(context);
+    setIsOpen(next);
+  };
   const isEmpty = !context.trim();
   return (
     <Popover
       isOpen={isOpen}
-      onOpenChange={setIsOpen}
+      onOpenChange={open}
       placement="below"
       width={420}
       label="Workflow context"
       content={
         onChange ? (
-          <TextArea
-            label="Workflow context"
-            description="Like a system prompt: what this workflow is for, who it’s for, and rules every LLM step should follow."
-            placeholder="For example: This prepares the monthly sales close for Finance. Report amounts in US dollars and keep regions as Sales names them."
-            value={context}
-            onChange={onChange}
-            rows={8}
-          />
+          <VStack gap={3}>
+            <TextArea
+              label="Workflow context"
+              description="Optional. Like a system prompt: what this workflow is for, who it’s for, and rules every LLM step should follow."
+              placeholder="For example: This prepares the monthly sales close for Finance. Report amounts in US dollars and keep regions as Sales names them."
+              value={draft}
+              onChange={setDraft}
+              rows={8}
+            />
+            <HStack gap={2} hAlign="end">
+              <Button label="Cancel" variant="ghost" size="sm" onClick={() => open(false)} />
+              <Button
+                label="Save"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  onChange(draft);
+                  open(false);
+                }}
+              />
+            </HStack>
+          </VStack>
         ) : (
           <VStack gap={1.5}>
             <Text type="label">Workflow context</Text>
@@ -1110,7 +1143,7 @@ function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Sched
         ) : (
           <VStack gap={1.5}>
             <Text type="label">Schedule</Text>
-            <Text type="supporting">{when ? scheduleText(when) : 'No schedule'}</Text>
+            <Text type="supporting">{when ? scheduleText(when) : NOT_SCHEDULED}</Text>
           </VStack>
         )
       }>
@@ -1176,7 +1209,7 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onOpen}: {
         gap={2}
         startContent={
           <HStack gap={2} vAlign="center">
-            {!isSmall && <Text type="supporting" weight="medium">Nodes</Text>}
+            {!isSmall && <Text type="supporting" weight="medium">Tiles</Text>}
             <HStack gap={1}>
               {KINDS.map(kind => {
                 const info = KIND_INFO[kind];
@@ -1440,6 +1473,21 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   // Where the person asked to go while the board has unsaved changes. Set, it opens the discard check.
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   const leaveTo = (href: string) => (isDirty ? setLeavingTo(href) : (window.location.hash = href.slice(1)));
+  // Every link that leaves the board (breadcrumbs, the sidebar, Open step page) asks first while there are
+  // unsaved changes, the same as Cancel.
+  useEffect(() => {
+    if (!isDirty || isRun) return;
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.('a[href^="#"]');
+      const href = a?.getAttribute('href');
+      if (!href || href === window.location.hash) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeavingTo(href);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [isDirty, isRun]);
   const [selectedId, setSelectedId] = useState<string | null>(() => (selectTile && board.some(n => n.id === selectTile) ? selectTile : null));
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
@@ -1465,7 +1513,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     setWhen(s);
     setIsAskingSchedule(false);
     onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context, when: s});
-    toast({body: `${finalName} is saved to your library. ${s ? `Schedule: ${scheduleText(s)}.` : 'No schedule yet: it runs when you start it.'}`});
+    toast({body: `${finalName} is saved to your library. ${s ? `Schedule: ${scheduleText(s)}.` : `${NOT_SCHEDULED}. ${RUNS_WHEN_STARTED}.`}`});
   };
   useEffect(() => {
     if (trial !== 'done') setChecked([]);
@@ -1490,7 +1538,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const nextHint = !board.some(n => n.step.kind === 'input' && isReady(n.step))
     ? 'Start here: select the Input tile and add your data.'
     : !count('instructions')
-      ? 'Next: drag an LLM node from the toolbar.'
+      ? 'Next: drag an LLM tile from the toolbar.'
       : !count('output')
         ? 'Next: drag a Handoff node from the toolbar, or click it there to add one after the last LLM step.'
         : !allLinked
@@ -1652,8 +1700,9 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     })),
     ...tileNodes,
   ];
+  const contentOf = (id: string) => tileNodes.find(n => n.id === id)?.data.content;
   const titleOf = (id: string) => {
-    const content = tileNodes.find(n => n.id === id)?.data.content;
+    const content = contentOf(id);
     return content ? tileText(content).title : '';
   };
   const viewing = board.find(n => n.id === viewingId) ?? null;
@@ -1826,13 +1875,11 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     </HStack>
   ) : (
     <HStack gap={2} wrap="wrap">
-      {editing && (
-        <Button
-          label="Cancel"
-          variant="ghost"
-          onClick={() => leaveTo(editing.href)}
-        />
-      )}
+      <Button
+        label="Cancel"
+        variant="ghost"
+        onClick={() => leaveTo(editing?.href ?? '#home')}
+      />
       <ScheduleButton when={when} onChange={setWhen} />
       <ContextButton context={context} onChange={setContext} />
       <Button
@@ -1852,7 +1899,8 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           label="Save changes"
           variant="primary"
           icon={<Icon icon={Save} />}
-          isIconOnly
+          // On a phone there are no tooltips, so the main Save shows its word.
+          isIconOnly={!isPhone}
           isDisabled={!isDirty || !allReady}
           tooltip={!isDirty ? 'Save changes: nothing has changed yet' : !allReady ? 'Save changes: finish the tiles first' : 'Save changes'}
           onClick={() => {
@@ -1865,7 +1913,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           label="Save"
           variant="primary"
           icon={<Icon icon={Save} />}
-          isIconOnly
+          isIconOnly={!isPhone}
           isDisabled={!allReady}
           tooltip={allReady ? 'Save: adds it to your library' : 'Save: finish the tiles first'}
           // A new workflow is saved once it knows when to run: without a schedule, Save asks first.
@@ -1893,6 +1941,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     <RunTilePanel
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
+      content={selectedId ? contentOf(selectedId) : undefined}
       run={selectedId ? viewRun?.tiles[selectedId] : undefined}
     />
   ) : selectedSection ? (
@@ -1902,6 +1951,9 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       tileId={selectedId ?? ''}
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
+      content={selectedId ? contentOf(selectedId) : undefined}
+      stepTrial={selectedId ? stepTrials[selectedId] : undefined}
+      sectionTitle={selected?.sectionId ? sections.find(x => x.id === selected.sectionId)?.title : undefined}
       run={selectedId ? editing?.runs?.[selectedId] : undefined}
       trial={selected && isTileTried(selected.id) ? trialFor(selected, board, links) : null}
       onOpenTrial={() => selected && openTrial(selected.id)}

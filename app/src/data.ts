@@ -74,14 +74,30 @@ const ORDERS_USD: Sheet = {
   columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'],
   addedColumns: [5],
   rows: [
-    ['SO-48211', '2026-11-09', 'Europe', 'EUR', '1,240.00', '1,344.28'],
-    ['SO-48212', '2026-11-09', 'Japan', 'JPY', '182,500', '1,208.15'],
-    ['SO-48215', '2026-11-08', 'UK', 'GBP', '860.50', '1,111.34'],
-    ['SO-48219', '2026-11-08', 'Europe', 'EUR', '312.00', '337.96'],
-    ['SO-48223', '2026-11-10', 'Canada', 'CAD', '2,045.75', '1,487.46'],
-    ['SO-48230', '2026-11-10', 'US', 'USD', '975.00', '975.00'],
-    ['SO-48236', '2026-11-11', 'UK', 'GBP', '4,120.00', '5,327.16'],
-    ['SO-48241', '2026-11-12', 'Europe', 'EUR', '58.90', '64.00'],
+    ['SO-48211', '2026-11-02', 'Europe', 'EUR', '1,240.00', '1,344.28'],
+    ['SO-48212', '2026-11-02', 'Japan', 'JPY', '182,500', '1,208.15'],
+    ['SO-48215', '2026-11-03', 'UK', 'GBP', '860.50', '1,111.34'],
+    ['SO-48219', '2026-11-03', 'Europe', 'EUR', '312.00', '337.96'],
+    ['SO-48223', '2026-11-04', 'Canada', 'CAD', '2,045.75', '1,487.46'],
+    ['SO-48230', '2026-11-04', 'US', 'USD', '975.00', '975.00'],
+    ['SO-48236', '2026-11-05', 'UK', 'GBP', '4,120.00', '5,327.16'],
+    ['SO-48241', '2026-11-06', 'Europe', 'EUR', '58.90', '64.00'],
+  ],
+};
+/** October's orders in USD: the Monthly sales close input, and what a try on last month (October) shows. */
+export const ORDERS_USD_OCTOBER: Sheet = {
+  kind: 'Output',
+  columns: ['Order ID', 'Date', 'Region', 'Currency', 'Amount', 'Amount (USD)'],
+  addedColumns: [5],
+  rows: [
+    ['SO-47102', '2026-10-01', 'Europe', 'EUR', '1,240.00', '1,344.28'],
+    ['SO-47118', '2026-10-02', 'Japan', 'JPY', '182,500', '1,208.15'],
+    ['SO-47240', '2026-10-06', 'UK', 'GBP', '860.50', '1,111.34'],
+    ['SO-47311', '2026-10-09', 'Europe', 'EUR', '312.00', '337.96'],
+    ['SO-47506', '2026-10-15', 'Canada', 'CAD', '2,045.75', '1,487.46'],
+    ['SO-47622', '2026-10-20', 'US', 'USD', '975.00', '975.00'],
+    ['SO-47815', '2026-10-27', 'UK', 'GBP', '4,120.00', '5,327.16'],
+    ['SO-47930', '2026-10-31', 'Europe', 'EUR', '58.90', '64.00'],
   ],
 };
 const NET_ORDERS: Sheet = {
@@ -95,13 +111,13 @@ export const TICKETS: Record<number, Ticket> = {
     workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Failed Nov 16 at 09:12', finishedAt: '2026-11-16T09:12',
     banner: {status: 'error', title: 'The run failed.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
     inputs: [
-      {name: 'Orders this week', source: ['connection', 'From connection: SharePoint, Orders this week.xlsx'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
-      {name: 'Refunds this week', source: ['connection', 'From connection: Shopify, Refunds this week'], stats: ['63 rows', '3 columns', 'Synced Mon'], sheet: 'Refunds'},
+      {name: 'Orders this week', source: ['connection', 'From app: SharePoint, Orders this week.xlsx'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
+      {name: 'Refunds this week', source: ['connection', 'From app: Shopify, Refunds this week'], stats: ['63 rows', '3 columns', 'Synced Mon'], sheet: 'Refunds'},
     ],
     instructions: "Combine this week's orders with refunds. Subtract each refund from its order using the order number. Keep the currency of each order so the next step can convert it to USD.",
-    agentSummary: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Stopped before writing the output: no Currency column to carry forward'],
+    agentSummary: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Failed before writing the output: no Currency column to carry forward'],
     python: `orders = read_sheet("Orders this week")\nrefunds = read_sheet("Refunds")\n\nnet = orders.merge(refunds, on="Order ID", how="left")\nnet["Amount"] = net["Amount"] - net["Refund amount"].fillna(0)\nnet = net[["Order ID", "Date", "Region", "Currency", "Amount"]]  # fails: no Currency`,
-    outputs: [{name: 'Net orders', emptyNote: 'Not produced. The run stopped before this step finished.', feedsInto: [['step', 'Convert to USD', '#ticket-2']], sheet: 'Net orders'}],
+    outputs: [{name: 'Net orders', emptyNote: 'Not produced. The run failed before this step finished.', feedsInto: [['step', 'Convert to USD', '#ticket-2']], sheet: 'Net orders'}],
     sheets: {
       'Orders this week': {kind: 'Input', columns: ['Order ID', 'Date', 'Customer', 'Region', 'Amount', 'Currency'], missingColumns: [5], rows: [
         ['SO-48211', '2026-11-09', 'Lindqvist AB', 'Europe', '1,240.00', ''], ['SO-48212', '2026-11-09', 'Tanaka Trading', 'Japan', '182,500', ''],
@@ -115,15 +131,15 @@ export const TICKETS: Record<number, Ticket> = {
     workflow: 'Weekly revenue report', step: 'Convert to USD', status: 'done', ran: 'Finished Nov 9 at 08:18', finishedAt: '2026-11-09T08:18',
     inputs: [
       {name: 'Net orders', source: ['step', 'From step: Combine orders and refunds'], stats: ['1,221 rows', '5 columns', "Last week's run"], sheet: 'Net orders'},
-      {name: 'Exchange rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['Daily rates', 'Updated today 06:00'], sheet: 'Exchange rates'},
+      {name: 'Exchange rates', source: ['connection', 'From app: ECB exchange rates'], stats: ['Daily rates', 'Updated Nov 9, 06:00'], sheet: 'Exchange rates'},
     ],
     instructions: "Convert every order amount to US dollars using the exchange rate on the order date. If there's no rate for that day, use the most recent earlier rate. Round to 2 decimals.",
     agentSummary: ["Looked up the rate for each order's currency and date", "Used Friday's rate for 37 weekend orders", 'Added one new column: Amount (USD)'],
     python: `orders = read_sheet("Net orders").sort_values("Date")\nrates = read_sheet("Exchange rates").sort_values("Date")\n\nout = pd.merge_asof(orders, rates, on="Date", by="Currency",\n                    direction="backward")\nout["Amount (USD)"] = (out["Amount"] * out["Rate to USD"]).round(2)\nwrite_sheet("Orders in USD", out.drop(columns="Rate to USD"))`,
-    outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#workflow-2'], ['workflow', 'Monthly sales close', '#workflow-1']], sheet: 'Orders in USD'}],
+    outputs: [{name: 'Orders in USD', stats: ['1,221 rows', '6 columns', '+1 column vs input'], feedsInto: [['step', 'Revenue by region', '#ticket-7']], sheet: 'Orders in USD'}],
     sheets: {
       'Net orders': NET_ORDERS,
-      'Exchange rates': {kind: 'Input', columns: ['Date', 'Currency', 'Rate to USD'], rows: [['2026-11-06', 'EUR', '1.0832'], ['2026-11-06', 'GBP', '1.2915'], ['2026-11-09', 'EUR', '1.0841'], ['2026-11-09', 'JPY', '0.00662'], ['2026-11-10', 'CAD', '0.7271'], ['2026-11-11', 'GBP', '1.2930'], ['2026-11-12', 'EUR', '1.0866']]},
+      'Exchange rates': {kind: 'Input', columns: ['Date', 'Currency', 'Rate to USD'], rows: [['2026-10-30', 'EUR', '1.0832'], ['2026-10-30', 'GBP', '1.2915'], ['2026-11-02', 'EUR', '1.0841'], ['2026-11-02', 'JPY', '0.00662'], ['2026-11-03', 'CAD', '0.7271'], ['2026-11-04', 'GBP', '1.2930'], ['2026-11-05', 'EUR', '1.0866']]},
       'Orders in USD': ORDERS_USD,
     },
   },
@@ -131,7 +147,7 @@ export const TICKETS: Record<number, Ticket> = {
     workflow: 'Monthly sales close', step: 'Sales summary for Finance', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
     inputs: [
       {name: 'Orders in USD', source: ['step', 'From step: Convert to USD (October)'], stats: ['5,402 rows', '6 columns'], sheet: 'Orders in USD'},
-      {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'FY26 targets.xlsx'},
+      {name: 'Sales targets', source: ['connection', 'From app: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'FY26 targets.xlsx'},
       {name: 'Total revenue (USD)', sheet: '', handoffId: 'h-total-usd'},
     ],
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
@@ -139,11 +155,11 @@ export const TICKETS: Record<number, Ticket> = {
     python: `orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
     outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['person', 'Priya Shah', '#home'], ['person', 'finance@company.com', '#home']], sheet: 'October summary'}],
     sheets: {
-      'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
+      'Orders in USD': {...ORDERS_USD_OCTOBER, kind: 'Input', addedColumns: []},
       // One Google Drive workbook with three sheets. The step reads only Targets.
       'FY26 targets.xlsx': {kind: 'Input', workbookSheets: [
         {name: 'Targets', isRead: true, sheet: {columns: ['Region', 'Month', 'Target (USD)'], rows: [['US', 'Oct', '1,850,000'], ['Europe', 'Oct', '1,240,000'], ['UK', 'Oct', '610,000'], ['Japan', 'Oct', '420,000'], ['Canada', 'Oct', '300,000']]}},
-        {name: 'Region owners', sheet: {columns: ['Region', 'Owner', 'Team'], rows: [['US', 'Priya Shah', 'Sales ops'], ['Europe', 'Marco Ruiz', 'Sales ops'], ['UK', 'Hannah Lee', 'EMEA sales'], ['Japan', 'Kenji Mori', 'APAC sales'], ['Canada', 'Sam Okafor', 'Americas sales']]}},
+        {name: 'Region owners', sheet: {columns: ['Region', 'Owner', 'Team'], rows: [['US', 'Jordan Lee', 'Americas sales'], ['Europe', 'Marco Ruiz', 'Sales ops'], ['UK', 'Hannah Lee', 'EMEA sales'], ['Japan', 'Kenji Mori', 'APAC sales'], ['Canada', 'Sam Okafor', 'Americas sales']]}},
         {name: 'FY25 actuals', sheet: {columns: ['Region', 'Month', 'Actual (USD)'], rows: [['US', 'Oct', '1,712,400'], ['Europe', 'Oct', '1,198,300'], ['UK', 'Oct', '574,900'], ['Japan', 'Oct', '409,600'], ['Canada', 'Oct', '288,100']]}},
       ]},
       'October summary': {kind: 'Output', columns: ['Region', 'Sales (USD)', 'Target', 'Gap', 'Gap %'], addedColumns: [1, 3, 4], signedColumns: [3, 4], rows: [
@@ -157,7 +173,7 @@ export const TICKETS: Record<number, Ticket> = {
   5: {
     workflow: 'Monthly sales close', step: 'Collect last month’s orders', status: 'done', ran: 'Finished Nov 2 at 08:06', finishedAt: '2026-11-02T08:06',
     inputs: [
-      {name: 'Orders, last month', source: ['connection', 'From connection: Shopify, Orders, last month'], stats: ['5,402 rows', '5 columns', 'Synced Nov 2, 08:01'], sheet: 'Shopify orders'},
+      {name: 'Orders, last month', source: ['connection', 'From app: Shopify, Orders, last month'], stats: ['5,402 rows', '5 columns', 'Synced Nov 2, 08:01'], sheet: 'Shopify orders'},
     ],
     instructions: 'Pull every order placed last month, with its region and currency.',
     agentSummary: ['Kept every order placed in October: 5,402', 'Kept each order’s region and currency', '1,968 orders are in other currencies, for Step 2 to convert'],
@@ -172,7 +188,7 @@ export const TICKETS: Record<number, Ticket> = {
     workflow: 'Monthly sales close', step: 'Convert to USD', status: 'done', ran: 'Finished Nov 2 at 08:14', finishedAt: '2026-11-02T08:14',
     inputs: [
       {name: 'Orders this month', source: ['step', 'From step: Collect last month’s orders'], stats: ['5,402 rows', '5 columns'], sheet: 'Orders this month'},
-      {name: 'Daily rates', source: ['connection', 'From connection: ECB exchange rates'], stats: ['31 days × 4 currencies', 'Updated Nov 2, 06:00'], sheet: 'Rates'},
+      {name: 'Daily rates', source: ['connection', 'From app: ECB exchange rates'], stats: ['31 days × 4 currencies', 'Updated Nov 2, 06:00'], sheet: 'Rates'},
     ],
     instructions: 'Convert each order to US dollars using the exchange rate on its order date.',
     agentSummary: ['Looked up the rate for each order’s currency and date', 'Used Friday’s rate for 412 weekend orders', 'Added one column: Amount (USD)'],
@@ -221,10 +237,10 @@ export const TICKETS: Record<number, Ticket> = {
     banner: {status: 'error', title: 'This step couldn’t run.', description: 'Marco Ruiz’s Pipeline health check failed on Nov 16 at 07:40, so the at-risk accounts it shares with you were never produced. Ask Marco to check his workflow, then run this step again.'},
     inputs: [
       {name: 'At-risk accounts', source: ['dataset', 'Shared with you: Marco Ruiz’s Pipeline health check'], stats: ['0 rows', 'Last ready Nov 9, 07:40'], warning: 'Not produced on Nov 16', sheet: 'At-risk accounts'},
-      {name: 'Orders, last month', source: ['connection', 'From connection: Shopify, Orders, last month'], stats: ['5,118 rows', 'Not read this run'], sheet: 'Shopify orders'},
+      {name: 'Orders, last month', source: ['connection', 'From app: Shopify, Orders, last month'], stats: ['5,402 rows', 'Not read this run'], sheet: 'Shopify orders'},
     ],
     instructions: 'Match each at-risk account to its orders from last month and add the amount it still owes.',
-    agentSummary: ['Waited for At-risk accounts from Pipeline health check', 'Stopped before reading orders: there were no accounts to match'],
+    agentSummary: ['Had no At-risk accounts to read: Pipeline health check didn’t produce them', 'Didn’t read orders: there were no accounts to match'],
     python: `accounts = read_shared("Pipeline health check", "At-risk accounts")\norders = read_app("Shopify", "Orders, last month")\nowed = orders[orders["Status"] != "Paid"].groupby("Account")["Amount"].sum().rename("Owed")\nwrite_sheet("At-risk accounts with amounts owed", accounts.join(owed, on="Account").fillna({"Owed": 0}))`,
     outputs: [{name: 'At-risk accounts with amounts owed', emptyNote: 'Not produced. This step couldn’t run without the at-risk accounts.', feedsInto: [['step', 'Follow-up list for Finance', '#ticket-10']], sheet: 'Accounts with amounts owed'}],
     sheets: {
@@ -251,11 +267,11 @@ export const TICKETS: Record<number, Ticket> = {
 
 
 /** The condition of a ticket. Home's board turns it into a lane and wording. */
-export type TicketCondition = 'needsApproval' | 'complete' | 'missingData' | 'notRun';
+export type TicketCondition = 'failed' | 'needsApproval' | 'complete' | 'missingData' | 'notRun';
 
 /**
- * Reads a ticket's condition from its own contents, in this order:
- * an input with a warning, a missing column or no rows means missing data; an approved step ran completely;
+ * Reads a ticket's condition from its own contents, in this order: a failed step failed (the same word its
+ * step page and runs use); an input with a warning, a missing column or no rows means missing data; an approved step ran completely;
  * a step waiting for approval needs approval; anything else has not run yet.
  */
 export function ticketCondition(t: Ticket, isApproved: boolean): TicketCondition {
@@ -263,6 +279,7 @@ export function ticketCondition(t: Ticket, isApproved: boolean): TicketCondition
     const sheet = t.sheets[i.sheet];
     return !!i.warning || !!sheet?.isEmpty || !!sheet?.missingColumns?.length;
   });
+  if (t.status === 'failed') return 'failed';
   if (inputGap) return 'missingData';
   if (isApproved || t.status === 'done') return 'complete';
   if (t.canApprove) return 'needsApproval';

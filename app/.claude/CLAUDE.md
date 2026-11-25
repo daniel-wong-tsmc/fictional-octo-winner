@@ -50,6 +50,14 @@ APP COMPONENTS (app/astryx-workflows, an Astryx integration installed as @worksp
   - Runs: `AgentDidList` ("What the agent did") and `ShowCode` ("Show the code") in src/pages/runParts.tsx, used by the step page and the board's side panels.
   - Board side panels: `TileHeading` (kind icon, kind label, title) in WorkflowBuilder.tsx.
   - Dates: src/dates.ts (`shortDate`, `shortDateTime`, `longDate`). The person using the app: `YOU` in src/workflow.ts.
+- Words, kept the same on every screen (the congruency audit of Nov 25 fixed each of these; keep them fixed):
+  - "Try" is anything on last month's data (Try on last month, Try this step, Tried on October 2026); "Run" is a real run (Run now, Run again). Never "Trial".
+  - What a step makes is its "output" (See output, Output: X, the step page's Output and Output data). Never "result" for it.
+  - Board pieces are "tiles", never "nodes". Side panel labels reuse the tile's own labels (Data type, Name, Instructions, Format, Approver, Sends to) via `TileDetails`.
+  - A step that failed is red "Failed" everywhere: its Home card (state failed), its step page, its runs. An upstream failure is "Failed" too, never "Didn't run". Not scheduled is `NOT_SCHEDULED` with `RUNS_WHEN_STARTED`, nowhere typed by hand.
+  - Home's side panel names its pages Workflow, Step page and Shared data. Today is the prototype's `NOW` (src/schedule.ts) everywhere, including Home's date and "Turned on".
+  - The context and Schedule boxes both apply only on their own Save; the workflow itself saves with the header Save. Leaving the board by any link with unsaved changes asks first; a new board has Cancel too.
+  - Example data must agree across files: the same totals, counts, regions (US, Europe, UK, Japan, Canada), people and roles, and dates on or before `NOW`.
 - Words: "Handoff" is only the last tile kind (who gets the result). A value one workflow gives another is a "shared value" (code still calls these handoffs internally). Approval is "approval"/"Approver", never "OK". "Not connected" is only a tile with no lines; an app is "App not connected".
 - Prefilled workflows live in `PREFILLED_WORKFLOWS` (src/workflow.ts). Each gets the same routes as a built one (#workflow-N, #workflow-edit-N), its board from `boardFromWorkflow`, and its steps in `STEP_LISTS` automatically. Add a new example workflow there, not as a special case in App.tsx.
 - Board sections: dropping a saved workflow from the Library copies its tiles and lines into a `Section` (a React Flow parent node; tiles get `sectionId` and positions relative to it). Only a section's Handoff may draw a line out, and only into an LLM step of another workflow. In a saved workflow's columns (`toColumns`), a section isn't copied; each of its Handoffs that feeds this workflow counts as one input "From another workflow".

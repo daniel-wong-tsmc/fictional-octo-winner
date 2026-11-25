@@ -141,8 +141,8 @@ export function checksFor(rule: HandoffRule): CheckKind[] {
 
 export const SEED_HANDOFFS: Handoff[] = [
   {
-    id: 'h-total-usd', name: 'Total revenue (USD)', ticketId: 2, workflow: 'Weekly revenue report',
-    rule: {kind: 'sum', column: 'Amount (USD)'}, value: '1,482,906.17', check: 'positive',
+    id: 'h-total-usd', name: 'Total revenue (USD)', ticketId: 8, workflow: 'Weekly revenue report',
+    rule: {kind: 'sum', column: 'Amount (USD)'}, value: '1,012,450.00', check: 'positive',
     usedBy: ['Monthly sales close'],
   },
   {

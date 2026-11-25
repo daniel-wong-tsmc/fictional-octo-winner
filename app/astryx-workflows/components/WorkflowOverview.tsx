@@ -3,6 +3,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, Pencil, Play, Send, Trash2, UserCheck} from 'lucide-react';
+import {NOT_SCHEDULED, RUNS_WHEN_STARTED} from './WorkflowBoard';
 import {OverviewFrame, OverviewDetails, OverviewHeading, OverviewRuns, type OverviewRun} from '../parts/OverviewParts';
 export {OverviewFrame, OverviewHeading, OverviewSection} from '../parts/OverviewParts';
 
@@ -47,7 +48,7 @@ export function WorkflowOverview({
     <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
         status={isDraft ? 'draft' : 'on'}
-        note={isDraft ? 'Not turned on yet' : nextRun ? `Next run: ${nextRun}` : 'Not scheduled'}
+        note={isDraft ? 'Not turned on yet' : nextRun ? `Next run: ${nextRun}` : NOT_SCHEDULED}
         name={name}
         summary={summary}
         actions={
@@ -67,7 +68,7 @@ export function WorkflowOverview({
         ]}
       />
 
-      <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : nextRun ? `The first run is ${nextRun}.` : 'It runs when you press Run now, or on a schedule once it has one.'} />
+      <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : nextRun ? `The first run is ${nextRun}.` : `${RUNS_WHEN_STARTED}.`} />
 
       <AlertDialog
         isOpen={isDeleting}

@@ -1,4 +1,4 @@
-// When a workflow runs: a recurring day and time. Every workflow has one. Every schedule the app shows
+// When a workflow runs: a recurring day and time. It's optional; a workflow without one says Not scheduled. Every schedule the app shows
 // (the workflow page's Starts, Home's Scheduled cards, the board's Schedule button) is written by scheduleText
 // and timed by nextRunOf, so the words and the next run always agree.
 
@@ -78,7 +78,8 @@ const isoMinute = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /** What a workflow without a schedule says. A schedule is optional; without one it runs only when started. */
-export const NOT_SCHEDULED = 'Not scheduled';
+import {NOT_SCHEDULED} from '@workspace/astryx-workflows/components/WorkflowBoard';
+export {NOT_SCHEDULED, RUNS_WHEN_STARTED} from '@workspace/astryx-workflows/components/WorkflowBoard';
 
 /**
  * A workflow's schedule fields from its Schedule: the words, the next run in words, and the next run's time.

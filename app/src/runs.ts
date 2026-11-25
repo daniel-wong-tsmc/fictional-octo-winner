@@ -56,7 +56,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
       ticketId: 6,
     },
     's3-in-0': {status: 'done', numbers: [['Rows read', '60'], ['October targets', '5 regions']]},
-    's3-in-1': {status: 'done', numbers: [['Value', '$4,282,800'], ['From run', 'Weekly revenue report, Nov 2']]},
+    's3-in-1': {status: 'done', numbers: [['Value', '$968,920'], ['From run', 'Weekly revenue report, Nov 2']]},
     s3: {
       status: 'review',
       numbers: [['Orders totalled', '5,402'], ['Regions', '5'], ['Below target', '3']],
@@ -64,7 +64,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
       output: {columns: ['Region', 'Sales (USD)', 'Target', 'Gap %'], rows: [['Europe', '1,121,480', '1,240,000', '-9.6%'], ['US', '1,792,300', '1,850,000', '-3.1%'], ['Japan', '401,950', '420,000', '-4.3%']], total: '5 rows'},
       ticketId: 3,
     },
-    out: {status: 'waiting', numbers: [['Rows', '5'], ['Sends to', 'Priya Shah, finance@company.com']], problem: 'Waits for your approval on Step 3 before it is sent.'},
+    out: {status: 'waiting', numbers: [['Rows', '5']], problem: 'Needs your approval on Step 3 before it is sent.'},
   },
   'September 2026': {
     's1-in-0': {status: 'done', numbers: [['Rows read', '5,118'], ['Columns', '5']]},
@@ -72,7 +72,7 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
     's2-in-0': {status: 'done', numbers: [['Rates read', '30 days × 4 currencies']]},
     s2: {status: 'done', numbers: [['Rows in', '5,118'], ['Rows out', '5,118'], ['Weekend orders using Friday’s rate', '389']], did: ['Added one column: Amount (USD)']},
     's3-in-0': {status: 'done', numbers: [['Rows read', '60'], ['September targets', '5 regions']]},
-    's3-in-1': {status: 'done', numbers: [['Value', '$4,105,300']]},
+    's3-in-1': {status: 'done', numbers: [['Value', '$941,300']]},
     s3: {
       status: 'done',
       numbers: [['Orders totalled', '5,118'], ['Regions', '5'], ['Below target', '2']],
@@ -87,11 +87,11 @@ const MONTHLY_SALES_CLOSE: Record<string, Record<string, TileRunDetail>> = {
     's2-in-0': {status: 'done', numbers: [['Rates read', '31 days × 4 currencies']]},
     s2: {status: 'done', numbers: [['Rows in', '4,876'], ['Rows out', '4,876']], did: ['Added one column: Amount (USD)']},
     's3-in-0': {status: 'done', numbers: [['Rows read', '60'], ['August targets', '5 regions, after the fix']]},
-    's3-in-1': {status: 'done', numbers: [['Value', '$3,962,450']]},
+    's3-in-1': {status: 'done', numbers: [['Value', '$912,780']]},
     s3: {
       status: 'done',
-      numbers: [['Orders totalled', '4,876'], ['Regions', '5'], ['Tries', '2']],
-      did: ['First try stopped Sep 1, 08:20: FY26 targets.xlsx had no APAC row for August', 'Priya Shah added the row, and it ran again Sep 2, 14:10', 'Totaled 4,876 orders into 5 regions'],
+      numbers: [['Orders totalled', '4,876'], ['Regions', '5'], ['Runs', '2']],
+      did: ['First run failed Sep 1, 08:20: FY26 targets.xlsx had no Japan row for August', 'Priya Shah added the row, and it ran again Sep 2, 14:10', 'Totaled 4,876 orders into 5 regions'],
       output: {columns: ['Region', 'Sales (USD)', 'Target', 'Gap %'], rows: [['Europe', '1,050,900', '1,100,000', '-4.5%'], ['Japan', '372,400', '380,000', '-2.0%'], ['US', '1,702,600', '1,690,000', '+0.7%']], total: '5 rows'},
     },
     out: {status: 'sent', numbers: [['Rows', '5'], ['Approved by', 'Daniel, Sep 2 14:40']]},
@@ -105,7 +105,7 @@ const WEEKLY_REVENUE_REPORT: Record<string, Record<string, TileRunDetail>> = {
     w1: {
       status: 'failed',
       numbers: [['Orders in', '1,284'], ['Refunds in', '63'], ['Refunds matched', '63'], ['Rows out', '0']],
-      did: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Stopped before writing the output: no Currency column to carry forward'],
+      did: ['Matched 63 refunds to orders by Order ID', 'Subtracted each refund from its order amount', 'Failed before writing the output: no Currency column to carry forward'],
       problem: 'This week’s orders file has no Currency column, so the agent can’t keep each order’s currency for the next step.',
       ticketId: 1,
     },
@@ -147,18 +147,18 @@ const AT_RISK_FOLLOW_UPS: Record<string, Record<string, TileRunDetail>> = {
   'Week of Nov 9': {
     'f1-in-0': {status: 'failed', numbers: [['Rows read', '0']], problem: 'Marco Ruiz’s Pipeline health check failed on Nov 16 at 07:40, so there were no at-risk accounts to read.', ticketId: 9},
     'f1-in-1': notRun('Not read, because the at-risk accounts never arrived.'),
-    f1: {...notRun('Didn’t process: its at-risk accounts weren’t produced. Ask Marco Ruiz to check Pipeline health check.'), ticketId: 9},
+    f1: {...notRun('Couldn’t run: its at-risk accounts weren’t produced. Ask Marco Ruiz to check Pipeline health check.'), ticketId: 9},
     f2: notRun('Step 1 didn’t run, so this step didn’t either.'),
     out: notRun('Nothing was sent.'),
   },
   'Week of Nov 2': {
     'f1-in-0': {status: 'done', numbers: [['Rows read', '5'], ['From', 'Pipeline health check, Nov 9 07:40']]},
-    'f1-in-1': {status: 'done', numbers: [['Rows read', '5,118']]},
+    'f1-in-1': {status: 'done', numbers: [['Rows read', '5,402']]},
     f1: {
       status: 'done',
       numbers: [['Accounts in', '5'], ['Orders matched', '214'], ['Amount owed', '$182,640']],
       did: ['Matched each account to its unpaid orders', 'Added Amount owed to each account'],
-      output: {columns: ['Account', 'Risk', 'Amount owed'], rows: [['Bluefin Logistics', 'High', '$71,200'], ['Northwind Traders', 'High', '$48,950'], ['Harbor Health', 'Medium', '$39,300']], total: '5 rows'},
+      output: {columns: ['Account', 'Owner', 'Signal', 'Owed'], rows: [['Bluefin Logistics', 'Sam Okafor', 'Renewal in 14 days, no reply', '$71,200'], ['Northwind Traders', 'Ana Lopez', 'Usage down 60% in 30 days', '$48,950'], ['Harbor Health', 'Lee Tanaka', 'Invoice 45 days overdue', '$39,300']], total: '5 rows'},
     },
     f2: {status: 'done', numbers: [['Accounts in', '5'], ['On the list', '5']], did: ['Ranked accounts by amount owed', 'Added each account owner for follow-up'], ticketId: 10},
     out: {status: 'sent', numbers: [['Rows', '5'], ['Approved by', 'Daniel, Nov 9 08:41']]},

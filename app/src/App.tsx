@@ -22,7 +22,7 @@ import {TicketPage} from './pages/TicketPage';
 import {ChatPage} from './pages/ChatPage';
 import {CHATS} from './chats';
 import {BuiltWorkflowPage, LiveWorkflowPage} from './pages/WorkflowPages';
-import {timing} from './schedule';
+import {NOW, timing} from './schedule';
 import {PREFILLED_WORKFLOWS, type BuiltStage, type BuiltWorkflow, type Workflow as WorkflowData} from './workflow';
 import {useToast} from '@astryxdesign/core/Toast';
 import {WorkflowBuilderPage, boardFromWorkflow, sharedInputsOf, type LibraryItem, type SavedBoard} from './pages/WorkflowBuilder';
@@ -93,7 +93,7 @@ export default function App() {
       return;
     }
     const id = Math.max(...PREFILLED_WORKFLOWS.map(w => w.id), ...built.map(w => w.id)) + 1;
-    const createdOn = longDate(new Date());
+    const createdOn = longDate(NOW);
     setBuilt(prev => [...prev, {id, name, columns, saved, ...timing(saved.when), createdOn}]);
     window.location.hash = `workflow-${id}`;
   };
@@ -164,7 +164,7 @@ export default function App() {
     const tid = Number(r.match(/^ticket-(\d+)$/)?.[1] ?? NaN);
     if (TICKETS[tid]) {
       return {
-        title: 'Task',
+        title: 'Step page',
         page: (
           <TicketPage
             key={tid}
