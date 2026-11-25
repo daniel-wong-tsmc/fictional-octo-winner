@@ -10,7 +10,8 @@
     "./components/WorkflowSheetTable": "./components/WorkflowSheetTable.tsx",
     "./components/WorkflowBoard": "./components/WorkflowBoard.tsx",
     "./components/SharedDataOverview": "./components/SharedDataOverview.tsx",
-    "./components/StatusText": "./components/StatusText.tsx"
+    "./components/StatusText": "./components/StatusText.tsx",
+    "./components/WorkflowWorkbook": "./components/WorkflowWorkbook.tsx"
   },
   "peerDependencies": {
     "@astryxdesign/core": "^0.7.15",

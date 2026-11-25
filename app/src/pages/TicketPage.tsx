@@ -22,7 +22,7 @@ import {
 import {STATUS, TICKETS, type DataSet, type Sheet} from '../data';
 import {PREFILLED_WORKFLOWS} from '../workflow';
 import {CHECK_LABEL, describeRule, shapeOf, type Handoff} from '../handoffs';
-import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
+import {WorkflowWorkbook, type WorkflowWorkbookSheet} from '@workspace/astryx-workflows/components/WorkflowWorkbook';
 import {OverviewFrame, OverviewHeading} from '@workspace/astryx-workflows/components/WorkflowOverview';
 import {StatusText} from '@workspace/astryx-workflows/components/StatusText';
 import {RefLabel} from './shared';
@@ -161,6 +161,22 @@ function Workbook({
 }) {
   const current = sheets.find(([n]) => n === selected)?.[1] ?? sheets[0][1];
   const currentName = sheets.find(([n]) => n === selected)?.[0] ?? sheets[0][0];
+  const note = (text: string) => (
+    <HStack paddingInline={3} paddingBlockStart={2}>
+      <Text type="supporting" weight="medium" hasTabularNumbers>{text}</Text>
+    </HStack>
+  );
+  const previewNote = (rows: number) => note(`Preview: ${rows} of ${rowTotals[currentName] ?? `${rows} rows`}. The agent works on all of them.`);
+  // A file with several sheets shows them as tabs under its rows; the note says which ones the step reads.
+  const fileSheets: WorkflowWorkbookSheet[] = current.workbookSheets
+    ? current.workbookSheets.map(w => ({
+        name: w.name,
+        sheet: w.sheet,
+        note: w.sheet.rows && !w.sheet.fromFile
+          ? (w.isRead ? previewNote(w.sheet.rows.length) : note(`${w.sheet.rows.length} rows. This step doesn’t read this sheet.`))
+          : undefined,
+      }))
+    : [{name: currentName, sheet: current, note: current.rows && !current.fromFile ? previewNote(current.rows.length) : undefined}];
   return (
     <Card padding={0}>
       <VStack>
@@ -201,17 +217,10 @@ function Workbook({
               ))}
             </TabList>
             <VStack id={`${anchorId}-panel`} role="tabpanel" aria-label={currentName}>
-            {current.rows && !current.fromFile && (
-              <HStack paddingInline={3} paddingBlockStart={2}>
-                <Text type="supporting" weight="medium" hasTabularNumbers>
-                  {`Preview: ${current.rows.length} of ${rowTotals[currentName] ?? `${current.rows.length} rows`}. The agent works on all of them.`}
-                </Text>
-              </HStack>
-            )}
-            <WorkflowSheetTable sheet={current} />
+              <WorkflowWorkbook key={currentName} fileName={currentName} sheets={fileSheets} defaultSheet={current.workbookSheets?.find(w => w.isRead)?.name} />
             </VStack>
             <HStack gap={4} padding={3} wrap="wrap">
-              {(current.fromFile || !current.rows) && (
+              {(current.fromFile || (!current.rows && !current.workbookSheets)) && (
                 <Text type="supporting">{current.fromFile ? `From ${current.fromFile}` : 'No rows yet'}</Text>
               )}
               {!!current.addedColumns?.length && (
@@ -294,19 +303,19 @@ export function TicketPage({
     scrollTo('output-sheets');
   };
 
-  // Prototype only: a real upload reads the workbook's sheet names. Here we stand in two.
+  // Prototype only: a real upload reads the workbook's sheet names. Here we stand in two. A workbook is one
+  // file tab; its sheets are tabs under the preview, like in Excel.
   const addUpload = (file: File) => {
-    const base = file.name.replace(/\.(xlsx|xls|csv)$/i, '');
-    const names = file.name.toLowerCase().endsWith('.csv') ? [base] : [`${base}: Sheet1`, `${base}: Sheet2`];
-    const added: [string, Sheet][] = names.map(n => [n, {
-      kind: 'Input', isEmpty: true, fromFile: file.name,
-      emptyNote: 'Uploaded. The sheet preview appears once uploads are connected.',
-    }]);
-    setUploadedSheets(prev => [...prev.filter(([, s]) => s.fromFile !== file.name), ...added]);
-    setInputSheet(names[0]);
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    const empty = {isEmpty: true, fromFile: file.name, emptyNote: 'Uploaded. The sheet preview appears once uploads are connected.'};
+    const added: Sheet = isCsv
+      ? {kind: 'Input', ...empty}
+      : {kind: 'Input', ...empty, workbookSheets: ['Sheet1', 'Sheet2'].map(name => ({name, sheet: empty}))};
+    setUploadedSheets(prev => [...prev.filter(([n]) => n !== file.name), [file.name, added]]);
+    setInputSheet(file.name);
     setInputsOpen(true);
     setUpload(null);
-    toast({body: `Added ${names.length} ${names.length === 1 ? 'sheet' : 'sheets'} from ${file.name} to Input data.`});
+    toast({body: isCsv ? `Added ${file.name} to Input data.` : `Added ${file.name} and its 2 sheets to Input data.`});
   };
 
   return (

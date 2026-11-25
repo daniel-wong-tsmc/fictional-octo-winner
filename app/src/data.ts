@@ -41,6 +41,11 @@ export type Sheet = {
   /** File the sheet came from, when the user uploaded it. */
   fromFile?: string;
   emptyNote?: string;
+  /**
+   * A file with more than one sheet: every sheet in the file's order, shown as tabs under the preview. The
+   * step reads the ones with isRead. When set, the entry is keyed by the file name and its own rows are unused.
+   */
+  workbookSheets?: {name: string; sheet: Omit<Sheet, 'kind' | 'workbookSheets'>; isRead?: boolean}[];
 };
 
 export type Ticket = {
@@ -125,7 +130,7 @@ export const TICKETS: Record<number, Ticket> = {
     workflow: 'Monthly sales close', step: 'Sales summary for Finance', status: 'review', ran: 'Agent finished at 08:30', finishedAt: '2026-11-02T08:30',
     inputs: [
       {name: 'Orders in USD', source: ['step', 'From step: Convert to USD (October)'], stats: ['5,402 rows', '6 columns'], sheet: 'Orders in USD'},
-      {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'Targets'},
+      {name: 'Sales targets', source: ['connection', 'From connection: Google Drive, FY26 targets.xlsx'], stats: ['60 rows', '3 columns', 'Edited Oct 2'], sheet: 'FY26 targets.xlsx'},
       {name: 'Total revenue (USD)', sheet: '', handoffId: 'h-total-usd'},
     ],
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
@@ -134,7 +139,12 @@ export const TICKETS: Record<number, Ticket> = {
     outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Google Drive: Finance close pack', '#home']], sheet: 'October summary'}],
     sheets: {
       'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
-      Targets: {kind: 'Input', columns: ['Region', 'Month', 'Target (USD)'], rows: [['US', 'Oct', '1,850,000'], ['Europe', 'Oct', '1,240,000'], ['UK', 'Oct', '610,000'], ['Japan', 'Oct', '420,000'], ['Canada', 'Oct', '300,000']]},
+      // One Google Drive workbook with three sheets. The step reads only Targets.
+      'FY26 targets.xlsx': {kind: 'Input', workbookSheets: [
+        {name: 'Targets', isRead: true, sheet: {columns: ['Region', 'Month', 'Target (USD)'], rows: [['US', 'Oct', '1,850,000'], ['Europe', 'Oct', '1,240,000'], ['UK', 'Oct', '610,000'], ['Japan', 'Oct', '420,000'], ['Canada', 'Oct', '300,000']]}},
+        {name: 'Region owners', sheet: {columns: ['Region', 'Owner', 'Team'], rows: [['US', 'Priya Shah', 'Sales ops'], ['Europe', 'Marco Ruiz', 'Sales ops'], ['UK', 'Hannah Lee', 'EMEA sales'], ['Japan', 'Kenji Mori', 'APAC sales'], ['Canada', 'Sam Okafor', 'Americas sales']]}},
+        {name: 'FY25 actuals', sheet: {columns: ['Region', 'Month', 'Actual (USD)'], rows: [['US', 'Oct', '1,712,400'], ['Europe', 'Oct', '1,198,300'], ['UK', 'Oct', '574,900'], ['Japan', 'Oct', '409,600'], ['Canada', 'Oct', '288,100']]}},
+      ]},
       'October summary': {kind: 'Output', columns: ['Region', 'Sales (USD)', 'Target', 'Gap', 'Gap %'], addedColumns: [1, 3, 4], signedColumns: [3, 4], rows: [
         ['Europe', '1,121,480', '1,240,000', '-118,520', '-9.6%'], ['US', '1,792,300', '1,850,000', '-57,700', '-3.1%'], ['Japan', '401,950', '420,000', '-18,050', '-4.3%'],
         ['Canada', '311,200', '300,000', '+11,200', '+3.7%'], ['UK', '655,870', '610,000', '+45,870', '+7.5%']]},
