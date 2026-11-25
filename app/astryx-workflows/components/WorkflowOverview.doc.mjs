@@ -27,6 +27,7 @@ export default {
     {name: 'onDelete', type: '() => void', description: 'Called after the person confirms the delete.', required: true},
     {name: 'isDraft', type: 'boolean', description: 'A draft hasn’t been turned on: the page says Draft and shows no next run.', default: 'false'},
     {name: 'isInPanel', type: 'boolean', description: 'Shown in a side panel, which has its own header: leaves out the breadcrumbs.', default: 'false'},
+    {name: 'fullPageHref', type: 'string', description: 'With isInPanel: the full page’s address. The title becomes a link to it, in place of an Open full page button.'},
     {name: 'homeHref', type: 'string', description: 'Where the Home breadcrumb goes.', default: "'#home'"},
   ],
   examples: [

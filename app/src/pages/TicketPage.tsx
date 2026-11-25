@@ -229,7 +229,7 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, code, handoffs, onApprove, onUndoApprove, isInPanel = false,
+  id, code, handoffs, onApprove, onUndoApprove, isInPanel = false, fullPageHref,
 }: {
   id: number;
   /** The step's current code from its workflow's saved board, so code edited on the board shows here too. */
@@ -239,6 +239,8 @@ export function TicketPage({
   onUndoApprove: (id: number) => void;
   /** Shown in Home's side panel, which has its own header: leaves out the breadcrumbs. */
   isInPanel?: boolean;
+  /** In Home's side panel: this page's own address. Its title links there. */
+  fullPageHref?: string;
 }) {
   const t = TICKETS[id];
   // The step's workflow, for the breadcrumb.
@@ -325,6 +327,7 @@ export function TicketPage({
         status={STATUS[status]}
         note={`Part of ${t.workflow}`}
         name={t.step}
+        nameHref={isInPanel ? fullPageHref : undefined}
         summary={isApproved && t.status !== 'done' ? 'Approved just now. The next step and any shared values use this output.' : t.ran}
         actions={
           <>

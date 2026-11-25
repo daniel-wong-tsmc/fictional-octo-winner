@@ -173,7 +173,7 @@ export default function App() {
             handoffs={handoffs}
             onApprove={markApproved}
             onUndoApprove={id => setApproved(prev => prev.filter(x => x !== id))}
-            isInPanel={isInPanel}
+            isInPanel={isInPanel} fullPageHref={`#${r}`}
           />
         ),
       };
@@ -183,13 +183,13 @@ export default function App() {
     if (p) {
       return {
         title: 'Workflow',
-        page: <LiveWorkflowPage key={wid} workflow={{...p.workflow, ...scheduleOf(p)}} name={p.name} saved={p.saved} approved={approved} onDelete={() => deletePrefilled(p)} isInPanel={isInPanel} />,
+        page: <LiveWorkflowPage key={wid} workflow={{...p.workflow, ...scheduleOf(p)}} name={p.name} saved={p.saved} approved={approved} onDelete={() => deletePrefilled(p)} isInPanel={isInPanel} fullPageHref={`#${r}`} />,
       };
     }
     const b = built.find(x => x.id === wid);
-    if (b) return {title: 'Workflow', page: <BuiltWorkflowPage key={wid} workflow={b} onDelete={() => deleteBuilt(b)} isInPanel={isInPanel} />};
+    if (b) return {title: 'Workflow', page: <BuiltWorkflowPage key={wid} workflow={b} onDelete={() => deleteBuilt(b)} isInPanel={isInPanel} fullPageHref={`#${r}`} />};
     const d = sharedById(r.match(/^data-(.+)$/)?.[1] ?? '');
-    if (d) return {title: 'Shared data', page: <SharedDataPage key={d.id} data={d} isInPanel={isInPanel} />};
+    if (d) return {title: 'Shared data', page: <SharedDataPage key={d.id} data={d} isInPanel={isInPanel} fullPageHref={`#${r}`} />};
     return null;
   };
   const fullPage = detailPage(route);

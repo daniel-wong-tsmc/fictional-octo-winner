@@ -32,6 +32,8 @@ export type SharedDataOverviewProps = {
   homeHref?: string;
   /** Shown in a side panel, which has its own header: leaves out the breadcrumbs. */
   isInPanel?: boolean;
+  /** In a side panel: the full page's address. The title links there. */
+  fullPageHref?: string;
 };
 
 /**
@@ -42,6 +44,7 @@ export function SharedDataOverview({
   name, summary, updated, sharedBy, workflow, updates, format, sheet, sheetNote, runs, useHref, failure,
   homeHref = '#home',
   isInPanel = false,
+  fullPageHref,
 }: SharedDataOverviewProps) {
   return (
     <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
@@ -49,6 +52,7 @@ export function SharedDataOverview({
         status={failure ? 'failed' : 'ready'}
         note={failure ? `Last run failed ${updated}` : `Updated ${updated}`}
         name={name}
+        nameHref={isInPanel ? fullPageHref : undefined}
         summary={summary}
         actions={
           failure ? (

@@ -27,7 +27,7 @@ function handoffDetails(contents: WorkflowTileContent[]) {
  * approves and where it sends come from its stored board, the same board Edit opens, so the page and the
  * board always match. An approved ticket marks its run approved.
  */
-export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, isInPanel}: {
+export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, isInPanel, fullPageHref}: {
   workflow: Workflow;
   name: string;
   saved: SavedBoard;
@@ -36,6 +36,8 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, 
   onDelete: () => void;
   /** Shown in Home's side panel. */
   isInPanel?: boolean;
+  /** In Home's side panel: this page's own address. Its title links there. */
+  fullPageHref?: string;
 }) {
   const toast = useToast();
   const last = w.steps[w.steps.length - 1];
@@ -61,11 +63,12 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, 
       onDelete={onDelete}
       isDraft={w.isDraft}
       isInPanel={isInPanel}
+      fullPageHref={fullPageHref}
     />
   );
 }
 
-export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel}: {workflow: BuiltWorkflow; onDelete: () => void; isInPanel?: boolean}) {
+export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel, fullPageHref}: {workflow: BuiltWorkflow; onDelete: () => void; isInPanel?: boolean; fullPageHref?: string}) {
   const toast = useToast();
   const stages = w.columns.flat().map(st => st.content);
   const count = (k: string) => stages.filter(c => c.kind === k).length;
@@ -82,6 +85,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel}: {workflow:
       onRunNow={runNow(toast)}
       onDelete={onDelete}
       isInPanel={isInPanel}
+      fullPageHref={fullPageHref}
     />
   );
 }

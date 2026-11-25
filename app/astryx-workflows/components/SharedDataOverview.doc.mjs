@@ -28,6 +28,7 @@ export default {
     {name: 'useHref', type: 'string', description: 'Where Use in a new workflow goes.', required: true},
     {name: 'failure', type: '{message: string; askLabel: string; onAsk: () => void}', description: 'Set when the last run failed. Shows the message and a button to ask the owner instead of Use in a new workflow.'},
     {name: 'isInPanel', type: 'boolean', description: 'Shown in a side panel, which has its own header: leaves out the breadcrumbs.', default: 'false'},
+    {name: 'fullPageHref', type: 'string', description: 'With isInPanel: the full page’s address. The title becomes a link to it, in place of an Open full page button.'},
     {name: 'homeHref', type: 'string', description: 'Where the Home breadcrumb goes.', default: "'#home'"},
   ],
   examples: [

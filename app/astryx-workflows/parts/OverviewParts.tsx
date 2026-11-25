@@ -7,6 +7,7 @@ import {Card} from '@astryxdesign/core/Card';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
+import {Link} from '@astryxdesign/core/Link';
 import {Icon} from '@astryxdesign/core/Icon';
 import {ChevronRight, type LucideIcon} from 'lucide-react';
 import type {WorkflowTileTone} from '../components/WorkflowTile';
@@ -60,12 +61,14 @@ export function OverviewFrame({crumbs, homeHref = '#home', isInPanel = false, ch
 }
 
 /** Status line, name and one sentence on the left; the page's buttons on the right, with an optional note under them. */
-export function OverviewHeading({status, note, name, summary, actions, actionsNote}: {
+export function OverviewHeading({status, note, name, nameHref, summary, actions, actionsNote}: {
   /** A status from STATUSES, or a tone and label of its own. */
   status: StatusKey | {tone: StatusTone; label: string};
   /** Next to the status, such as "Next run: …" or "Updated …". */
   note: string;
   name: string;
+  /** In Home's side panel: the page's own address, so its title opens the full page. */
+  nameHref?: string;
   summary: string;
   actions: ReactNode;
   /** Under the actions, such as where approving sends the result. */
@@ -78,7 +81,9 @@ export function OverviewHeading({status, note, name, summary, actions, actionsNo
           <StatusText status={status} />
           <Text type="supporting">{note}</Text>
         </HStack>
-        <Heading level={1} textWrap="balance">{name}</Heading>
+        <Heading level={1} textWrap="balance">
+          {nameHref ? <Link href={nameHref} type="inherit" color="inherit" tooltip="Open full page">{name}</Link> : name}
+        </Heading>
         <Text type="supporting">{summary}</Text>
       </VStack>
       <VStack gap={1.5} hAlign="end">

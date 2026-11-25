@@ -30,6 +30,8 @@ export type WorkflowOverviewProps = {
   isDraft?: boolean;
   /** Shown in a side panel, which has its own header: leaves out the breadcrumbs. */
   isInPanel?: boolean;
+  /** In a side panel: the full page's address. The title links there. */
+  fullPageHref?: string;
 };
 
 /**
@@ -42,6 +44,7 @@ export function WorkflowOverview({
   homeHref = '#home',
   isDraft = false,
   isInPanel = false,
+  fullPageHref,
 }: WorkflowOverviewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   return (
@@ -50,6 +53,7 @@ export function WorkflowOverview({
         status={isDraft ? 'draft' : 'on'}
         note={isDraft ? 'Not turned on yet' : nextRun ? `Next run: ${nextRun}` : NOT_SCHEDULED}
         name={name}
+        nameHref={isInPanel ? fullPageHref : undefined}
         summary={summary}
         actions={
           <>
