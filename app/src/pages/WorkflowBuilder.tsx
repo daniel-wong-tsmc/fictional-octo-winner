@@ -166,6 +166,10 @@ type TileData = {
   onOpenTrial: (id: string) => void;
   /** When the board shows a past run: how this tile did in it. */
   run?: TileRunDetail;
+  /** Running only this LLM step, from its play button: running, or set when it's done. */
+  stepTrial?: 'running' | 'done';
+  /** Runs only this LLM step. Left out on a past run, which can't run anything. */
+  onRunStep?: (id: string) => void;
 };
 type TileNode = Node<TileData, 'tile'>;
 
@@ -187,6 +191,25 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
     : !data.isLinked
     ? {tone: 'warning' as const, label: 'Not connected'}
     : undefined;
+  // While building or editing, each LLM step has a play button that runs only that step.
+  const canRunStep = ready && data.isLinked;
+  const action = step.kind === 'instructions' && data.onRunStep ? (
+    <Button
+      className="nodrag"
+      label="Run this step"
+      tooltip={canRunStep ? `Run only this step on ${TRIAL_MONTH} data. Nothing is sent.` : 'Run this step: give it instructions and connect both sides first'}
+      variant="ghost"
+      size="sm"
+      isIconOnly
+      icon={<Icon icon={Play} />}
+      isDisabled={!canRunStep}
+      isLoading={data.stepTrial === 'running'}
+      onClick={e => {
+        e.stopPropagation();
+        data.onRunStep?.(id);
+      }}
+    />
+  ) : undefined;
   const runLine = data.run?.numbers?.[0];
   // In a past run every tile shows its status at the top and its first number below, the same for each tile.
   // The tile where it failed is also red, and tiles that didn't run are greyed out; the side panel says why.
@@ -221,6 +244,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         detailMaxLines={2}
         detailLayout="inline"
         status={status}
+        action={action}
         footer={footer}
         width={250}
         elevation={selected ? 'high' : 'low'}
@@ -1397,12 +1421,19 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const [selectedId, setSelectedId] = useState<string | null>(() => (selectTile && board.some(n => n.id === selectTile) ? selectTile : null));
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
+  // LLM steps run on their own from their play button. Any change to the board clears them, like a full trial.
+  const [stepTrials, setStepTrials] = useState<Record<string, 'running' | 'done'>>({});
+  const runStep = useCallback((id: string) => {
+    setStepTrials(prev => ({...prev, [id]: 'running'}));
+    window.setTimeout(() => setStepTrials(prev => (prev[id] === 'running' ? {...prev, [id]: 'done'} : prev)), 1100);
+  }, []);
+  /** Has a trial result: from a full trial, or from running only this step. */
+  const isTileTried = (id: string) => trial === 'done' || stepTrials[id] === 'done';
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
   const [fitKey, setFitKey] = useState(0);
   // Trial output the user is looking at, and the Handoff tiles they've opened since the last trial.
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
-  const isTried = trial === 'done';
   const finalName = name.trim() || 'Untitled workflow';
   const saveNew = (s: Schedule) => {
     setWhen(s);
@@ -1476,6 +1507,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     setSelectedId(id);
     setSelectedLinkId(null);
     setTrial('none');
+    setStepTrials({});
   };
 
   /**
@@ -1512,6 +1544,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     setSelectedId(null);
     setSelectedLinkId(null);
     setTrial('none');
+    setStepTrials({});
   };
   /** Takes a section off the board, with its tiles and every line touching them. */
   const removeSection = (sid: string) => {
@@ -1521,11 +1554,13 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     setSections(prev => prev.filter(x => x.id !== sid));
     setSelectedId(null);
     setTrial('none');
+    setStepTrials({});
   };
 
   const changeLinks = (next: Link[]) => {
     setLinks(next);
     setTrial('none');
+    setStepTrials({});
   };
   const removeLink = (id: string) => {
     changeLinks(links.filter(l => l.id !== id));
@@ -1549,6 +1584,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const update = (id: string, step: Step) => {
     setBoard(prev => prev.map(n => (n.id === id ? {...n, step} : n)));
     setTrial('none');
+    setStepTrials({});
   };
   const openTrial = useCallback(
     (id: string) => {
@@ -1564,21 +1600,22 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
     setLinks(prev => prev.filter(l => l.source !== id && l.target !== id));
     setSelectedId(null);
     setTrial('none');
+    setStepTrials({});
   };
 
   const tileNodes: TileNode[] = useMemo(() => {
     const contents = tileContents(board, links);
     return board.map(n => {
-      const result = trial === 'done' ? trialFor(n, board, links) : null;
+      const result = isTileTried(n.id) ? trialFor(n, board, links) : null;
       const isUnchecked = !!result && n.step.kind === 'output' && !checked.includes(n.id);
       return {
         id: n.id, type: 'tile' as const, position: n.position, measured: n.measured, selected: n.id === selectedId, parentId: n.sectionId,
-        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, run: viewRun?.tiles[n.id]},
+        data: {step: n.step, canFeedOtherWorkflow: sections.length > 0, content: contents.get(n.id)!, trial: result, isLinked: isLinked(n, links), isUnchecked, onOpenTrial: openTrial, run: viewRun?.tiles[n.id], stepTrial: stepTrials[n.id], onRunStep: viewRun ? undefined : runStep},
       };
     });
     // `add` is rebuilt each render; the tiles only need the latest board and links, which are deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board, links, sections.length, selectedId, trial, checked, openTrial, viewRun]);
+  }, [board, links, sections.length, selectedId, trial, stepTrials, checked, openTrial, viewRun, runStep]);
   // Sections come first: React Flow needs a parent before the tiles inside it.
   const nodes: BoardFlowNode[] = [
     ...sections.map((sec): SectionNode => ({
@@ -1840,7 +1877,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
       step={selected?.step ?? null}
       title={selected ? titleOf(selected.id) : ''}
       run={selectedId ? editing?.runs?.[selectedId] : undefined}
-      trial={selected && isTried ? trialFor(selected, board, links) : null}
+      trial={selected && isTileTried(selected.id) ? trialFor(selected, board, links) : null}
       onOpenTrial={() => selected && openTrial(selected.id)}
       onChange={s => selected && update(selected.id, s)} onRemove={() => selected && remove(selected.id)} />
   );
@@ -1883,7 +1920,7 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
           if (href) window.location.hash = href.slice(1);
         }}
       />
-      {viewing && isTried && (
+      {viewing && isTileTried(viewing.id) && (
         <TrialDialog title={titleOf(viewing.id)} step={viewing.step} trial={trialFor(viewing, board, links)} onClose={() => setViewingId(null)} />
       )}
       {isNarrow && (

@@ -16,6 +16,7 @@ export default {
     ],
   },
   props: [
+    {name: 'action', type: 'ReactNode', description: 'A small icon button at the top right, after the status, such as the board’s button that runs only this LLM step. Use a ghost, small, icon-only button.'},
     {name: 'content', type: 'WorkflowTileContent', description: 'What the tile says. Its kind (input, step or output) sets the title and which labeled details show.', required: true},
     {name: 'status', type: '{tone: WorkflowTileTone; label: string}', description: 'Status dot and label in the header, such as Ready or Needs approval.'},
     {name: 'footer', type: 'ReactNode', description: 'Actions or results at the bottom, such as a See output button.'},

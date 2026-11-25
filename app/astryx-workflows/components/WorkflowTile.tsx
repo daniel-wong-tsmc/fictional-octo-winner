@@ -127,6 +127,8 @@ export type WorkflowTileProps = {
   /** What the tile says. The kind decides which details it shows. */
   content: WorkflowTileContent;
   status?: {tone: WorkflowTileTone; label: string};
+  /** A small icon button at the top right, after the status, such as one that runs only this step. */
+  action?: ReactNode;
   /** Actions or results shown at the bottom, such as a See output button. */
   footer?: ReactNode;
   /** Cuts each detail to this many lines, for small tiles such as those on a board. */
@@ -149,7 +151,7 @@ export type WorkflowTileProps = {
  * One tile of a workflow: an Input, an LLM step or a Handoff. Used for every tile on the workflow board,
  * so a tile looks and reads the same wherever it appears.
  */
-export function WorkflowTile({content, status, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', emphasis, onClick}: WorkflowTileProps) {
+export function WorkflowTile({content, status, action, footer, detailMaxLines, detailLayout = 'stacked', width = '100%', elevation = 'none', emphasis, onClick}: WorkflowTileProps) {
   const variant = emphasis === 'failed' ? 'red' : emphasis === 'muted' ? 'muted' : 'default';
   const raised = emphasis === 'failed' ? 'high' : elevation;
   const info = WORKFLOW_TILE_KINDS[content.kind];
@@ -161,7 +163,12 @@ export function WorkflowTile({content, status, footer, detailMaxLines, detailLay
           <Icon icon={info.icon} size="sm" color="secondary" />
           <Text type="supporting" weight="medium">{info.label}</Text>
         </HStack>
-        {status && <StatusText status={status} />}
+        {(status || action) && (
+          <HStack gap={1} vAlign="center">
+            {status && <StatusText status={status} />}
+            {action}
+          </HStack>
+        )}
       </HStack>
       {content.kind !== 'input' && <Text weight="semibold">{title}</Text>}
       {/* Each detail is its label, then its value: the same labels in the same order for every tile of a kind. */}
