@@ -5,10 +5,8 @@ import {Heading, Text} from '@astryxdesign/core/Text';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Card} from '@astryxdesign/core/Card';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
-import {Table, pixel, proportional, type TableColumn} from '@astryxdesign/core/Table';
+import {List, ListItem} from '@astryxdesign/core/List';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
-import {Link} from '@astryxdesign/core/Link';
-import {Button} from '@astryxdesign/core/Button';
 import {Icon} from '@astryxdesign/core/Icon';
 import {ChevronRight, type LucideIcon} from 'lucide-react';
 import type {WorkflowTileTone} from '../components/WorkflowTile';
@@ -20,8 +18,8 @@ import {StatusText, type StatusKey, type StatusTone} from '../components/StatusT
  */
 
 /**
- * One run. period identifies the row; started and finished are shown as date and time. With href, the result
- * links to that run and the row gets an open arrow.
+ * One run. period identifies the row; started and finished are shown as date and time. With href, the whole row
+ * links to that run and shows an open arrow.
  */
 export type OverviewRun = {period: string; started: string; tone: WorkflowTileTone; result: string; finished: string; href?: string};
 
@@ -105,9 +103,9 @@ export function OverviewDetails({items}: {items: {label: string; icon: LucideIco
 /** A titled card, such as Recent runs. */
 export function OverviewSection({title, description, children}: {title: string; description?: string; children: ReactNode}) {
   return (
-    <Card padding={0}>
-      <VStack>
-        <VStack gap={0.5} padding={4}>
+    <Card padding={4}>
+      <VStack gap={3}>
+        <VStack gap={0.5}>
           <Text type="label">{title}</Text>
           {description && <Text type="supporting">{description}</Text>}
         </VStack>
@@ -117,38 +115,24 @@ export function OverviewSection({title, description, children}: {title: string; 
   );
 }
 
-type RunRow = OverviewRun & Record<string, unknown>;
-const RUN_COLUMNS: TableColumn<RunRow>[] = [
-  {key: 'started', header: 'Started', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.started}</Text>},
-  {
-    key: 'result',
-    header: 'Result',
-    // Keeps room for the result on a narrow screen; the table scrolls sideways instead of squeezing it.
-    width: proportional(1, {minWidth: 180}),
-    renderCell: r => (
-      r.href
-        ? <Link href={r.href} color="primary"><StatusText status={{tone: r.tone, label: r.result}} /></Link>
-        : <StatusText status={{tone: r.tone, label: r.result}} />
-    ),
-  },
-  {key: 'finished', header: 'Finished', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.finished}</Text>},
-];
-
-const OPEN_COLUMN: TableColumn<RunRow> = {
-  key: 'open',
-  header: '',
-  width: pixel(56),
-  align: 'end',
-  renderCell: r => (r.href ? <Button label={`Open the run of ${r.started}`} tooltip="Open this run on the board" variant="ghost" size="sm" isIconOnly icon={<Icon icon={ChevronRight} />} href={r.href} /> : null),
-};
-
 /** Recent runs, newest first. Runs with an href open on the board. With none, says what's next. */
 export function OverviewRuns({runs, emptyTitle, emptyDescription}: {runs: OverviewRun[]; emptyTitle: string; emptyDescription: string}) {
   const isLinked = runs.some(r => r.href);
   return (
-    <OverviewSection title="Recent runs" description={isLinked ? 'Open a run to see each step’s numbers on the board, and where it stopped.' : undefined}>
+    <OverviewSection title="Recent runs" description={isLinked ? 'Open a run to see each step’s numbers on the board, and where it failed.' : undefined}>
       {runs.length ? (
-        <Table data={runs as RunRow[]} columns={isLinked ? [...RUN_COLUMNS, OPEN_COLUMN] : RUN_COLUMNS} idKey="period" density="balanced" />
+        // A list, not a table: each run with an href is one link, so the whole row opens it.
+        <List hasDividers edge="bleed">
+          {runs.map(r => (
+            <ListItem
+              key={r.period}
+              label={<StatusText status={{tone: r.tone, label: r.result}} />}
+              description={`Started ${r.started}, finished ${r.finished}`}
+              href={r.href}
+              endContent={r.href ? <Icon icon={ChevronRight} color="secondary" /> : undefined}
+            />
+          ))}
+        </List>
       ) : (
         <EmptyState isCompact title={emptyTitle} description={emptyDescription} />
       )}

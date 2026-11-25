@@ -44,10 +44,13 @@ export type StatusTextProps = {
 export function StatusText({status, note}: StatusTextProps) {
   const {tone, label} = typeof status === 'string' ? STATUSES[status] : status;
   return (
-    <HStack gap={1.5} vAlign="center" wrap="wrap">
+    // The dot stays beside the label when a long label wraps; only the note moves to the next line.
+    <HStack gap={1.5} vAlign="center">
       <StatusDot variant={tone} label={label} />
-      <Text type="supporting" weight="medium">{label}</Text>
-      {note && <Text type="supporting">{note}</Text>}
+      <HStack gap={1.5} vAlign="center" wrap="wrap">
+        <Text type="supporting" weight="medium">{label}</Text>
+        {note && <Text type="supporting">{note}</Text>}
+      </HStack>
     </HStack>
   );
 }
