@@ -1,7 +1,7 @@
 import {Icon} from '@astryxdesign/core/Icon';
 import {HStack} from '@astryxdesign/core/Stack';
 import {Text} from '@astryxdesign/core/Text';
-import {Database, FileSpreadsheet, Plug, SquareTerminal, Workflow} from 'lucide-react';
+import {Database, FileSpreadsheet, Plug, SquareTerminal, User, Workflow} from 'lucide-react';
 import {type RefKind} from '../data';
 
 export const REF_ICON: Record<RefKind, typeof Workflow> = {
@@ -10,6 +10,7 @@ export const REF_ICON: Record<RefKind, typeof Workflow> = {
   dataset: Database,
   file: FileSpreadsheet,
   connection: Plug,
+  person: User,
 };
 
 

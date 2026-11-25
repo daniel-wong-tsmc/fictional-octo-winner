@@ -38,7 +38,7 @@ export default {
   schedule="First business day of each month, 8:00"
   nextRun="Tuesday, December 1, 8:00"
   approvers={['Daniel (you)']}
-  sendTo={['Slack: #finance-close']}
+  sendTo={['Priya Shah', 'finance@company.com']}
   runs={[]}
   editHref="#workflow-edit-2"
   onRunNow={() => {}}

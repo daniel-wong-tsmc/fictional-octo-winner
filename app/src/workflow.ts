@@ -76,7 +76,7 @@ export const MONTHLY_SALES_CLOSE: Workflow = {
   context: 'This workflow prepares the monthly sales close for the Finance team. Report every amount in US dollars, rounded to whole dollars. Use the five sales regions as Sales names them: US, Canada, Europe, UK and Japan. Never drop an order without saying why.',
   ...timing(SCHEDULE_PRESETS[0]),
   approver: PEOPLE[0],
-  destinations: ['Slack: #finance-close', 'Google Drive: Finance close pack'],
+  destinations: ['Priya Shah', 'finance@company.com'],
   outputFormat: 'Excel sheet',
   steps: [
     {
@@ -129,7 +129,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   context: 'This workflow reports last week’s revenue, Monday to Sunday. Count an order once, net of its refunds. Convert to US dollars at the rate on the order date. If a file is missing a column you need, stop and say which one rather than guessing.',
   ...timing(SCHEDULE_PRESETS[1]),
   approver: PEOPLE[0],
-  destinations: ['Slack: #finance-close'],
+  destinations: ['Priya Shah'],
   outputFormat: 'Single value',
   steps: [
     {
@@ -195,7 +195,7 @@ export const CUSTOMER_CHURN_LIST: Workflow = {
   nextRunAt: '',
   isDraft: true,
   approver: PEOPLE[2],
-  destinations: ['Email: Marco Ruiz'],
+  destinations: ['Marco Ruiz'],
   outputFormat: 'Excel sheet',
   steps: [
     {
@@ -251,7 +251,7 @@ export const AT_RISK_FOLLOW_UPS: Workflow = {
   context: 'This workflow turns the at-risk accounts Sales shares with us into a follow-up list for Finance. Amounts are in US dollars. Rank by what each account still owes, highest first, and keep each account’s owner so Finance knows who to call.',
   ...timing(SCHEDULE_PRESETS[1]),
   approver: PEOPLE[0],
-  destinations: ['Slack: #finance-close'],
+  destinations: ['finance@company.com'],
   outputFormat: 'Excel sheet',
   steps: [
     {

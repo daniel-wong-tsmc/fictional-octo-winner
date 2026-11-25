@@ -66,7 +66,8 @@ export function dataProblems(): string[] {
       for (const [kind, label, href] of out.feedsInto ?? []) {
         if (kind === 'step' && !isStep(label)) problems.push(`Ticket ${id}: feeds step "${label}", which doesn't exist.`);
         if (kind === 'workflow' && !workflows.has(label)) problems.push(`Ticket ${id}: feeds workflow "${label}", which doesn't exist.`);
-        if ((kind === 'connection' || kind === 'file') && !destinations.has(label)) problems.push(`Ticket ${id}: sends to "${label}", which no workflow sends to.`);
+        if (kind === 'person' && !destinations.has(label)) problems.push(`Ticket ${id}: sends to "${label}", whom no workflow sends to.`);
+        if (kind === 'connection' || kind === 'file') problems.push(`Ticket ${id}: sends to "${label}": results go to people, never to channels or folders.`);
         const ticketLink = href.match(/^#ticket-(\d+)$/);
         const workflowLink = href.match(/^#workflow-(\d+)$/);
         if (ticketLink && !TICKETS[Number(ticketLink[1])]) problems.push(`Ticket ${id}: links to ticket ${ticketLink[1]}, which doesn't exist.`);

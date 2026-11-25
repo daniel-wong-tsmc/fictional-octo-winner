@@ -3,7 +3,8 @@
 import type {StatusKey} from '@workspace/astryx-workflows/components/StatusText';
 
 export type Status = 'failed' | 'review' | 'stale' | 'draft' | 'done';
-export type RefKind = 'workflow' | 'step' | 'dataset' | 'file' | 'connection';
+/** person: someone a Handoff sends the result to, by name or email. */
+export type RefKind = 'workflow' | 'step' | 'dataset' | 'file' | 'connection' | 'person';
 
 /** A step page's status, as one of the shared statuses (STATUSES), so it reads the same as everywhere else. */
 export const STATUS: Record<Status, StatusKey> = {
@@ -136,7 +137,7 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: "Total October sales by region. Show each region's target and the difference in dollars and percent. Sort by the biggest miss first.",
     agentSummary: ['Totaled 5,402 orders into 5 regions', 'Matched each region to its October target', 'Sorted by gap, biggest shortfall first'],
     python: `orders = read_sheet("Orders in USD")\ntargets = read_sheet("Targets").query("Month == 'Oct'")\n\nsales = orders.groupby("Region")["Amount (USD)"].sum().rename("Sales (USD)")\nout = targets.join(sales, on="Region")\nout["Gap"] = out["Sales (USD)"] - out["Target"]\nout["Gap %"] = out["Gap"] / out["Target"]\nwrite_sheet("October summary", out.sort_values("Gap"))`,
-    outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home'], ['file', 'Google Drive: Finance close pack', '#home']], sheet: 'October summary'}],
+    outputs: [{name: 'October summary', stats: ['5 rows', '5 columns'], feedsInto: [['person', 'Priya Shah', '#home'], ['person', 'finance@company.com', '#home']], sheet: 'October summary'}],
     sheets: {
       'Orders in USD': {...ORDERS_USD, kind: 'Input', addedColumns: []},
       // One Google Drive workbook with three sheets. The step reads only Targets.
@@ -240,7 +241,7 @@ export const TICKETS: Record<number, Ticket> = {
     instructions: 'Rank the accounts by amount owed and write one line on why each is at risk.',
     agentSummary: ['Ranked 5 accounts by amount owed, highest first', 'Wrote one line on why each is at risk', 'Kept each account owner for Finance to call'],
     python: `accounts = read_sheet("At-risk accounts with amounts owed").sort_values("Owed", ascending=False)\naccounts["Why"] = accounts.apply(lambda a: f"{a['Signal']}, owes {a['Owed']:,.0f}", axis=1)\nwrite_sheet("Follow-up list", accounts[["Account", "Owner", "Owed", "Why"]])`,
-    outputs: [{name: 'Follow-up list', stats: ['5 rows', '4 columns'], feedsInto: [['connection', 'Slack: #finance-close', '#home']], sheet: 'Follow-up list'}],
+    outputs: [{name: 'Follow-up list', stats: ['5 rows', '4 columns'], feedsInto: [['person', 'finance@company.com', '#home']], sheet: 'Follow-up list'}],
     sheets: {
       'Accounts with amounts owed': {kind: 'Input', columns: ['Account', 'Owner', 'Signal', 'Owed'], rows: [['Bluefin Logistics', 'Sam Okafor', 'Renewal in 14 days, no reply', '71,200'], ['Northwind Traders', 'Ana Lopez', 'Usage down 60% in 30 days', '48,950'], ['Harbor Health', 'Lee Tanaka', 'Invoice 45 days overdue', '39,300']]},
       'Follow-up list': {kind: 'Output', columns: ['Account', 'Owner', 'Owed', 'Why'], addedColumns: [3], rows: [['Bluefin Logistics', 'Sam Okafor', '71,200', 'Renewal in 14 days, no reply, owes 71,200'], ['Northwind Traders', 'Ana Lopez', '48,950', 'Usage down 60% in 30 days, owes 48,950'], ['Harbor Health', 'Lee Tanaka', '39,300', 'Invoice 45 days overdue, owes 39,300']]},

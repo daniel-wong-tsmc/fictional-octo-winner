@@ -17,7 +17,8 @@ import {TextArea} from '@astryxdesign/core/TextArea';
 import {TextInput} from '@astryxdesign/core/TextInput';
 import {FileInput} from '@astryxdesign/core/FileInput';
 import {Selector} from '@astryxdesign/core/Selector';
-import {MultiSelector} from '@astryxdesign/core/MultiSelector';
+import {Tokenizer} from '@astryxdesign/core/Tokenizer';
+import {createStaticSource} from '@astryxdesign/core/Typeahead';
 import {Switch} from '@astryxdesign/core/Switch';
 import {Slider} from '@astryxdesign/core/Slider';
 import {Collapsible} from '@astryxdesign/core/Collapsible';
@@ -68,7 +69,7 @@ type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | 'shared
 type InstructionsStep = {kind: 'instructions'; name: string; text: string; python: string; isCodeEdited: boolean; topP: number; temperature: number};
 /** Settings a new LLM step starts with: no code yet, and low temperature, since these steps work on numbers. */
 const LLM_DEFAULTS = {python: '', isCodeEdited: false, topP: 1, temperature: 0.2};
-type OutputStep = {kind: 'output'; name: string; format: WorkflowDataFormat; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
+type OutputStep = {kind: 'output'; name: string; format: WorkflowDataFormat; needsOk: boolean; approver: string; sendTo: string[]};
 type Step = InputStep | InstructionsStep | OutputStep;
 
 /** The board's step kinds, named and drawn from the shared WORKFLOW_TILE_KINDS. */
@@ -90,16 +91,19 @@ const INSTRUCTION_EXAMPLES: [string, string][] = [
   ['Total vs target', 'Total sales by region. Show each region’s target and the gap in dollars and percent. Biggest miss first.'],
   ['Flag misses', 'Flag any region more than 5% below target.'],
 ];
-const SEND_OPTIONS = [
-  {type: 'section' as const, title: 'People', options: ['Email: Priya Shah', 'Email: Marco Ruiz', 'Email: finance@company.com'].map(v => ({value: v, label: v}))},
-  {type: 'section' as const, title: 'Channels and folders', options: ['Slack: #finance-close', 'Google Drive: Finance close pack', 'SharePoint: Close archive'].map(v => ({value: v, label: v}))},
-];
+/**
+ * People a Handoff can send to, offered as you type. Results go only to people, by name or email; anyone not
+ * listed is added as typed.
+ */
+const SEND_SOURCE = createStaticSource(
+  [...PEOPLE.slice(1).map(personName), 'finance@company.com'].map(p => ({id: p, label: p})),
+);
 const UPLOAD_EXAMPLE = {fileName: 'Sales close – Oct 2026.xlsx', sheets: ['Orders', 'Rates']};
 
 function blankStep(kind: StepKind, n: number): Step {
   if (kind === 'input') return {kind, source: null, fileName: '', sheets: [], app: '', resource: ''};
   if (kind === 'instructions') return {kind, name: '', text: INSTRUCTION_EXAMPLES[n % INSTRUCTION_EXAMPLES.length][1], ...LLM_DEFAULTS};
-  return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: ['Slack: #finance-close'], shareWithWorkflows: false};
+  return {kind, name: 'October summary', format: 'Excel sheet', needsOk: true, approver: PEOPLE[0], sendTo: []};
 }
 
 function isReady(s: Step): boolean {
@@ -147,7 +151,7 @@ function trialFor(node: BoardNode, board: BoardNode[], links: Link[]): TrialResu
 const trialButtonLabel = (step: Step) => (step.kind === 'output' ? 'See output' : 'See result');
 
 function sendSentence(s: OutputStep): string {
-  const to = s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet (pick who gets it in the tile)';
+  const to = s.sendTo.length ? s.sendTo.join(', ') : 'nobody yet (type who gets it in the tile)';
   return s.needsOk ? `On a real run this waits for approval from ${s.approver}, then goes to ${to}.` : `On a real run this goes straight to ${to}.`;
 }
 
@@ -726,21 +730,16 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
           <Text type="label">Who gets it</Text>
           <Switch label="Needs approval before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
           {step.needsOk && <Selector label="Who approves it" options={PEOPLE} value={step.approver} onChange={approver => onChange({...step, approver})} />}
-          <MultiSelector
+          <Tokenizer
             label="Send it to"
-            placeholder="Pick people, channels or folders"
-            options={SEND_OPTIONS}
-            value={step.sendTo}
-            onChange={sendTo => onChange({...step, sendTo})}
-            triggerDisplay="labels"
-            hasSearch
+            description="Type a person’s name or email, then press Enter."
+            placeholder="Name or email"
+            searchSource={SEND_SOURCE}
+            hasCreate
+            debounceMs={0}
+            value={step.sendTo.map(p => ({id: p, label: p}))}
+            onChange={people => onChange({...step, sendTo: people.map(p => p.label)})}
             width="100%"
-          />
-          <Switch
-            label="Let other workflows use it"
-            description="Other workflows can pick this output as an input."
-            value={step.shareWithWorkflows}
-            onChange={shareWithWorkflows => onChange({...step, shareWithWorkflows})}
           />
         </>
       )}
@@ -852,7 +851,7 @@ export function boardFromWorkflow(w: Workflow): SavedBoard {
   const output: BoardNode = {
     id: 'out',
     position: {x: COL * (w.steps.length + 1), y: middle},
-    step: {kind: 'output', name: w.steps[w.steps.length - 1].output, format: w.outputFormat, needsOk: true, approver: w.approver, sendTo: w.destinations, shareWithWorkflows: w.shares.length > 0},
+    step: {kind: 'output', name: w.steps[w.steps.length - 1].output, format: w.outputFormat, needsOk: true, approver: w.approver, sendTo: w.destinations},
   };
   const links = [
     ...w.steps.flatMap(st => st.inputs.map((_, k) => link(`${st.id}-in-${k}`, st.id))),
