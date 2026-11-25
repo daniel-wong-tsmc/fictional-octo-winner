@@ -36,7 +36,8 @@ export type WorkflowDataFormat = (typeof WORKFLOW_DATA_FORMATS)[number];
 /**
  * What a tile says, by kind. Each field is one setting of the tile, and each kind always shows the same
  * details in the same order:
- * - Input: title is the source; details From, Format (only for data another workflow passes on), Reads.
+ * - Input: details Data type, then Name: what kind of data it is and what it's called. No title line; its title
+ *   (for labels and side panels) is the name.
  * - LLM: title is "Step N" (plus its name when it has one); details Instructions.
  * Where a tile leads is shown by the lines or arrows around it, not in its text.
  * - Handoff: title is the output's name; details Format, Approver, Sends to.
@@ -70,25 +71,37 @@ export type WorkflowTileContent =
       sendTo: string[];
     };
 
-const VIA_LABEL: Record<WorkflowInputVia, string> = {
-  upload: 'Excel upload',
-  mcp: 'App, through MCP',
-  workflow: 'Another workflow',
-  shared: 'Shared with you',
-};
 const NOT_SET = 'Not set yet';
 /** Fits the longest label, "Instructions", so values start in one column. */
 const LABEL_WIDTH = 84;
 
+type InputContent = Extract<WorkflowTileContent, {kind: 'input'}>;
+const fileType = (name: string): WorkflowDataFormat | undefined =>
+  /\.csv$/i.test(name) ? 'CSV file' : /\.xlsx?$/i.test(name) ? 'Excel sheet' : undefined;
+
+/**
+ * What kind of data an input is: the format another workflow passes it on in, the type of an uploaded or app
+ * file, or for other app data a table from that app.
+ */
+function inputDataType(c: InputContent): string {
+  if (!c.via) return '';
+  if (c.format) return c.format;
+  if (c.via === 'upload') return fileType(c.source) ?? 'Excel sheet';
+  return fileType(c.reads) ?? (c.source ? `Table from ${c.source}` : '');
+}
+
+/** What the data is called: the uploaded file, or what it reads from an app or another workflow. */
+const inputName = (c: InputContent) => (c.via === 'upload' ? c.source : c.reads);
+
 /** The title and labeled details for a tile. Exported so text versions (search, tooltips) match the tile. */
 export function tileText(c: WorkflowTileContent): {title: string; details: {label: string; value: string}[]} {
   if (c.kind === 'input') {
+    const name = inputName(c);
     return {
-      title: c.source || 'Add your data',
+      title: name || 'Add your data',
       details: [
-        {label: 'From', value: c.via ? VIA_LABEL[c.via] : NOT_SET},
-        ...(c.format ? [{label: 'Format', value: c.format}] : []),
-        {label: 'Reads', value: c.reads || NOT_SET},
+        {label: 'Data type', value: inputDataType(c) || NOT_SET},
+        {label: 'Name', value: name || NOT_SET},
       ],
     };
   }
@@ -150,7 +163,7 @@ export function WorkflowTile({content, status, footer, detailMaxLines, detailLay
         </HStack>
         {status && <StatusText status={status} />}
       </HStack>
-      <Text weight="semibold">{title}</Text>
+      {content.kind !== 'input' && <Text weight="semibold">{title}</Text>}
       {/* Each detail is its label, then its value: the same labels in the same order for every tile of a kind. */}
       <MetadataList label={{position: detailLayout === 'inline' ? 'start' : 'top', width: LABEL_WIDTH}}>
         {details.map(d => (

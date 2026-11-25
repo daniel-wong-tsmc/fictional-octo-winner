@@ -1158,8 +1158,9 @@ export function toColumns(board: BoardNode[], links: Link[], sections: Section[]
     .filter(n => n.sectionId && n.step.kind === 'output' && links.some(l => l.source === n.id && isOwn(l.target)))
     .map(n => {
       const name = n.step.kind === 'output' ? n.step.name : '';
+      const format = n.step.kind === 'output' ? n.step.format : undefined;
       const title = sections.find(x => x.id === n.sectionId)?.title ?? 'Another workflow';
-      return {id: n.id, content: {kind: 'input', source: title, via: 'workflow', reads: name}};
+      return {id: n.id, content: {kind: 'input', source: title, via: 'workflow', reads: name, format}};
     });
   if (!feeds.length) return columns;
   // Inputs run first, so these join the first column when it holds inputs, or start a new one.
