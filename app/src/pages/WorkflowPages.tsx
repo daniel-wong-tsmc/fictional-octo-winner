@@ -50,13 +50,15 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, 
     href: RUN_DETAILS[w.id]?.[r.period] ? runHref(w.id, i) : undefined,
   }));
 
+  const tiles = toColumns(saved.board, saved.links, saved.sections).flat().map(st => st.content);
   return (
     <WorkflowOverview
       name={name}
       summary={w.description}
       schedule={w.schedule}
       nextRun={w.nextRun}
-      {...handoffDetails(toColumns(saved.board, saved.links, saved.sections).flat().map(st => st.content))}
+      {...handoffDetails(tiles)}
+      tiles={tiles}
       runs={runs}
       editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}
@@ -80,6 +82,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel, fullPageHre
       schedule={w.schedule}
       nextRun={w.nextRunAt ? w.nextRun : undefined}
       {...handoffDetails(stages)}
+      tiles={stages}
       runs={[]}
       editHref={`#workflow-edit-${w.id}`}
       onRunNow={runNow(toast)}

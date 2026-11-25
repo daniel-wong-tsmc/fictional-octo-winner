@@ -25,7 +25,8 @@ import {PEOPLE, PREFILLED_WORKFLOWS} from '../workflow';
 import {workflowOwner} from '../sharedData';
 import {CHECK_LABEL, shapeOf, type Handoff} from '../handoffs';
 import {WorkflowWorkbook, type WorkflowWorkbookSheet} from '@workspace/astryx-workflows/components/WorkflowWorkbook';
-import {OverviewFrame, OverviewHeading} from '@workspace/astryx-workflows/components/WorkflowOverview';
+import {OverviewFrame, OverviewHeading, markdownTable, overviewMarkdown} from '@workspace/astryx-workflows/components/WorkflowOverview';
+import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import {StatusText} from '@workspace/astryx-workflows/components/StatusText';
 import {RefLabel} from './shared';
 import {AgentDidList, ShowCode} from './runParts';
@@ -328,6 +329,21 @@ export function TicketPage({
         note={`Part of ${t.workflow}`}
         name={t.step}
         nameHref={isInPanel ? fullPageHref : undefined}
+        share={fullPageHref ? {href: fullPageHref, markdown: overviewMarkdown({
+          name: t.step,
+          status: STATUSES[STATUS[status]].label,
+          summary: t.ran,
+          details: [
+            {label: 'Part of', value: t.workflow},
+            {label: 'Instructions', value: instructions},
+            {label: 'Inputs', value: t.inputs.map(d => d.name).join(', ')},
+            {label: 'Output', value: result.name},
+          ],
+          sections: [
+            ...(t.agentSummary?.length ? [{title: 'What the agent did', body: t.agentSummary.map(l => `- ${l}`).join('\n')}] : []),
+            ...(outputSheets[0]?.[1].columns && outputSheets[0][1].rows ? [{title: `Output: ${result.name}`, body: markdownTable(outputSheets[0][1].columns!, outputSheets[0][1].rows!)}] : []),
+          ],
+        })} : undefined}
         summary={isApproved && t.status !== 'done' ? 'Approved just now. The next step and any shared values use this output.' : t.ran}
         actions={
           <>

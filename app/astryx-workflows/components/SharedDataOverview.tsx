@@ -2,7 +2,7 @@ import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, FileSpreadsheet, Plus, Send, User, Workflow as WorkflowIcon} from 'lucide-react';
-import {OverviewFrame, OverviewDetails, OverviewHeading, OverviewRuns, OverviewSection, type OverviewRun} from '../parts/OverviewParts';
+import {OverviewFrame, OverviewDetails, OverviewHeading, OverviewRuns, OverviewSection, markdownTable, overviewMarkdown, type OverviewRun} from '../parts/OverviewParts';
 import {WorkflowSheetTable, type WorkflowSheet} from './WorkflowSheetTable';
 
 export type SharedDataOverviewProps = {
@@ -46,12 +46,28 @@ export function SharedDataOverview({
   isInPanel = false,
   fullPageHref,
 }: SharedDataOverviewProps) {
+  const note = failure ? `Last run failed ${updated}` : `Updated ${updated}`;
+  const details = [
+    {label: 'Shared by', icon: User, value: sharedBy},
+    {label: 'From their workflow', icon: WorkflowIcon, value: workflow},
+    {label: 'Updates', icon: CalendarClock, value: updates},
+    {label: 'Format', icon: FileSpreadsheet, value: format},
+  ];
+  const markdown = overviewMarkdown({
+    name,
+    status: `${failure ? 'Failed' : 'Ready'}, ${note.charAt(0).toLowerCase()}${note.slice(1)}`,
+    summary,
+    details,
+    sections: sheet.columns && sheet.rows ? [{title: 'The data', body: `${sheetNote}\n\n${markdownTable(sheet.columns, sheet.rows)}`}] : [],
+    runs,
+  });
   return (
-    <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
+    <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel} aside={<OverviewDetails items={details} />}>
       <OverviewHeading
         status={failure ? 'failed' : 'ready'}
-        note={failure ? `Last run failed ${updated}` : `Updated ${updated}`}
+        note={note}
         name={name}
+        share={fullPageHref ? {href: fullPageHref, markdown} : undefined}
         nameHref={isInPanel ? fullPageHref : undefined}
         summary={summary}
         actions={
@@ -64,15 +80,6 @@ export function SharedDataOverview({
       />
 
       {failure && <Banner status="error" title="No new data this time." description={failure.message} collapsible={false} />}
-
-      <OverviewDetails
-        items={[
-          {label: 'Shared by', icon: User, value: sharedBy},
-          {label: 'From their workflow', icon: WorkflowIcon, value: workflow},
-          {label: 'Updates', icon: CalendarClock, value: updates},
-          {label: 'Format', icon: FileSpreadsheet, value: format},
-        ]}
-      />
 
       <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={`It appears here once ${workflow} runs.`} />
 

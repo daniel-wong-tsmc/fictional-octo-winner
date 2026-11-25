@@ -7,7 +7,7 @@ export default {
   keywords: ['shared data page', 'data detail', 'dataset page', 'handed off data', 'upstream output'],
   usage: {
     description:
-      'The full page for data someone else’s workflow shares with you: ready or failed and when, what it holds, who shares it and from which workflow, how often it updates and its format, the recent runs of the workflow that makes it, then its rows. Ready data offers Use in a new workflow; failed data shows why and a button to ask the owner. It is built from the same parts as WorkflowOverview, so the two pages read alike.',
+      'The full page for data someone else’s workflow shares with you: ready or failed and when, what it holds, who shares it and from which workflow, how often it updates and its format, the recent runs of the workflow that makes it, then its rows. Ready data offers Use in a new workflow; failed data shows why and a button to ask the owner. It is built from the same parts as WorkflowOverview, so the two pages read alike. Layout: the content (heading, Recent runs, The data) in the middle, which scrolls; the details in a column on the right that is short enough never to scroll (below the content on a phone). The heading starts with Copy link and Copy as Markdown, so the page can be shared.',
     bestPractices: [
       {guidance: true, description: 'After a failed run, pass the rows from the last run that worked and say so in sheetNote.'},
       {guidance: true, description: 'Pass the runs in the same shape as a workflow’s runs, newest first.'},
@@ -28,7 +28,7 @@ export default {
     {name: 'useHref', type: 'string', description: 'Where Use in a new workflow goes.', required: true},
     {name: 'failure', type: '{message: string; askLabel: string; onAsk: () => void}', description: 'Set when the last run failed. Shows the message and a button to ask the owner instead of Use in a new workflow.'},
     {name: 'isInPanel', type: 'boolean', description: 'Shown in a side panel, which has its own header: leaves out the breadcrumbs.', default: 'false'},
-    {name: 'fullPageHref', type: 'string', description: 'With isInPanel: the full page’s address. The title becomes a link to it, in place of an Open full page button.'},
+    {name: 'fullPageHref', type: 'string', description: 'The page’s own address. Copy link copies it and Copy as Markdown links to it; with isInPanel the title becomes a link to it.'},
     {name: 'homeHref', type: 'string', description: 'Where the Home breadcrumb goes.', default: "'#home'"},
   ],
   examples: [

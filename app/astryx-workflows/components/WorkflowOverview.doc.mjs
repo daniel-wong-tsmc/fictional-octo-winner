@@ -7,7 +7,7 @@ export default {
   keywords: ['workflow page', 'workflow detail', 'automation overview', 'pipeline page', 'workflow summary'],
   usage: {
     description:
-      'The full page for one workflow: on/off state and next run, schedule, approvers and destinations, then its recent runs. It includes Run now, Edit workflow and Delete workflow (with a confirm step). Its tiles are not shown here; Edit workflow opens them on the board. It is built from the same parts as SharedDataOverview, so the two pages read alike. Use it for every workflow page, prefilled or user-built, so they all look the same. Use the workflow builder board to create or change a workflow.',
+      'The full page for one workflow: on/off state and next run, schedule, approvers and destinations, then its recent runs. It includes Run now, Edit workflow and Delete workflow (with a confirm step). Its tiles are not shown here; Edit workflow opens them on the board. It is built from the same parts as SharedDataOverview, so the two pages read alike. Use it for every workflow page, prefilled or user-built, so they all look the same. Use the workflow builder board to create or change a workflow. Layout: the content (heading, Recent runs) in the middle, which scrolls; the details in a column on the right that is short enough never to scroll (below the content on a phone). The heading starts with Copy link and Copy as Markdown, so the page can be shared.',
     bestPractices: [
       {guidance: true, description: 'Read approvers and sendTo from the workflow’s Handoff tiles, so the page matches the board.'},
       {guidance: true, description: 'Pass runs newest first, with a result that says what happened, such as the step where a run failed.'},
@@ -27,7 +27,8 @@ export default {
     {name: 'onDelete', type: '() => void', description: 'Called after the person confirms the delete.', required: true},
     {name: 'isDraft', type: 'boolean', description: 'A draft hasn’t been turned on: the page says Draft and shows no next run.', default: 'false'},
     {name: 'isInPanel', type: 'boolean', description: 'Shown in a side panel, which has its own header: leaves out the breadcrumbs.', default: 'false'},
-    {name: 'fullPageHref', type: 'string', description: 'With isInPanel: the full page’s address. The title becomes a link to it, in place of an Open full page button.'},
+    {name: 'tiles', type: 'WorkflowTileContent[]', description: 'The workflow’s tiles in run order. Copy as Markdown lists them as Steps.'},
+    {name: 'fullPageHref', type: 'string', description: 'The page’s own address. Copy link copies it and Copy as Markdown links to it; with isInPanel the title becomes a link to it.'},
     {name: 'homeHref', type: 'string', description: 'Where the Home breadcrumb goes.', default: "'#home'"},
   ],
   examples: [
