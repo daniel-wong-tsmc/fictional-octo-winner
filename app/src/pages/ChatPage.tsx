@@ -6,10 +6,11 @@ import {TextInput} from '@astryxdesign/core/TextInput';
 import {ChatMessage, ChatMessageBubble, ChatMessageList} from '@astryxdesign/core/Chat';
 import {Sparkles} from 'lucide-react';
 import type {Chat} from '../chats';
+import {shortDateTime} from '../dates';
 
 /** One past conversation with the agent, read only. Continuing it comes with the real build. */
 export function ChatPage({chat}: {chat: Chat}) {
-  const updated = new Date(chat.updatedAt).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false});
+  const updated = shortDateTime(chat.updatedAt);
   return (
     <Layout
       height="fill"

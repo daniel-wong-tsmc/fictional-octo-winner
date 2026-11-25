@@ -1,7 +1,7 @@
 import {useToast} from '@astryxdesign/core/Toast';
 import {SharedDataOverview} from '@workspace/astryx-workflows/components/SharedDataOverview';
 import {failedMessage, personName, type SharedData} from '../sharedData';
-import {shortDateTime} from '../tasks';
+import {shortDateTime} from '../dates';
 
 /**
  * The page for data someone else's workflow shares with you. It renders SharedDataOverview, which is built

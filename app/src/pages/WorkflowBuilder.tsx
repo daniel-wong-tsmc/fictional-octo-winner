@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode} from 'react';
 import {
   Background, BackgroundVariant, BaseEdge, EdgeLabelRenderer, Handle, Panel, Position, ReactFlow, ReactFlowProvider,
   applyNodeChanges, getBezierPath, useReactFlow, useUpdateNodeInternals, useViewport,
@@ -8,7 +8,6 @@ import '@xyflow/react/dist/style.css';
 import {Layout, LayoutContent, LayoutFooter, LayoutHeader, LayoutPanel} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
-import {List, ListItem} from '@astryxdesign/core/List';
 import {Button} from '@astryxdesign/core/Button';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
@@ -29,7 +28,6 @@ import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {Popover} from '@astryxdesign/core/Popover';
 import {IconButton} from '@astryxdesign/core/IconButton';
 import {Divider} from '@astryxdesign/core/Divider';
-import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Dialog, DialogHeader} from '@astryxdesign/core/Dialog';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
@@ -43,7 +41,8 @@ import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
 import {TILE_RUN_STATUS, type TileRunDetail} from '../runs';
-import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
+import {AgentDidList, ShowCode} from './runParts';
+import {STATUSES, StatusText} from '@workspace/astryx-workflows/components/StatusText';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
@@ -336,16 +335,10 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
           <VStack gap={2}>
             <Text type="supporting">{`${sharedFrom(d)}. ${d.format}.`}</Text>
             {d.lastRun.result === 'ready' ? (
-              <HStack gap={1.5} vAlign="center">
-                <StatusDot variant="success" label="Ready" />
-                <Text type="supporting">{`Ready ${shortDateTime(d.lastRun.at)}. You get the new version each time it runs.`}</Text>
-              </HStack>
+              <StatusText status="ready" note={`${shortDateTime(d.lastRun.at)}. You get the new version each time it runs.`} />
             ) : (
               <VStack gap={2}>
-                <HStack gap={1.5} vAlign="center">
-                  <StatusDot variant="error" label="Failed" />
-                  <Text type="supporting">{failedMessage(d)}</Text>
-                </HStack>
+                <StatusText status="failed" note={failedMessage(d)} />
                 <HStack>
                   <Button
                     label={`Ask ${personName(d.owner)}`}
@@ -422,10 +415,10 @@ function InputPanel({step, onChange}: {step: InputStep; onChange: (s: InputStep)
       />
       {app && (
         <HStack gap={1.5} vAlign="center" hAlign="between" wrap="wrap">
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={app.isConnected ? 'success' : 'warning'} label={app.isConnected ? 'Connected' : 'App not connected'} />
-            <Text type="supporting">{app.isConnected ? 'Connected through MCP. Read only.' : 'This app isn’t connected yet. The step waits until it is.'}</Text>
-          </HStack>
+          <StatusText
+            status={app.isConnected ? {tone: 'success', label: 'Connected'} : {tone: 'warning', label: 'App not connected'}}
+            note={app.isConnected ? 'through MCP. Read only.' : 'This app isn’t connected yet. The step waits until it is.'}
+          />
           {!app.isConnected && (
             <Button label="Request access" size="sm" onClick={() => toast({body: `Asked your workspace admin to connect ${app.name}. You can keep building meanwhile.`})} />
           )}
@@ -493,18 +486,30 @@ function PythonCode({code, isEdited, onSave}: {code: string; isEdited: boolean; 
   );
 }
 
+/**
+ * The top of a side panel: the tile's kind (icon and name), its title, and an optional row below, such as a
+ * status or a summary.
+ */
+function TileHeading({icon, kind, title, children}: {icon: typeof Upload; kind: string; title: string; children?: ReactNode}) {
+  return (
+    <VStack gap={1}>
+      <HStack gap={2} vAlign="center">
+        <Icon icon={icon} size="sm" color="secondary" />
+        <Text type="supporting" weight="medium">{kind}</Text>
+      </HStack>
+      <Heading level={3}>{title}</Heading>
+      {children}
+    </VStack>
+  );
+}
+
 /** The side panel for a selected section: which workflow it is, and how to open or remove it. */
 function SectionPanel({section, openHref, onOpen, onRemove}: {section: Section; openHref?: string; onOpen: (href: string) => void; onRemove: () => void}) {
   return (
     <VStack gap={4}>
-      <VStack gap={1}>
-        <HStack gap={2} vAlign="center">
-          <Icon icon={WorkflowIcon} size="sm" color="secondary" />
-          <Text type="supporting" weight="medium">Saved workflow</Text>
-        </HStack>
-        <Heading level={3}>{section.title}</Heading>
+      <TileHeading icon={WorkflowIcon} kind="Saved workflow" title={section.title}>
         <Text type="supporting">{section.summary}</Text>
-      </VStack>
+      </TileHeading>
       <Text type="supporting">
         Drag the section to move everything in it. Draw a line from its Handoff into an LLM step of this workflow to use its result.
       </Text>
@@ -543,19 +548,9 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
   const status = run ? STATUSES[TILE_RUN_STATUS[run.status]] : null;
   return (
     <VStack gap={4}>
-      <VStack gap={1}>
-        <HStack gap={2} vAlign="center">
-          <Icon icon={info.icon} size="sm" color="secondary" />
-          <Text type="supporting" weight="medium">{info.label}</Text>
-        </HStack>
-        <Heading level={3}>{title}</Heading>
-        {status && (
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={status.tone} label={status.label} />
-            <Text weight="medium">{status.label}</Text>
-          </HStack>
-        )}
-      </VStack>
+      <TileHeading icon={info.icon} kind={info.label} title={title}>
+        {status && <StatusText status={status} />}
+      </TileHeading>
       {run?.ticketId !== undefined && TICKETS[run.ticketId] && (
         <StepPageButton ticketId={run.ticketId} forStep={step.kind === 'input' ? TICKETS[run.ticketId].step : undefined} />
       )}
@@ -577,12 +572,7 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
       )}
 
       {run?.did && run.did.length > 0 && (
-        <VStack gap={1.5}>
-          <Text type="label">What the agent did</Text>
-          <List hasDividers={false} density="compact" edge="outset">
-            {run.did.map(line => <ListItem key={line} label={<Text type="supporting">{line}</Text>} />)}
-          </List>
-        </VStack>
+        <AgentDidList lines={run.did} />
       )}
 
       {run?.output && (
@@ -594,9 +584,7 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
       )}
 
       {step.kind === 'instructions' && step.python && run && run.status !== 'notRun' && (
-        <Collapsible defaultIsOpen={false} chevronPosition="start" trigger={<Text weight="medium">Show the code</Text>}>
-          <CodeBlock code={step.python} language="python" width="100%" size="sm" isWrapped />
-        </Collapsible>
+        <ShowCode code={step.python} />
       )}
 
     </VStack>
@@ -624,28 +612,14 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
   const info = KIND_INFO[step.kind];
   return (
     <VStack gap={4}>
-      <VStack gap={1}>
-        <HStack gap={2} vAlign="center">
-          <Icon icon={info.icon} size="sm" color="secondary" />
-          <Text type="supporting" weight="medium">{info.label}</Text>
-        </HStack>
-        <Heading level={3}>{title}</Heading>
-      </VStack>
+      <TileHeading icon={info.icon} kind={info.label} title={title} />
 
       {run && (
         <>
           <VStack gap={1.5}>
             <Text type="label">Last run</Text>
-            <HStack gap={1.5} vAlign="center">
-              <StatusDot variant={run.tone} label={run.label} />
-              <Text weight="medium">{run.label}</Text>
-              {run.ran && <Text type="supporting">{run.ran}</Text>}
-            </HStack>
-            {step.kind === 'instructions' && run.summary.length > 0 && (
-              <List hasDividers={false} density="compact" edge="outset">
-                {run.summary.map(line => <ListItem key={line} label={<Text type="supporting">{line}</Text>} />)}
-              </List>
-            )}
+            <StatusText status={{tone: run.tone, label: run.label}} note={run.ran} />
+            {step.kind === 'instructions' && <AgentDidList lines={run.summary} hasLabel={false} />}
             <StepPageButton ticketId={run.ticketId} />
           </VStack>
           <Divider />
@@ -1049,9 +1023,8 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onOpen}: {
               label="Library"
               content={
                 <VStack gap={2}>
-                  <VStack gap={2}>
                   <Text type="supporting">Saved workflows. Drag one onto the board, or click to add it.</Text>
-                  {library.length === 0 && <Text type="supporting">No saved workflows yet.</Text>}
+                  {library.length === 0 && <EmptyState isCompact title="No saved workflows yet." />}
                   {library.map(w => (
                     <HStack key={w.key} gap={1} vAlign="center">
                       <ClickableCard
@@ -1090,7 +1063,6 @@ function BoardToolbar({onAdd, library, onAddWorkflow, onOpen}: {
                       />
                     </HStack>
                   ))}
-                  </VStack>
                 </VStack>
               }>
               <Button label="Library" variant="ghost" icon={<Icon icon={Library} />} isIconOnly={isSmall} tooltip="Saved workflows" />

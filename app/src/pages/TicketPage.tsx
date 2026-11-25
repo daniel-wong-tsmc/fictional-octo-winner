@@ -1,17 +1,13 @@
 import {useState} from 'react';
 import {FileInput} from '@astryxdesign/core/FileInput';
-import {Layout, LayoutContent, LayoutHeader} from '@astryxdesign/core/Layout';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Grid} from '@astryxdesign/core/Grid';
-import {Heading, Text} from '@astryxdesign/core/Text';
+import {Text} from '@astryxdesign/core/Text';
 import {Button} from '@astryxdesign/core/Button';
 import {IconButton} from '@astryxdesign/core/IconButton';
-import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Banner} from '@astryxdesign/core/Banner';
 import {Card} from '@astryxdesign/core/Card';
 import {TextArea} from '@astryxdesign/core/TextArea';
-import {Collapsible} from '@astryxdesign/core/Collapsible';
-import {CodeBlock} from '@astryxdesign/core/CodeBlock';
 import {List, ListItem} from '@astryxdesign/core/List';
 import {Token} from '@astryxdesign/core/Token';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
@@ -21,13 +17,16 @@ import {Icon} from '@astryxdesign/core/Icon';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
 import {useToast} from '@astryxdesign/core/Toast';
 import {
-  ArrowRightLeft, Bot, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Pencil, RotateCcw, Sparkles, Trash2,
+  ArrowRightLeft, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Pencil, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
-import {TICKETS, type DataSet, type Sheet} from '../data';
+import {STATUS, TICKETS, type DataSet, type Sheet} from '../data';
 import {PREFILLED_WORKFLOWS} from '../workflow';
 import {CHECK_LABEL, describeRule, shapeOf, type Handoff} from '../handoffs';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
-import {RefLabel, StatusLabel} from './shared';
+import {OverviewFrame, OverviewHeading} from '@workspace/astryx-workflows/components/WorkflowOverview';
+import {StatusText} from '@workspace/astryx-workflows/components/StatusText';
+import {RefLabel} from './shared';
+import {AgentDidList, ShowCode} from './runParts';
 
 /* ---------- Inputs, result and handoffs as list rows ---------- */
 
@@ -45,10 +44,7 @@ function DataRow({data, onSelect}: {data: DataSet; onSelect: () => void}) {
           {data.emptyNote && <Text type="supporting">{data.emptyNote}</Text>}
           {data.stats && <Text type="supporting" hasTabularNumbers>{data.stats.join(' · ')}</Text>}
           {data.warning && (
-            <HStack gap={1.5} vAlign="center">
-              <StatusDot variant={data.isWarningStale ? 'warning' : 'error'} label={data.isWarningStale ? 'Out of date' : 'Problem'} />
-              <Text type="supporting" weight="medium">{data.warning}</Text>
-            </HStack>
+            <StatusText status={data.isWarningStale ? 'stale' : 'missingData'} note={data.warning} />
           )}
         </VStack>
       }
@@ -72,12 +68,10 @@ function HandoffInputRow({handoff, onRemove}: {handoff: Handoff; onRemove: () =>
             <Token size="sm" label={shapeOf(handoff.rule)} />
             <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
           </HStack>
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Waiting' : 'Ready'} />
-            <Text type="supporting" weight="medium">
-              {failed ? `Waiting: ${handoff.checkFailure} This step won't run until it passes.` : 'Fills in automatically on every run'}
-            </Text>
-          </HStack>
+          <StatusText
+            status={failed ? 'failed' : 'ready'}
+            note={failed ? `${handoff.checkFailure} This step won't run until it passes.` : 'Fills in automatically on every run'}
+          />
         </VStack>
       }
       endContent={<IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
@@ -124,14 +118,12 @@ function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void
             <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
           </HStack>
           {handoff.check !== 'none' && (
-            <HStack gap={1.5} vAlign="center">
-              <StatusDot variant={failed ? 'error' : 'success'} label={failed ? 'Check failed' : 'Check passed'} />
-              <Text type="supporting" weight="medium">
-                {failed
-                  ? `Check failed: ${CHECK_LABEL[handoff.check].toLowerCase()}. ${handoff.checkFailure}`
-                  : `Check passed: ${CHECK_LABEL[handoff.check].toLowerCase()}`}
-              </Text>
-            </HStack>
+            <StatusText
+              status={failed ? {tone: 'error', label: 'Check failed'} : {tone: 'success', label: 'Check passed'}}
+              note={failed
+                ? `${CHECK_LABEL[handoff.check]}. ${handoff.checkFailure}`
+                : CHECK_LABEL[handoff.check]}
+            />
           )}
           <HStack gap={1.5} vAlign="center" wrap="wrap">
             <Text type="supporting">Used by</Text>
@@ -223,10 +215,7 @@ function Workbook({
                 <Text type="supporting">{current.fromFile ? `From ${current.fromFile}` : 'No rows yet'}</Text>
               )}
               {!!current.addedColumns?.length && (
-                <HStack gap={1.5} vAlign="center">
-                  <StatusDot variant="info" label="Added by the agent" />
-                  <Text type="supporting">Column added by the agent</Text>
-                </HStack>
+                <StatusText status={{tone: 'info', label: 'Added by the agent'}} note="Column added by the agent" />
               )}
             </HStack>
           </>
@@ -321,76 +310,59 @@ export function TicketPage({
   };
 
   return (
-    <Layout
-      height="fill"
-      contentWidth={1240}
-      header={
-        isInPanel ? undefined : <LayoutHeader hasDivider padding={4}>
-          <Breadcrumbs>
-            <BreadcrumbItem href="#home">Home</BreadcrumbItem>
-            {workflowId !== undefined && <BreadcrumbItem href={`#workflow-${workflowId}`}>{t.workflow}</BreadcrumbItem>}
-            <BreadcrumbItem isCurrent>{t.step}</BreadcrumbItem>
-          </Breadcrumbs>
-        </LayoutHeader>
-      }
-      content={
-        <LayoutContent padding={6}>
-          <VStack gap={5}>
-            {/* Title and actions */}
-            <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
-              <VStack gap={1.5}>
-                <HStack gap={3} vAlign="center" wrap="wrap">
-                  <StatusLabel status={status} />
-                  <Text type="supporting">{`Part of ${t.workflow}`}</Text>
-                </HStack>
-                <Heading level={1} textWrap="balance">{t.step}</Heading>
-                <Text type="supporting">
-                  {isApproved && t.status !== 'done' ? 'Approved just now. The next step and any shared values use this output.' : t.ran}
-                </Text>
-              </VStack>
-              <VStack gap={1.5} hAlign="end">
-              <HStack gap={2} wrap="wrap">
-                <Button
-                  label={runLabel}
-                  variant={hasEdits && !(t.canApprove && !isApproved) ? 'primary' : 'secondary'}
-                  icon={<Icon icon={hasEdits ? Sparkles : RotateCcw} />}
-                  tooltip={hasEdits ? 'The agent rewrites the code from your new instructions, then runs it' : 'Runs the same code on the latest inputs'}
-                  onClick={() => preview(hasEdits ? 'Updating and running' : 'Running steps')}
-                />
-                {t.canApprove && !isApproved && (
-                  <Button
-                    label="Approve output"
-                    variant="primary"
-                    icon={<Icon icon={Check} />}
-                    onClick={() => {
-                      setIsApproved(true);
-                      onApprove(id);
-                      let dismiss = () => {};
-                      dismiss = toast({
-                        body: `Approved. Sent to ${destinations.length ? destinations.join(', ') : 'the next step'}.`,
-                        autoHideDuration: 10000,
-                        endContent: (
-                          <Button
-                            label="Undo"
-                            size="sm"
-                            onClick={() => {
-                              setIsApproved(false);
-                              onUndoApprove(id);
-                              dismiss();
-                              toast({body: 'Approval undone. Nothing was sent.'});
-                            }}
-                          />
-                        ),
-                      });
-                    }}
-                  />
-                )}
-              </HStack>
-              {t.canApprove && !isApproved && destinations.length > 0 && (
-                <Text type="supporting">{`Approving sends it to: ${destinations.join(', ')}`}</Text>
-              )}
-              </VStack>
-            </HStack>
+    <OverviewFrame
+      isInPanel={isInPanel}
+      crumbs={[
+        ...(workflowId !== undefined ? [{label: t.workflow, href: `#workflow-${workflowId}`}] : []),
+        {label: t.step},
+      ]}
+    >
+      <OverviewHeading
+        status={STATUS[status]}
+        note={`Part of ${t.workflow}`}
+        name={t.step}
+        summary={isApproved && t.status !== 'done' ? 'Approved just now. The next step and any shared values use this output.' : t.ran}
+        actions={
+          <>
+            <Button
+              label={runLabel}
+              variant={hasEdits && !(t.canApprove && !isApproved) ? 'primary' : 'secondary'}
+              icon={<Icon icon={hasEdits ? Sparkles : RotateCcw} />}
+              tooltip={hasEdits ? 'The agent rewrites the code from your new instructions, then runs it' : 'Runs the same code on the latest inputs'}
+              onClick={() => preview(hasEdits ? 'Updating and running' : 'Running steps')}
+            />
+            {t.canApprove && !isApproved && (
+              <Button
+                label="Approve output"
+                variant="primary"
+                icon={<Icon icon={Check} />}
+                onClick={() => {
+                  setIsApproved(true);
+                  onApprove(id);
+                  let dismiss = () => {};
+                  dismiss = toast({
+                    body: `Approved. Sent to ${destinations.length ? destinations.join(', ') : 'the next step'}.`,
+                    autoHideDuration: 10000,
+                    endContent: (
+                      <Button
+                        label="Undo"
+                        size="sm"
+                        onClick={() => {
+                          setIsApproved(false);
+                          onUndoApprove(id);
+                          dismiss();
+                          toast({body: 'Approval undone. Nothing was sent.'});
+                        }}
+                      />
+                    ),
+                  });
+                }}
+              />
+            )}
+          </>
+        }
+        actionsNote={t.canApprove && !isApproved && destinations.length > 0 ? `Approving sends it to: ${destinations.join(', ')}` : undefined}
+      />
 
             {t.banner && !isApproved && (
               <Banner status={t.banner.status} title={t.banner.title} description={t.banner.description} collapsible={false} />
@@ -433,25 +405,8 @@ export function TicketPage({
                     </VStack>
                   )}
                   <Divider />
-                    <VStack gap={2}>
-                      <HStack gap={1.5} vAlign="center">
-                        <Icon icon={Bot} size="sm" color="secondary" />
-                        <Text type="label">What the agent did</Text>
-                      </HStack>
-                      {t.agentSummary ? (
-                        <List listStyle="disc" density="compact">
-                          {t.agentSummary.map(line => <ListItem key={line} label={<Text>{line}</Text>} />)}
-                        </List>
-                      ) : (
-                        <Text type="supporting">Nothing yet. Run the step and the agent explains its work here in plain words.</Text>
-                      )}
-                    </VStack>
-                  <Collapsible
-                    defaultIsOpen={false}
-                    chevronPosition="start"
-                    trigger={<Text type="supporting" weight="medium">Show the code</Text>}>
-                    <CodeBlock code={code ?? t.python} language="python" width="100%" size="sm" isWrapped />
-                  </Collapsible>
+                  <AgentDidList lines={t.agentSummary ?? []} emptyText="Nothing yet. Run the step and the agent explains its work here in plain words." />
+                  <ShowCode code={code ?? t.python} />
                 </VStack>
               </Region>
             <Grid columns={{minWidth: 320, max: 2, repeat: 'fit'}} gap={3} align="stretch">
@@ -554,9 +509,6 @@ export function TicketPage({
               />
             )}
             <Text type="supporting" justify="center">Design prototype. Example data. Runs, uploads and downloads are not connected yet.</Text>
-          </VStack>
-        </LayoutContent>
-      }
-    />
+    </OverviewFrame>
   );
 }

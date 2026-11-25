@@ -1,10 +1,8 @@
 import {Button} from '@astryxdesign/core/Button';
 import {Banner} from '@astryxdesign/core/Banner';
-import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, FileSpreadsheet, Plus, Send, User, Workflow as WorkflowIcon} from 'lucide-react';
-import {STATUSES} from './StatusText';
-import {OverviewFrame, OverviewHeading, OverviewRuns, OverviewSection, type OverviewRun} from '../parts/OverviewParts';
+import {OverviewFrame, OverviewDetails, OverviewHeading, OverviewRuns, OverviewSection, type OverviewRun} from '../parts/OverviewParts';
 import {WorkflowSheetTable, type WorkflowSheet} from './WorkflowSheetTable';
 
 export type SharedDataOverviewProps = {
@@ -46,9 +44,9 @@ export function SharedDataOverview({
   isInPanel = false,
 }: SharedDataOverviewProps) {
   return (
-    <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
+    <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
-        status={STATUSES[failure ? 'failed' : 'ready']}
+        status={failure ? 'failed' : 'ready'}
         note={failure ? `Last run failed ${updated}` : `Updated ${updated}`}
         name={name}
         summary={summary}
@@ -63,12 +61,14 @@ export function SharedDataOverview({
 
       {failure && <Banner status="error" title="No new data this time." description={failure.message} collapsible={false} />}
 
-      <MetadataList orientation="horizontal">
-        <MetadataListItem label="Shared by" icon={<Icon icon={User} size="sm" />}>{sharedBy}</MetadataListItem>
-        <MetadataListItem label="From their workflow" icon={<Icon icon={WorkflowIcon} size="sm" />}>{workflow}</MetadataListItem>
-        <MetadataListItem label="Updates" icon={<Icon icon={CalendarClock} size="sm" />}>{updates}</MetadataListItem>
-        <MetadataListItem label="Format" icon={<Icon icon={FileSpreadsheet} size="sm" />}>{format}</MetadataListItem>
-      </MetadataList>
+      <OverviewDetails
+        items={[
+          {label: 'Shared by', icon: User, value: sharedBy},
+          {label: 'From their workflow', icon: WorkflowIcon, value: workflow},
+          {label: 'Updates', icon: CalendarClock, value: updates},
+          {label: 'Format', icon: FileSpreadsheet, value: format},
+        ]}
+      />
 
       <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={`It appears here once ${workflow} runs.`} />
 

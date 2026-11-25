@@ -61,6 +61,10 @@ export const SCHEDULES = [
   'When I run it',
 ];
 export const PEOPLE = ['Daniel (you)', 'Priya Shah, Finance lead', 'Marco Ruiz, Sales ops'];
+/** First name of a PEOPLE entry ("Daniel (you)" gives "Daniel"). Defined here because sharedData.ts, which has personName, imports this file. */
+export const firstName = (person: string) => person.split(/[ ,(]/)[0];
+/** Your first name, as run details say it ("Approved by Daniel"). */
+export const YOU = firstName(PEOPLE[0]);
 
 export const MONTHLY_SALES_CLOSE: Workflow = {
   id: 1,

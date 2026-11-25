@@ -1,7 +1,7 @@
 import {useToast} from '@astryxdesign/core/Toast';
 import {WorkflowOverview} from '@workspace/astryx-workflows/components/WorkflowOverview';
 import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
-import type {BuiltWorkflow, Workflow} from '../workflow';
+import {YOU, type BuiltWorkflow, type Workflow} from '../workflow';
 import {toColumns, type SavedBoard} from './WorkflowBuilder';
 import {RUN_DETAILS, runHref} from '../runs';
 
@@ -43,7 +43,7 @@ export function LiveWorkflowPage({workflow: w, name, saved, approved, onDelete, 
   // Each run with recorded tile results opens on the board, showing what every step did in it.
   const runs = w.runs.map((r, i) => ({
     ...(r.result === 'review' && isLastApproved
-      ? {period: r.period, started: r.started, tone: 'success' as const, result: 'Approved by Daniel', finished: r.finished}
+      ? {period: r.period, started: r.started, tone: 'success' as const, result: `Approved by ${YOU}`, finished: r.finished}
       : {period: r.period, started: r.started, tone: RUN_TONE[r.result], result: r.detail, finished: r.finished}),
     href: RUN_DETAILS[w.id]?.[r.period] ? runHref(w.id, i) : undefined,
   }));

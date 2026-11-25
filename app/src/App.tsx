@@ -14,6 +14,7 @@ import {attentionCount, boardItems, ticketRun, type BoardWorkflow, type TileRun}
 import {SEED_HANDOFFS, type Handoff} from './handoffs';
 import {SHARED_DATA, sharedById} from './sharedData';
 import {SharedDataPage} from './pages/SharedDataPage';
+import {longDate, shortDate} from './dates';
 import {RUN_DETAILS, failureKind, firstFailedTile, ranBetween, type TileRunDetail} from './runs';
 import {HomePage} from './pages/HomePage';
 import {HomePanel} from './pages/HomePanel';
@@ -40,9 +41,6 @@ function useHashRoute(): string {
 function firstRunTile(tiles: Record<string, TileRunDetail>): string | undefined {
   return firstFailedTile(tiles) ?? Object.entries(tiles).find(([, t]) => t.status === 'review')?.[0];
 }
-
-/** "Nov 17": the date of a chat's last message, for the sidebar. */
-const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
 
 export default function App() {
   // A route can carry ?tile=<id>, which opens the board with that tile selected.
@@ -86,7 +84,7 @@ export default function App() {
       return;
     }
     const id = Math.max(...PREFILLED_WORKFLOWS.map(w => w.id), ...built.map(w => w.id)) + 1;
-    const createdOn = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric'});
+    const createdOn = longDate(new Date());
     setBuilt(prev => [...prev, {id, name, columns, saved, schedule: SCHEDULES[0], nextRun: PREFILLED_WORKFLOWS[0].nextRun, nextRunAt: PREFILLED_WORKFLOWS[0].nextRunAt, createdOn}]);
     window.location.hash = `workflow-${id}`;
   };

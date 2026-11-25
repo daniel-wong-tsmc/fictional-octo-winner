@@ -4,14 +4,15 @@ import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Heading, Text} from '@astryxdesign/core/Text';
 import {Breadcrumbs, BreadcrumbItem} from '@astryxdesign/core/Breadcrumbs';
 import {Card} from '@astryxdesign/core/Card';
-import {StatusDot} from '@astryxdesign/core/StatusDot';
+import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Table, pixel, proportional, type TableColumn} from '@astryxdesign/core/Table';
 import {EmptyState} from '@astryxdesign/core/EmptyState';
 import {Link} from '@astryxdesign/core/Link';
 import {Button} from '@astryxdesign/core/Button';
 import {Icon} from '@astryxdesign/core/Icon';
-import {ChevronRight} from 'lucide-react';
+import {ChevronRight, type LucideIcon} from 'lucide-react';
 import type {WorkflowTileTone} from '../components/WorkflowTile';
+import {StatusText, type StatusKey, type StatusTone} from '../components/StatusText';
 
 /*
  * The pieces every overview page is made of: WorkflowOverview (a workflow) and SharedDataOverview (data
@@ -25,10 +26,16 @@ import type {WorkflowTileTone} from '../components/WorkflowTile';
 export type OverviewRun = {period: string; started: string; tone: WorkflowTileTone; result: string; finished: string; href?: string};
 
 /**
- * The page frame: breadcrumbs from Home, then the content at the same width and padding. In a side panel
- * the panel has its own header, so the breadcrumbs are left out.
+ * The page frame: breadcrumbs from Home, then the content at the same width and padding. crumbs are the
+ * pages after Home, the last being this page (it has no link). In a side panel the panel has its own
+ * header, so the breadcrumbs are left out.
  */
-export function OverviewFrame({name, homeHref, isInPanel = false, children}: {name: string; homeHref: string; isInPanel?: boolean; children: ReactNode}) {
+export function OverviewFrame({crumbs, homeHref = '#home', isInPanel = false, children}: {
+  crumbs: {label: string; href?: string}[];
+  homeHref?: string;
+  isInPanel?: boolean;
+  children: ReactNode;
+}) {
   return (
     <Layout
       height="fill"
@@ -37,7 +44,11 @@ export function OverviewFrame({name, homeHref, isInPanel = false, children}: {na
         isInPanel ? undefined : <LayoutHeader hasDivider padding={4}>
           <Breadcrumbs>
             <BreadcrumbItem href={homeHref}>Home</BreadcrumbItem>
-            <BreadcrumbItem isCurrent>{name}</BreadcrumbItem>
+            {crumbs.map((c, i) => (
+              i === crumbs.length - 1
+                ? <BreadcrumbItem key={c.label} isCurrent>{c.label}</BreadcrumbItem>
+                : <BreadcrumbItem key={c.label} href={c.href}>{c.label}</BreadcrumbItem>
+            ))}
           </Breadcrumbs>
         </LayoutHeader>
       }
@@ -50,30 +61,44 @@ export function OverviewFrame({name, homeHref, isInPanel = false, children}: {na
   );
 }
 
-/** Status line, name and one sentence on the left; the page's buttons on the right. */
-export function OverviewHeading({status, note, name, summary, actions}: {
-  status: {tone: WorkflowTileTone; label: string};
+/** Status line, name and one sentence on the left; the page's buttons on the right, with an optional note under them. */
+export function OverviewHeading({status, note, name, summary, actions, actionsNote}: {
+  /** A status from STATUSES, or a tone and label of its own. */
+  status: StatusKey | {tone: StatusTone; label: string};
   /** Next to the status, such as "Next run: …" or "Updated …". */
   note: string;
   name: string;
   summary: string;
   actions: ReactNode;
+  /** Under the actions, such as where approving sends the result. */
+  actionsNote?: string;
 }) {
   return (
     <HStack gap={4} hAlign="between" vAlign="start" wrap="wrap">
       <VStack gap={1.5}>
         <HStack gap={3} vAlign="center" wrap="wrap">
-          <HStack gap={1.5} vAlign="center">
-            <StatusDot variant={status.tone} label={status.label} />
-            <Text type="supporting" weight="medium">{status.label}</Text>
-          </HStack>
+          <StatusText status={status} />
           <Text type="supporting">{note}</Text>
         </HStack>
-        <Heading level={1}>{name}</Heading>
+        <Heading level={1} textWrap="balance">{name}</Heading>
         <Text type="supporting">{summary}</Text>
       </VStack>
-      <HStack gap={2} wrap="wrap">{actions}</HStack>
+      <VStack gap={1.5} hAlign="end">
+        <HStack gap={2} wrap="wrap">{actions}</HStack>
+        {actionsNote && <Text type="supporting">{actionsNote}</Text>}
+      </VStack>
     </HStack>
+  );
+}
+
+/** The details row under the heading: each item a label, a small icon and its value. */
+export function OverviewDetails({items}: {items: {label: string; icon: LucideIcon; value: ReactNode}[]}) {
+  return (
+    <MetadataList orientation="horizontal">
+      {items.map(i => (
+        <MetadataListItem key={i.label} label={i.label} icon={<Icon icon={i.icon} size="sm" />}>{i.value}</MetadataListItem>
+      ))}
+    </MetadataList>
   );
 }
 
@@ -101,10 +126,9 @@ const RUN_COLUMNS: TableColumn<RunRow>[] = [
     // Keeps room for the result on a narrow screen; the table scrolls sideways instead of squeezing it.
     width: proportional(1, {minWidth: 180}),
     renderCell: r => (
-      <HStack gap={1.5} vAlign="center">
-        <StatusDot variant={r.tone} label={r.result} />
-        {r.href ? <Link href={r.href} color="primary">{r.result}</Link> : <Text>{r.result}</Text>}
-      </HStack>
+      r.href
+        ? <Link href={r.href} color="primary"><StatusText status={{tone: r.tone, label: r.result}} /></Link>
+        : <StatusText status={{tone: r.tone, label: r.result}} />
     ),
   },
   {key: 'finished', header: 'Finished', width: pixel(140), renderCell: r => <Text hasTabularNumbers type="supporting">{r.finished}</Text>},

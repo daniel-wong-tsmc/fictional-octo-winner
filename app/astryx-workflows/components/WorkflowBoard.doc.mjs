@@ -7,16 +7,16 @@ export default {
   keywords: ['board', 'kanban', 'swimlanes', 'lanes', 'home board', 'to do', 'todo', 'runs', 'workflow runs', 'needs attention', 'new data ready for use', 'data ready for use', 'shared data'],
   usage: {
     description:
-      'Home’s board of workflow runs in four lanes: To-run (with Scheduled and Unscheduled groups; drafts that aren’t turned on sit in Unscheduled), New data ready for use, Needs attention and Done. New data ready for use holds outputs other people’s workflows share with the person that none of their workflows reads yet: a ready card reads "From Priya Shah’s Quarterly targets update", and a failed one reads "Previous workflow failed to produce an output. Please ask Marco Ruiz to check workflow." Each lane shows its name and count; each card shows a status dot, the workflow name, one line ("Step 3 of 3 needs approval", or the schedule) and one time line ("Notified Nov 2, 08:30"). The board picks the lane and the wording from each card’s state, so runs from any workflow look the same. Needs attention holds everything that needs the person: approvals, missing data, and their own workflow that didn’t run because the shared data it reads failed (state upstreamFailed, with owner). Lanes sit side by side and stack on narrow screens; an empty lane says so.',
+      'Home’s board of workflow runs in four lanes: To-run (with Scheduled and Unscheduled groups; drafts that aren’t turned on sit in Unscheduled), New data ready for use, Needs attention and Done. New data ready for use holds outputs other people’s workflows share with the person that none of their workflows reads yet: a ready card reads "From Priya Shah’s Quarterly targets update", and a failed one reads "Previous workflow failed to produce an output. Please ask Marco Ruiz to check workflow." Each lane shows its name and count; each card shows a status dot, a title (the workflow name, or for shared data the name of the data), one line ("Step 3 of 3 needs approval", or the schedule) and one time line ("Notified Nov 2, 08:30"). The board picks the lane and the wording from each card’s state, so runs from any workflow look the same. Needs attention holds everything that needs the person: approvals, missing data, and their own workflow that didn’t run because the shared data it reads failed (state upstreamFailed, with owner). The failure sentence comes from the exported upstreamFailedLine(owner), which other screens reuse so the wording stays the same. Lanes sit side by side and stack on narrow screens; an empty lane says so.',
     bestPractices: [
       {guidance: true, description: 'Work out each item’s state, step and time from its ticket or workflow, not from typed text.'},
       {guidance: true, description: 'Link each card with href: a ticket for runs that need the person, the workflow page otherwise. Link shared data, ready or failed, to its own page.'},
-    {guidance: true, description: 'For shared data, set data (what is shared), workflow (the other person’s workflow) and owner (their name). The board writes the line, including the failure message.'},
+      {guidance: true, description: 'For shared data, set data (what is shared), workflow (the other person’s workflow) and owner (their name). The board writes the line, including the failure message.'},
       {guidance: false, description: 'Add extra lanes or wording per workflow. The lanes and lines are fixed so every workflow reads the same.'},
     ],
   },
   props: [
-    {name: 'items', type: 'WorkflowBoardItem[]', description: 'Cards from any workflow, each with its workflow name, state, optional step position, schedule, time and link.', required: true},
+    {name: 'items', type: 'WorkflowBoardItem[]', description: 'Cards from any workflow: id, workflow, state, and optionally data (shared data’s name, shown as the title), owner, stepNumber and stepCount, schedule, at (date and time) and href.', required: true},
   ],
   examples: [
     {

@@ -1,11 +1,10 @@
 import {useState} from 'react';
 import {Button} from '@astryxdesign/core/Button';
-import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, Pencil, Play, Send, Trash2, UserCheck} from 'lucide-react';
-import {STATUSES} from './StatusText';
-import {OverviewFrame, OverviewHeading, OverviewRuns, type OverviewRun} from '../parts/OverviewParts';
+import {OverviewFrame, OverviewDetails, OverviewHeading, OverviewRuns, type OverviewRun} from '../parts/OverviewParts';
+export {OverviewFrame, OverviewHeading, OverviewSection} from '../parts/OverviewParts';
 
 /** One run. period names the data it covered and identifies the row; started and finished are shown as date and time. */
 export type WorkflowRun = OverviewRun;
@@ -44,9 +43,9 @@ export function WorkflowOverview({
 }: WorkflowOverviewProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   return (
-    <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
+    <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
-        status={STATUSES[isDraft ? 'draft' : 'on']}
+        status={isDraft ? 'draft' : 'on'}
         note={isDraft ? 'Not turned on yet' : `Next run: ${nextRun}`}
         name={name}
         summary={summary}
@@ -59,11 +58,13 @@ export function WorkflowOverview({
         }
       />
 
-      <MetadataList orientation="horizontal">
-        <MetadataListItem label="Starts" icon={<Icon icon={CalendarClock} size="sm" />}>{schedule}</MetadataListItem>
-        <MetadataListItem label="Needs approval from" icon={<Icon icon={UserCheck} size="sm" />}>{approvers.length ? approvers.join(', ') : 'Nobody'}</MetadataListItem>
-        <MetadataListItem label="Sends to" icon={<Icon icon={Send} size="sm" />}>{sendTo.length ? sendTo.join(', ') : 'Nobody yet'}</MetadataListItem>
-      </MetadataList>
+      <OverviewDetails
+        items={[
+          {label: 'Starts', icon: CalendarClock, value: schedule},
+          {label: 'Needs approval from', icon: UserCheck, value: approvers.length ? approvers.join(', ') : 'Nobody'},
+          {label: 'Sends to', icon: Send, value: sendTo.length ? sendTo.join(', ') : 'Nobody yet'},
+        ]}
+      />
 
       <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : `The first run is ${nextRun}.`} />
 

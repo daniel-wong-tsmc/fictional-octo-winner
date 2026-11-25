@@ -2,13 +2,10 @@ import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
 import {SCHEDULES, stepPosition} from './workflow';
+import {shortDateTime} from './dates';
 import {personName, sharedHref, type SharedData} from './sharedData';
 
-/** "Nov 2, 08:30": a date and time as Home's board shows it. */
-export function shortDateTime(iso: string): string {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}, ${d.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})}`;
-}
+export {shortDateTime};
 
 /** A workflow as Home's board needs it: its schedule, next run, page, and its last finished run. */
 export type BoardWorkflow = {

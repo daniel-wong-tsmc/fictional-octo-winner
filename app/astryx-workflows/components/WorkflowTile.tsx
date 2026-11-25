@@ -3,7 +3,7 @@ import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Text} from '@astryxdesign/core/Text';
 import {Card} from '@astryxdesign/core/Card';
 import {ClickableCard} from '@astryxdesign/core/ClickableCard';
-import {StatusDot} from '@astryxdesign/core/StatusDot';
+import {StatusText} from './StatusText';
 import {Icon} from '@astryxdesign/core/Icon';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Database, Send, WandSparkles} from 'lucide-react';
@@ -138,12 +138,7 @@ export function WorkflowTile({content, status, footer, detailMaxLines, detailLay
           <Icon icon={info.icon} size="sm" color="secondary" />
           <Text type="supporting" weight="medium">{info.label}</Text>
         </HStack>
-        {status && (
-          <HStack gap={1} vAlign="center">
-            <StatusDot variant={status.tone} label={status.label} />
-            <Text type="supporting">{status.label}</Text>
-          </HStack>
-        )}
+        {status && <StatusText status={status} />}
       </HStack>
       <Text weight="semibold">{title}</Text>
       {/* Each detail is its label, then its value: the same labels in the same order for every tile of a kind. */}

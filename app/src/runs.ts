@@ -191,7 +191,11 @@ export function firstFailedTile(tiles: Record<string, TileRunDetail>): string | 
   return failed.find(id => id.includes('-in-')) ?? failed.find(id => id !== 'out') ?? failed.find(id => id === 'out');
 }
 
-/** "Nov 16, 08:00 to 09:12", with both dates when it ran into the next day, or one time when it stopped at once. */
+/**
+ * "Nov 16, 08:00 to 09:12", with both dates when it ran into the next day, or one time when it stopped at once.
+ * Both arguments are display strings already formatted as "Nov 16, 08:00" (RunRecord started/finished), not ISO dates,
+ * so this splits them on ", " rather than parsing them.
+ */
 export const ranBetween = (started: string, finished: string) => {
   const [startDay] = started.split(', ');
   const [endDay, endTime] = finished.split(', ');
