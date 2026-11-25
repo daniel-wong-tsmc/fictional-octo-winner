@@ -37,7 +37,7 @@ import {useToast} from '@astryxdesign/core/Toast';
 import {SHARED_DATA, failedMessage, personName, sharedByName, sharedFrom, type SharedData} from '../sharedData';
 import {shortDateTime} from '../tasks';
 import {ScrollText, Inbox, Eye, Maximize, X, Minus, Play, Plug, ArrowUpRight, Library, Pencil, Plus, Save, Trash2, Upload, Workflow as WorkflowIcon} from 'lucide-react';
-import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
+import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
 import {TILE_RUN_STATUS, type TileRunDetail} from '../runs';
@@ -45,7 +45,7 @@ import {AgentDidList, ShowCode} from './runParts';
 import {STATUSES, StatusText} from '@workspace/astryx-workflows/components/StatusText';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
-import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
+import {WORKFLOW_DATA_FORMATS, WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowDataFormat, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
 
 /* ---------- Steps ---------- */
 
@@ -64,7 +64,7 @@ type InputStep = {kind: 'input'; source: 'upload' | 'mcp' | 'workflow' | 'shared
 type InstructionsStep = {kind: 'instructions'; name: string; text: string; python: string; isCodeEdited: boolean; topP: number; temperature: number};
 /** Settings a new LLM step starts with: no code yet, and low temperature, since these steps work on numbers. */
 const LLM_DEFAULTS = {python: '', isCodeEdited: false, topP: 1, temperature: 0.2};
-type OutputStep = {kind: 'output'; name: string; format: string; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
+type OutputStep = {kind: 'output'; name: string; format: WorkflowDataFormat; needsOk: boolean; approver: string; sendTo: string[]; shareWithWorkflows: boolean};
 type Step = InputStep | InstructionsStep | OutputStep;
 
 /** The board's step kinds, named and drawn from the shared WORKFLOW_TILE_KINDS. */
@@ -684,7 +684,7 @@ function StepPanel({tileId, step, title, run, trial, onOpenTrial, onChange, onRe
       {step.kind === 'output' && (
         <>
           <TextInput label="Name" description="How people and other workflows will see it." value={step.name} onChange={name => onChange({...step, name})} />
-          <Selector label="Format" options={['Excel sheet', 'CSV file', 'A single number']} value={step.format} onChange={format => onChange({...step, format})} />
+          <Selector label="Format" options={[...WORKFLOW_DATA_FORMATS]} value={step.format} onChange={format => onChange({...step, format: format as WorkflowDataFormat})} />
           <Divider />
           <Text type="label">Who gets it</Text>
           <Switch label="Needs approval before it’s sent" value={step.needsOk} onChange={needsOk => onChange({...step, needsOk})} />
@@ -1127,6 +1127,10 @@ function tileContents(board: BoardNode[], links: Link[]): Map<string, WorkflowTi
         source: s.source === 'upload' ? s.fileName : s.source ? s.app : '',
         via: s.source,
         reads: s.source === 'upload' ? s.sheets.join(', ') : s.source ? s.resource : '',
+        // Data another workflow passes on says what form it comes in: that workflow's Handoff format.
+        format: s.source === 'shared' ? sharedByName(s.resource)?.format
+          : s.source === 'workflow' ? PREFILLED_WORKFLOWS.find(w => w.name === s.app)?.outputFormat
+          : undefined,
       });
     } else if (s.kind === 'instructions') {
       contents.set(n.id, {kind: 'step', number: number.get(n.id) ?? 0, name: s.name.trim() || undefined, instructions: s.text});

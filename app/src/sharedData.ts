@@ -5,6 +5,8 @@
 
 import {upstreamFailedLine} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {PEOPLE, PREFILLED_WORKFLOWS} from './workflow';
+import type {WorkflowDataFormat} from '@workspace/astryx-workflows/components/WorkflowTile';
+
 
 export type SharedData = {
   id: string;
@@ -15,7 +17,7 @@ export type SharedData = {
   /** Who owns that workflow. One of PEOPLE, never you. */
   owner: string;
   /** File type of what it hands over. */
-  format: string;
+  format: WorkflowDataFormat;
   /** Runs of the workflow that makes it, newest first: ready, or failed before it made the output. */
   runs: {started: string; finished: string; result: 'ready' | 'failed'}[];
   /** The newest run, from `runs`: how it went and when it finished. */
@@ -60,7 +62,7 @@ const ENTRIES: Omit<SharedData, 'lastRun'>[] = [
     name: 'Open pipeline by region',
     workflow: 'Weekly pipeline export',
     owner: PEOPLE[2],
-    format: 'Excel sheet',
+    format: 'CSV file',
     runs: [
       {started: '2026-11-16T07:00', finished: '2026-11-16T07:15', result: 'ready'},
       {started: '2026-11-09T07:00', finished: '2026-11-09T07:12', result: 'ready'},

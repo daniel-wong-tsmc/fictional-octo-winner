@@ -27,9 +27,16 @@ export const WORKFLOW_TILE_KINDS: Record<WorkflowTileKind, {label: string; icon:
 export type WorkflowInputVia = 'upload' | 'mcp' | 'workflow' | 'shared';
 
 /**
+ * The forms a workflow can pass its result on in: what a Handoff's Format offers, and so what an Input that
+ * reads another workflow's or a colleague's data receives.
+ */
+export const WORKFLOW_DATA_FORMATS = ['Excel sheet', 'CSV file', 'Single value'] as const;
+export type WorkflowDataFormat = (typeof WORKFLOW_DATA_FORMATS)[number];
+
+/**
  * What a tile says, by kind. Each field is one setting of the tile, and each kind always shows the same
  * details in the same order:
- * - Input: title is the source; details From, Reads.
+ * - Input: title is the source; details From, Format (only for data another workflow passes on), Reads.
  * - LLM: title is "Step N" (plus its name when it has one); details Instructions.
  * Where a tile leads is shown by the lines or arrows around it, not in its text.
  * - Handoff: title is the output's name; details Format, Approver, Sends to.
@@ -42,6 +49,8 @@ export type WorkflowTileContent =
       via: WorkflowInputVia | null;
       /** Sheets, table or value it reads. */
       reads: string;
+      /** The form the data comes in, for data another workflow passes on (via 'workflow' or 'shared'). */
+      format?: WorkflowDataFormat;
     }
   | {
       kind: 'step';
@@ -78,6 +87,7 @@ export function tileText(c: WorkflowTileContent): {title: string; details: {labe
       title: c.source || 'Add your data',
       details: [
         {label: 'From', value: c.via ? VIA_LABEL[c.via] : NOT_SET},
+        ...(c.format ? [{label: 'Format', value: c.format}] : []),
         {label: 'Reads', value: c.reads || NOT_SET},
       ],
     };

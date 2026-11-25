@@ -1,4 +1,4 @@
-import type {WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
+import type {WorkflowDataFormat, WorkflowTileContent} from '@workspace/astryx-workflows/components/WorkflowTile';
 // Example workflow for the UI prototype. Nothing here runs.
 
 /** 'shared' reads data someone else's workflow shares with you (SHARED_DATA): source is their workflow, reads the data. */
@@ -44,7 +44,7 @@ export type Workflow = {
   approver: string;
   destinations: string[];
   /** File type of what the last step passes on, such as Excel sheet. */
-  outputFormat: string;
+  outputFormat: WorkflowDataFormat;
   steps: WorkflowStep[];
   /** Handoff ids this workflow uses from other workflows. */
   uses: string[];
@@ -131,7 +131,7 @@ export const WEEKLY_REVENUE_REPORT: Workflow = {
   nextRunAt: '2026-11-23T08:00',
   approver: PEOPLE[0],
   destinations: ['Slack: #finance-close'],
-  outputFormat: 'A single number',
+  outputFormat: 'Single value',
   steps: [
     {
       id: 'w1',
