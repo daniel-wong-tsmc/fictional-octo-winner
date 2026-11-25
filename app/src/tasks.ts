@@ -1,3 +1,4 @@
+import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import type {WorkflowBoardItem, WorkflowBoardState} from '@workspace/astryx-workflows/components/WorkflowBoard';
 import {TICKETS, ticketCondition, type Task, type TicketCondition} from './data';
 import {SCHEDULES, stepPosition} from './workflow';
@@ -94,11 +95,12 @@ export type TileRun = {
   summary: string[];
 };
 
+// A step's last run, in the shared statuses: a step that has never run is "Not run yet".
 const RUN_STATUS = {
-  needsApproval: {tone: 'info', label: 'Needs approval'},
-  complete: {tone: 'success', label: 'Done'},
-  missingData: {tone: 'warning', label: 'Missing data'},
-  notRun: {tone: 'neutral', label: 'Not run yet'},
+  needsApproval: STATUSES.needsApproval,
+  complete: STATUSES.done,
+  missingData: STATUSES.missingData,
+  notRun: STATUSES.neverRun,
 } as const;
 
 /** Reads a ticket's last run: its condition, when it ran, and what the agent did. */

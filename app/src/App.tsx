@@ -1,3 +1,4 @@
+import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import {useEffect, useState, type ReactElement} from 'react';
 import {AppShell} from '@astryxdesign/core/AppShell';
 import {SideNav, SideNavHeading, SideNavItem, SideNavSection} from '@astryxdesign/core/SideNav';
@@ -260,10 +261,7 @@ export default function App() {
           selectTile={firstRunTile(runTiles)}
           viewRun={{
             title: `Run of ${runData.started}`,
-            status: {
-              tone: runData.result === 'stopped' ? 'error' : runData.result === 'review' ? 'info' : 'success',
-              label: runData.result === 'stopped' ? 'Stopped' : runData.result === 'review' ? 'Waiting for approval' : 'Done',
-            },
+            status: STATUSES[runData.result === 'stopped' ? 'failed' : runData.result === 'review' ? 'needsApproval' : 'done'],
             ran: ranBetween(runData.started, runData.finished),
             why: runData.result === 'stopped' ? failureKind(runTiles) : undefined,
             tiles: runTiles,

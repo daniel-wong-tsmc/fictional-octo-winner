@@ -1,14 +1,17 @@
 // Example data for the UI prototype. Nothing here is real or saved anywhere.
 
+import type {StatusKey} from '@workspace/astryx-workflows/components/StatusText';
+
 export type Status = 'failed' | 'review' | 'stale' | 'draft' | 'done';
 export type RefKind = 'workflow' | 'step' | 'dataset' | 'file' | 'connection';
 
-export const STATUS: Record<Status, {dot: 'error' | 'warning' | 'info' | 'neutral' | 'success'; label: string}> = {
-  failed: {dot: 'error', label: 'Stopped'},
-  review: {dot: 'info', label: 'Needs approval'},
-  stale: {dot: 'warning', label: 'Out of date'},
-  draft: {dot: 'neutral', label: 'Draft'},
-  done: {dot: 'success', label: 'Done'},
+/** A step page's status, as one of the shared statuses (STATUSES), so it reads the same as everywhere else. */
+export const STATUS: Record<Status, StatusKey> = {
+  failed: 'failed',
+  review: 'needsApproval',
+  stale: 'stale',
+  draft: 'draft',
+  done: 'done',
 };
 
 /** A task on Home points at a ticket. Everything the row says is read from that ticket. */
@@ -83,8 +86,8 @@ const NET_ORDERS: Sheet = {
 
 export const TICKETS: Record<number, Ticket> = {
   1: {
-    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Stopped Nov 16 at 09:12', finishedAt: '2026-11-16T09:12',
-    banner: {status: 'error', title: 'The run stopped.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
+    workflow: 'Weekly revenue report', step: 'Combine orders and refunds', status: 'failed', ran: 'Failed Nov 16 at 09:12', finishedAt: '2026-11-16T09:12',
+    banner: {status: 'error', title: 'The run failed.', description: "This week's orders file has no Currency column, so the agent can't keep each order's currency for the next step. Ask the sender to add it back, or tell the agent which currency to assume."},
     inputs: [
       {name: 'Orders this week', source: ['connection', 'From connection: SharePoint, Orders this week.xlsx'], stats: ['1,284 rows', '5 columns', 'Received 09:02'], warning: 'Missing column: Currency', sheet: 'Orders this week'},
       {name: 'Refunds this week', source: ['connection', 'From connection: Shopify, Refunds this week'], stats: ['63 rows', '3 columns', 'Synced Mon'], sheet: 'Refunds'},

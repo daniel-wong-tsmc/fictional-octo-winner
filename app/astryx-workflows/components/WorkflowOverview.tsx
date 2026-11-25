@@ -4,6 +4,7 @@ import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {AlertDialog} from '@astryxdesign/core/AlertDialog';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, Pencil, Play, Send, Trash2, UserCheck} from 'lucide-react';
+import {STATUSES} from './StatusText';
 import {OverviewFrame, OverviewHeading, OverviewRuns, type OverviewRun} from '../parts/OverviewParts';
 
 /** One run. period names the data it covered and identifies the row; started and finished are shown as date and time. */
@@ -45,7 +46,7 @@ export function WorkflowOverview({
   return (
     <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
-        status={isDraft ? {tone: 'neutral', label: 'Draft'} : {tone: 'success', label: 'On'}}
+        status={STATUSES[isDraft ? 'draft' : 'on']}
         note={isDraft ? 'Not turned on yet' : `Next run: ${nextRun}`}
         name={name}
         summary={summary}

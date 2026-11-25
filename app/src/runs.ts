@@ -4,6 +4,8 @@
 // Keyed by workflow id, then by run period, then by tile id as boardFromWorkflow names tiles:
 // a step's id (s1), its inputs (s1-in-0) and the Handoff ('out').
 
+import type {StatusKey} from '@workspace/astryx-workflows/components/StatusText';
+
 export type TileRunStatus = 'done' | 'review' | 'failed' | 'notRun' | 'sent' | 'waiting';
 
 export type TileRunDetail = {
@@ -23,13 +25,14 @@ export type TileRunDetail = {
   ticketId?: number;
 };
 
-export const TILE_RUN_STATUS: Record<TileRunStatus, {tone: 'success' | 'info' | 'error' | 'neutral'; label: string}> = {
-  done: {tone: 'success', label: 'Done'},
-  review: {tone: 'info', label: 'Needs approval'},
-  failed: {tone: 'error', label: 'Failed'},
-  notRun: {tone: 'neutral', label: 'Didn’t run'},
-  sent: {tone: 'success', label: 'Sent'},
-  waiting: {tone: 'info', label: 'Waiting for approval'},
+/** How a tile did in a past run, in the shared statuses. A Handoff waiting on a step's approval needs approval too. */
+export const TILE_RUN_STATUS: Record<TileRunStatus, StatusKey> = {
+  done: 'done',
+  review: 'needsApproval',
+  failed: 'failed',
+  notRun: 'notRun',
+  sent: 'sent',
+  waiting: 'needsApproval',
 };
 
 const notRun = (problem: string): TileRunDetail => ({status: 'notRun', problem});

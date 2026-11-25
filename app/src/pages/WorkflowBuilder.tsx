@@ -43,6 +43,7 @@ import {MCP_APPS, PEOPLE, type BuiltStage, type Workflow} from '../workflow';
 import {TICKETS, type Sheet} from '../data';
 import type {TileRun} from '../tasks';
 import {TILE_RUN_STATUS, type TileRunDetail} from '../runs';
+import {STATUSES} from '@workspace/astryx-workflows/components/StatusText';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {WorkflowSheetTable} from '@workspace/astryx-workflows/components/WorkflowSheetTable';
 import {WORKFLOW_TILE_KINDS, WorkflowTile, tileText, type WorkflowTileContent, type WorkflowTileKind} from '@workspace/astryx-workflows/components/WorkflowTile';
@@ -173,7 +174,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   // shows a status when it needs something (Needs setup, Not connected) or after a trial; a ready tile shows
   // none. A shared input whose workflow failed says so in its side panel.
   const status = data.run
-    ? TILE_RUN_STATUS[data.run.status]
+    ? STATUSES[TILE_RUN_STATUS[data.run.status]]
     : data.isUnchecked
     ? {tone: 'info' as const, label: 'Check output'}
     : data.trial
@@ -539,7 +540,7 @@ function RunTilePanel({step, title, run}: {step: Step | null; title: string; run
     return <EmptyState isCompact title="Select a tile" description="Click a tile to see how it did in this run." />;
   }
   const info = KIND_INFO[step.kind];
-  const status = run ? TILE_RUN_STATUS[run.status] : null;
+  const status = run ? STATUSES[TILE_RUN_STATUS[run.status]] : null;
   return (
     <VStack gap={4}>
       <VStack gap={1}>

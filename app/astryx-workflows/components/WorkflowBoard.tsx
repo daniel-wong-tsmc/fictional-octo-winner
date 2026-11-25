@@ -1,4 +1,5 @@
 import {HStack, VStack} from '@astryxdesign/core/Stack';
+import {STATUSES} from './StatusText';
 import {Grid} from '@astryxdesign/core/Grid';
 import {Text} from '@astryxdesign/core/Text';
 import {Card} from '@astryxdesign/core/Card';
@@ -43,9 +44,9 @@ const STATE: Record<WorkflowBoardState, {dot: 'info' | 'success' | 'warning' | '
   scheduled: {dot: 'neutral', step: '', when: 'Next run'},
   unscheduled: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
   draft: {dot: 'neutral', step: 'hasn’t run yet', when: 'Not scheduled'},
-  dataReady: {dot: 'success', step: '', when: 'Ready'},
-  dataFailed: {dot: 'error', step: '', when: 'Failed'},
-  upstreamFailed: {dot: 'error', step: '', when: 'Didn’t run'},
+  dataReady: {dot: STATUSES.ready.tone, step: '', when: STATUSES.ready.label},
+  dataFailed: {dot: STATUSES.failed.tone, step: '', when: STATUSES.failed.label},
+  upstreamFailed: {dot: STATUSES.failed.tone, step: '', when: STATUSES.notRun.label},
   needsApproval: {dot: 'info', step: 'needs approval', when: 'Notified'},
   missingData: {dot: 'warning', step: 'is missing data', when: 'Notified'},
   complete: {dot: 'success', step: 'ran completely', when: 'Finished'},

@@ -3,6 +3,7 @@ import {Banner} from '@astryxdesign/core/Banner';
 import {MetadataList, MetadataListItem} from '@astryxdesign/core/MetadataList';
 import {Icon} from '@astryxdesign/core/Icon';
 import {CalendarClock, FileSpreadsheet, Plus, Send, User, Workflow as WorkflowIcon} from 'lucide-react';
+import {STATUSES} from './StatusText';
 import {OverviewFrame, OverviewHeading, OverviewRuns, OverviewSection, type OverviewRun} from '../parts/OverviewParts';
 import {WorkflowSheetTable, type WorkflowSheet} from './WorkflowSheetTable';
 
@@ -47,7 +48,7 @@ export function SharedDataOverview({
   return (
     <OverviewFrame name={name} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
-        status={failure ? {tone: 'error', label: 'Failed'} : {tone: 'success', label: 'Ready'}}
+        status={STATUSES[failure ? 'failed' : 'ready']}
         note={failure ? `Last run failed ${updated}` : `Updated ${updated}`}
         name={name}
         summary={summary}
