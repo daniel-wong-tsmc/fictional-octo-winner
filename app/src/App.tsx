@@ -54,7 +54,7 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>(TASKS);
   // Tickets the person approved here. A ticket's condition is read from the ticket plus this.
   const [approved, setApproved] = useState<number[]>([]);
-  const [handoffs, setHandoffs] = useState<Handoff[]>(SEED_HANDOFFS);
+  const [handoffs] = useState<Handoff[]>(SEED_HANDOFFS);
   // Workflows that come with the prototype, each stored as a board like a built one: its page and its Edit
   // board both read that board. Any of them can be deleted.
   const [prefilled, setPrefilled] = useState(() => PREFILLED_WORKFLOWS.map(w => ({workflow: w, name: w.name, saved: boardFromWorkflow(w)})));
@@ -165,7 +165,6 @@ export default function App() {
             handoffs={handoffs}
             onApprove={markApproved}
             onUndoApprove={id => setApproved(prev => prev.filter(x => x !== id))}
-            onRemoveHandoff={hid => setHandoffs(prev => prev.filter(h => h.id !== hid))}
             isInPanel={isInPanel}
           />
         ),

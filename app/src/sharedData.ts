@@ -4,7 +4,7 @@
 // everywhere.
 
 import {upstreamFailedLine} from '@workspace/astryx-workflows/components/WorkflowBoard';
-import {PEOPLE} from './workflow';
+import {PEOPLE, PREFILLED_WORKFLOWS} from './workflow';
 
 export type SharedData = {
   id: string;
@@ -120,6 +120,13 @@ export const sharedFrom = (d: SharedData) => `From ${personName(d.owner)}’s ${
 export const sharedByName = (name: string) => SHARED_DATA.find(d => d.name === name);
 
 export const sharedById = (id: string) => SHARED_DATA.find(d => d.id === id);
+
+/**
+ * Who a workflow belongs to: you for your own workflows, otherwise the person whose workflow shares data with
+ * you. Undefined for a name that is no known workflow.
+ */
+export const workflowOwner = (name: string): string | undefined =>
+  PREFILLED_WORKFLOWS.some(w => w.name === name) ? PEOPLE[0] : SHARED_DATA.find(d => d.workflow === name)?.owner;
 
 /** Each shared data's page. */
 export const sharedHref = (d: SharedData) => `#data-${d.id}`;

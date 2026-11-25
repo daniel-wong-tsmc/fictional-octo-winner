@@ -12,6 +12,7 @@ import {List, ListItem} from '@astryxdesign/core/List';
 import {Token} from '@astryxdesign/core/Token';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Divider} from '@astryxdesign/core/Divider';
+import {Collapsible} from '@astryxdesign/core/Collapsible';
 import {TabList, Tab} from '@astryxdesign/core/TabList';
 import {Icon} from '@astryxdesign/core/Icon';
 import {Toolbar} from '@astryxdesign/core/Toolbar';
@@ -20,8 +21,9 @@ import {
   ArrowRightLeft, Check, ChevronDown, ChevronRight, Download, FileSpreadsheet, Pencil, RotateCcw, Sparkles, Trash2,
 } from 'lucide-react';
 import {STATUS, TICKETS, type DataSet, type Sheet} from '../data';
-import {PREFILLED_WORKFLOWS} from '../workflow';
-import {CHECK_LABEL, describeRule, shapeOf, type Handoff} from '../handoffs';
+import {PEOPLE, PREFILLED_WORKFLOWS} from '../workflow';
+import {workflowOwner} from '../sharedData';
+import {CHECK_LABEL, shapeOf, type Handoff} from '../handoffs';
 import {WorkflowWorkbook, type WorkflowWorkbookSheet} from '@workspace/astryx-workflows/components/WorkflowWorkbook';
 import {OverviewFrame, OverviewHeading} from '@workspace/astryx-workflows/components/WorkflowOverview';
 import {StatusText} from '@workspace/astryx-workflows/components/StatusText';
@@ -104,38 +106,28 @@ function Region({title, count, endContent, variant = 'section', isFullHeight, ch
 
 /* ---------- Handoffs (step 2) and checks (step 3) ---------- */
 
-function HandoffRow({handoff, onRemove}: {handoff: Handoff; onRemove: () => void}) {
-  const failed = !!handoff.checkFailure;
+/**
+ * One workflow that reads values from this step's result: its name, who it belongs to and what it reads. Your
+ * own workflows open their page; a colleague's has no page here.
+ */
+function OutputUserRow({workflow, owner, values}: {workflow: string; owner: string; values: Handoff[]}) {
+  const id = PREFILLED_WORKFLOWS.find(w => w.name === workflow)?.id;
+  const failed = values.find(v => v.checkFailure);
   return (
     <ListItem
       align="first-line"
-      label={<Text weight="medium">{handoff.name}</Text>}
+      label={<Text weight="medium">{workflow}</Text>}
       description={
-        <VStack gap={1}>
-          <Text type="supporting">{describeRule(handoff.rule)}</Text>
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            <Token size="sm" label={shapeOf(handoff.rule)} />
-            <Text weight="semibold" hasTabularNumbers>{handoff.value ?? '—'}</Text>
-          </HStack>
-          {handoff.check !== 'none' && (
-            <StatusText
-              status={failed ? {tone: 'error', label: 'Check failed'} : {tone: 'success', label: 'Check passed'}}
-              note={failed
-                ? `${CHECK_LABEL[handoff.check]}. ${handoff.checkFailure}`
-                : CHECK_LABEL[handoff.check]}
-            />
+        <VStack gap={0.5}>
+          <Text type="supporting">{`Belongs to ${owner === PEOPLE[0] ? 'you' : owner}`}</Text>
+          <Text type="supporting" hasTabularNumbers>{`Uses ${values.map(v => `${v.name} (${v.value ?? 'no value yet'})`).join(', ')}`}</Text>
+          {failed && (
+            <StatusText status={{tone: 'error', label: 'Check failed'}} note={`${CHECK_LABEL[failed.check]}. ${failed.checkFailure} It waits until this passes.`} />
           )}
-          <HStack gap={1.5} vAlign="center" wrap="wrap">
-            <Text type="supporting">Used by</Text>
-            {handoff.usedBy.length ? (
-              handoff.usedBy.map(w => <RefLabel key={w} kind="workflow" label={failed ? `${w} (waiting)` : w} />)
-            ) : (
-              <Text type="supporting">Not used yet</Text>
-            )}
-          </HStack>
         </VStack>
       }
-      endContent={<IconButton label={`Remove ${handoff.name}`} icon={<Icon icon={Trash2} />} variant="ghost" size="sm" onClick={onRemove} />}
+      href={id !== undefined ? `#workflow-${id}` : undefined}
+      endContent={id !== undefined ? <Icon icon={ChevronRight} color="secondary" /> : undefined}
     />
   );
 }
@@ -237,7 +229,7 @@ function Workbook({
 /* ---------- Page ---------- */
 
 export function TicketPage({
-  id, code, handoffs, onApprove, onUndoApprove, onRemoveHandoff, isInPanel = false,
+  id, code, handoffs, onApprove, onUndoApprove, isInPanel = false,
 }: {
   id: number;
   /** The step's current code from its workflow's saved board, so code edited on the board shows here too. */
@@ -245,7 +237,6 @@ export function TicketPage({
   handoffs: Handoff[];
   onApprove: (id: number) => void;
   onUndoApprove: (id: number) => void;
-  onRemoveHandoff: (handoffId: string) => void;
   /** Shown in Home's side panel, which has its own header: leaves out the breadcrumbs. */
   isInPanel?: boolean;
 }) {
@@ -270,9 +261,13 @@ export function TicketPage({
   const status = isApproved ? 'done' : t.status;
   const myHandoffs = handoffs.filter(h => h.ticketId === id);
   const result = t.outputs[0];
-  const resultSheet = t.sheets[result.sheet];
-  const hasResult = !resultSheet.isEmpty;
   const failedChecks = myHandoffs.filter(h => h.checkFailure);
+  // Each other workflow that reads a value from this result, with who it belongs to and the values it reads.
+  const usersOfOutput = [...new Set(myHandoffs.flatMap(h => h.usedBy))].map(w => ({
+    workflow: w,
+    owner: workflowOwner(w) ?? '',
+    values: myHandoffs.filter(h => h.usedBy.includes(w)),
+  }));
 
   const fileInputs = t.inputs.filter(d => !d.handoffId);
   const inputCount = fileInputs.length + linkedInputs.length;
@@ -447,28 +442,19 @@ export function TicketPage({
 
                 <Divider />
 
-                {/* Step 2: handoffs, with step 3: checks */}
-                <VStack gap={0.5}>
-                  <Text type="label">{`Shared values · ${myHandoffs.length}`}</Text>
-                  <Text type="supporting">
-                    {hasResult
-                      ? 'Values from the result that other workflows can use as inputs.'
-                      : 'Values other workflows can use as inputs. Available after the agent has run.'}
-                  </Text>
-                </VStack>
-
-                <List hasDividers edge="outset">
-                {myHandoffs.map(h => (
-                  <HandoffRow
-                    key={h.id}
-                    handoff={h}
-                    onRemove={() => {
-                      onRemoveHandoff(h.id);
-                      toast({body: h.usedBy.length ? `Removed ${h.name}. ${h.usedBy.join(' and ')} lost this input.` : `Removed ${h.name}.`});
-                    }}
-                  />
-                ))}
-                </List>
+                {/* Other workflows reading values from this result: closed until opened. */}
+                <Collapsible
+                  defaultIsOpen={false}
+                  trigger={<Text type="label">{`Workflows that also use this output · ${usersOfOutput.length}`}</Text>}
+                >
+                  {usersOfOutput.length ? (
+                    <List hasDividers edge="outset">
+                      {usersOfOutput.map(u => <OutputUserRow key={u.workflow} {...u} />)}
+                    </List>
+                  ) : (
+                    <Text type="supporting">No other workflow uses it yet.</Text>
+                  )}
+                </Collapsible>
               </Region>
             </Grid>
 

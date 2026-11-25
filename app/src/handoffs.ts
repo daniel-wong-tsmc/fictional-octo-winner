@@ -26,6 +26,7 @@ export type Handoff = {
   check: CheckKind;
   /** Set when the last run failed the check. */
   checkFailure?: string;
+  /** Workflows that read it: yours or a colleague's (see workflowOwner in sharedData.ts). */
   usedBy: string[];
 };
 
@@ -147,11 +148,11 @@ export const SEED_HANDOFFS: Handoff[] = [
   {
     id: 'h-europe', name: 'Europe orders', ticketId: 2, workflow: 'Weekly revenue report',
     rule: {kind: 'rowsWhere', column: 'Region', equals: 'Europe'}, value: '412 rows', check: 'atLeastOneRow',
-    usedBy: [],
+    usedBy: ['Pipeline health check'],
   },
   {
     id: 'h-gap', name: 'October gap to target', ticketId: 3, workflow: 'Monthly sales close',
     rule: {kind: 'sum', column: 'Gap'}, value: '-137,200', check: 'notEmpty',
-    usedBy: ['Google Drive: Finance close pack'],
+    usedBy: ['Quarterly targets update'],
   },
 ];

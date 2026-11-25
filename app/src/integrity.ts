@@ -5,7 +5,7 @@
 import {TASKS, TICKETS} from './data';
 import {SEED_HANDOFFS} from './handoffs';
 import {MCP_APPS, PEOPLE, PREFILLED_WORKFLOWS, stepPosition} from './workflow';
-import {SHARED_DATA} from './sharedData';
+import {SHARED_DATA, workflowOwner} from './sharedData';
 import {RUN_DETAILS} from './runs';
 
 export function dataProblems(): string[] {
@@ -81,7 +81,8 @@ export function dataProblems(): string[] {
     if (!TICKETS[h.ticketId]) problems.push(`Shared value "${h.name}": ticket ${h.ticketId} doesn't exist.`);
     else if (TICKETS[h.ticketId].workflow !== h.workflow) problems.push(`Shared value "${h.name}": ticket ${h.ticketId} belongs to ${TICKETS[h.ticketId].workflow}.`);
     for (const user of h.usedBy) {
-      if (!workflows.has(user) && !destinations.has(user)) problems.push(`Shared value "${h.name}": used by "${user}", which is neither a workflow nor a destination.`);
+      if (!workflowOwner(user)) problems.push(`Shared value "${h.name}": used by "${user}", which is no known workflow.`);
+      if (user === h.workflow) problems.push(`Shared value "${h.name}": used by its own workflow.`);
     }
   }
 
