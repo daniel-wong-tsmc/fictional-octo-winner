@@ -4,8 +4,8 @@ import {Layout, LayoutContent} from '@astryxdesign/core/Layout';
 import {ResizeHandle, useResizable} from '@astryxdesign/core/Resizable';
 import {useMediaQuery} from '@astryxdesign/core/hooks';
 
-/** The panel starts this wide and can be dragged between the two limits. The last width is remembered. */
-const DEFAULT_WIDTH = 720;
+/** The panel starts at three quarters of the screen and can be dragged between the two limits. The last width is remembered. */
+const DEFAULT_SHARE = 0.75;
 const MIN_WIDTH = 420;
 /** How much of Home stays visible when the panel is dragged as wide as it goes. */
 const HOME_REVEAL = 160;
@@ -25,10 +25,11 @@ export function HomePanel({route, title, page, onClose}: {route: string | null; 
   if (route && page) last.current = {route, title, page};
   const shown = last.current;
   const resizable = useResizable({
-    defaultSize: DEFAULT_WIDTH,
+    defaultSize: Math.max(MIN_WIDTH, Math.round(window.innerWidth * DEFAULT_SHARE)),
     minSize: MIN_WIDTH,
     maxSize: Math.max(MIN_WIDTH, window.innerWidth - HOME_REVEAL),
-    autoSaveId: 'home-panel-width',
+    // A new key, so widths saved before the 75% default don't hold the panel narrow.
+    autoSaveId: 'home-panel-width-75',
   });
   const isOpen = !!route && !!page;
 
