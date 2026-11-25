@@ -166,12 +166,16 @@ type TileData = {
   onOpenTrial: (id: string) => void;
   /** When the board shows a past run: how this tile did in it. */
   run?: TileRunDetail;
-  /** Running only this LLM step, from its play button: running, or set when it's done. */
-  stepTrial?: 'running' | 'done';
+  /**
+   * Running only this LLM step, from its play button: running, done, or failed because an LLM step before it
+   * hasn't run yet.
+   */
+  stepTrial?: StepTrial;
   /** Runs only this LLM step. Left out on a past run, which can't run anything. */
   onRunStep?: (id: string) => void;
 };
 type TileNode = Node<TileData, 'tile'>;
+type StepTrial = 'running' | 'done' | 'failed';
 
 /** A tile on the board: the shared WorkflowTile, plus the dots that lines attach to. */
 function Tile({id, data, selected}: NodeProps<TileNode>) {
@@ -180,8 +184,11 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   // A past run shows how each tile did in it, and its first number under the tile. While editing, a tile only
   // shows a status when it needs something (Needs setup, Not connected) or after a trial; a ready tile shows
   // none. A shared input whose workflow failed says so in its side panel.
+  const stepFailed = !data.run && data.stepTrial === 'failed';
   const status = data.run
     ? STATUSES[TILE_RUN_STATUS[data.run.status]]
+    : stepFailed
+    ? STATUSES.failed
     : data.isUnchecked
     ? {tone: 'info' as const, label: 'Check output'}
     : data.trial
@@ -214,7 +221,9 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
   // In a past run every tile shows its status at the top and its first number below, the same for each tile.
   // The tile where it failed is also red, and tiles that didn't run are greyed out; the side panel says why.
   const isFailedHere = data.run?.status === 'failed';
-  const footer = runLine ? (
+  const footer = stepFailed ? (
+    <Text type="supporting">Please run previous step.</Text>
+  ) : runLine ? (
     <Text type="supporting">{`${runLine[0]}: ${runLine[1]}`}</Text>
   ) : data.trial ? (
     <VStack gap={1}>
@@ -248,7 +257,7 @@ function Tile({id, data, selected}: NodeProps<TileNode>) {
         footer={footer}
         width={250}
         elevation={selected ? 'high' : 'low'}
-        emphasis={isFailedHere ? 'failed' : data.run?.status === 'notRun' ? 'muted' : undefined}
+        emphasis={isFailedHere || stepFailed ? 'failed' : data.run?.status === 'notRun' ? 'muted' : undefined}
       />
       {(step.kind !== 'output' || data.canFeedOtherWorkflow) && <Handle type="source" position={Position.Right} style={HANDLE_STYLE} />}
     </>
@@ -1422,11 +1431,15 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [trial, setTrial] = useState<'none' | 'running' | 'done'>('none');
   // LLM steps run on their own from their play button. Any change to the board clears them, like a full trial.
-  const [stepTrials, setStepTrials] = useState<Record<string, 'running' | 'done'>>({});
+  // A step needs the LLM steps that feed it to have run (on their own or in a full trial); if one hasn't, it
+  // fails and asks for it. Inputs are data, so they don't need running.
+  const [stepTrials, setStepTrials] = useState<Record<string, StepTrial>>({});
   const runStep = useCallback((id: string) => {
+    const before = links.filter(l => l.target === id).map(l => board.find(n => n.id === l.source)).filter(n => n?.step.kind === 'instructions');
+    const outcome: StepTrial = before.every(n => trial === 'done' || stepTrials[n!.id] === 'done') ? 'done' : 'failed';
     setStepTrials(prev => ({...prev, [id]: 'running'}));
-    window.setTimeout(() => setStepTrials(prev => (prev[id] === 'running' ? {...prev, [id]: 'done'} : prev)), 1100);
-  }, []);
+    window.setTimeout(() => setStepTrials(prev => (prev[id] === 'running' ? {...prev, [id]: outcome} : prev)), 1100);
+  }, [board, links, trial, stepTrials]);
   /** Has a trial result: from a full trial, or from running only this step. */
   const isTileTried = (id: string) => trial === 'done' || stepTrials[id] === 'done';
   // Bumped when a click adds a tile, so the board refits. A dropped tile stays where it was put.
