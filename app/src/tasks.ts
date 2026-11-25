@@ -37,6 +37,8 @@ export function boardItems(tasks: Task[], approved: number[], workflows: BoardWo
     .map(w =>
       w.isDraft
         ? {id: `next-${w.key}`, workflow: w.name, state: 'draft', href: w.href}
+        : !w.nextRunAt
+        ? {id: `next-${w.key}`, workflow: w.name, state: 'unscheduled', href: w.href}
         : {id: `next-${w.key}`, workflow: w.name, state: 'scheduled', schedule: w.schedule, at: shortDateTime(w.nextRunAt), href: w.href},
     );
   const fromTickets: WorkflowBoardItem[] = tasks.flatMap(task => {

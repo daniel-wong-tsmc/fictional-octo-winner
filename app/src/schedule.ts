@@ -77,8 +77,18 @@ export const nextRunText = (d: Date) =>
 const isoMinute = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-/** A workflow's schedule fields from its Schedule: the words, the next run in words, and the next run's time. */
-export function timing(when: Schedule): {when: Schedule; schedule: string; nextRun: string; nextRunAt: string} {
+/** What a workflow without a schedule says. A schedule is optional; without one it runs only when started. */
+export const NOT_SCHEDULED = 'Not scheduled';
+
+/**
+ * A workflow's schedule fields from its Schedule: the words, the next run in words, and the next run's time.
+ * Without a schedule it says Not scheduled and has no next run.
+ */
+type Timing = {schedule: string; nextRun: string; nextRunAt: string};
+export function timing(when: Schedule): Timing & {when: Schedule};
+export function timing(when?: Schedule): Timing & {when?: Schedule};
+export function timing(when?: Schedule): Timing & {when?: Schedule} {
+  if (!when) return {when, schedule: NOT_SCHEDULED, nextRun: NOT_SCHEDULED, nextRunAt: ''};
   const next = nextRunOf(when);
   return {when, schedule: scheduleText(when), nextRun: next ? nextRunText(next) : 'Not set', nextRunAt: next ? isoMinute(next) : ''};
 }

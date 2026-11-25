@@ -18,7 +18,7 @@ export default {
     {name: 'name', type: 'string', description: 'Workflow name, shown as the heading and in the breadcrumb.', required: true},
     {name: 'summary', type: 'string', description: 'One sentence on what the workflow does.', required: true},
     {name: 'schedule', type: 'string', description: 'When it starts, such as "First business day of each month, 8:00".', required: true},
-    {name: 'nextRun', type: 'string', description: 'Date and time of the next run.', required: true},
+    {name: 'nextRun', type: 'string', description: 'Date and time of the next run. Leave it out for a workflow without a schedule (a schedule is optional): the page says Not scheduled.'},
     {name: 'approvers', type: 'string[]', description: 'People who must approve results before they go out. Empty shows "Nobody".', required: true},
     {name: 'sendTo', type: 'string[]', description: 'Where results go. Empty shows "Nobody yet".', required: true},
     {name: 'runs', type: 'WorkflowRun[]', description: 'Recent runs, newest first, each shown with when it started, its result and when it finished. A run with href is one clickable row that opens that run on the board. Empty shows when the first run is.', required: true},

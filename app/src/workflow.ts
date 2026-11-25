@@ -327,7 +327,8 @@ export type BuiltStage = {id: string; content: WorkflowTileContent};
 export type BuiltWorkflow = {
   id: number;
   name: string;
-  when: Schedule;
+  /** Optional: without one it says Not scheduled and runs only when someone starts it. */
+  when?: Schedule;
   schedule: string;
   nextRun: string;
   nextRunAt: string;

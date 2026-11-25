@@ -994,7 +994,7 @@ function ContextButton({context, onChange}: {context: string; onChange?: (contex
       }>
       <Button
         label="Workflow context"
-        tooltip={isEmpty ? 'Workflow context: not set yet' : 'Workflow context'}
+        tooltip={isEmpty ? 'Workflow context (optional): not set yet' : 'Workflow context (optional)'}
         isIconOnly
         icon={<Icon icon={ScrollText} />}
       />
@@ -1117,7 +1117,7 @@ function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Sched
       }>
       <Button
         label="Schedule"
-        tooltip={when ? `Schedule: ${scheduleText(when)}` : 'Schedule: not set yet'}
+        tooltip={when ? `Schedule (optional): ${scheduleText(when)}` : 'Schedule (optional): not set yet'}
         isIconOnly
         icon={<Icon icon={CalendarClock} />}
       />
@@ -1125,19 +1125,23 @@ function ScheduleButton({when, onChange}: {when?: Schedule; onChange?: (s: Sched
   );
 }
 
-/** Asks when a new workflow should run, the first time it is saved. Save is the only way out besides Cancel. */
-function ScheduleDialog({name, initial, onSave, onClose}: {name: string; initial: Schedule; onSave: (s: Schedule) => void; onClose: () => void}) {
+/**
+ * Asks when a new workflow should run, the first time it is saved. A schedule is optional: Skip for now saves
+ * it without one, and it runs only when someone starts it until it has one.
+ */
+function ScheduleDialog({name, initial, onSave, onClose}: {name: string; initial: Schedule; onSave: (s?: Schedule) => void; onClose: () => void}) {
   const [value, setValue] = useState(initial);
   return (
     <Dialog isOpen onOpenChange={open => !open && onClose()} width={480} purpose="form">
       <Layout
         height="auto"
-        header={<DialogHeader title="When should it run?" subtitle={`Pick a schedule for ${name}. You can change it later from the Schedule button.`} onOpenChange={open => !open && onClose()} />}
+        header={<DialogHeader title="When should it run?" subtitle={`Optional. Pick a schedule for ${name}, or skip it and set one later from the Schedule button.`} onOpenChange={open => !open && onClose()} />}
         content={<LayoutContent padding={4}><ScheduleFields value={value} onChange={setValue} /></LayoutContent>}
         footer={
           <LayoutFooter padding={4}>
             <HStack gap={2} hAlign="end">
               <Button label="Cancel" variant="ghost" onClick={onClose} />
+              <Button label="Skip for now" onClick={() => onSave(undefined)} />
               <Button label="Save" variant="primary" isDisabled={!isScheduleComplete(value)} onClick={() => onSave(value)} />
             </HStack>
           </LayoutFooter>
@@ -1458,11 +1462,11 @@ function Builder({editing, selectTile, startData, viewRun, library, onTurnOn}: B
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
   const finalName = name.trim() || 'Untitled workflow';
-  const saveNew = (s: Schedule) => {
+  const saveNew = (s?: Schedule) => {
     setWhen(s);
     setIsAskingSchedule(false);
     onTurnOn(finalName, toColumns(board, links, sections), {board, links, sections, context, when: s});
-    toast({body: `${finalName} is saved to your library. Schedule: ${scheduleText(s)}.`});
+    toast({body: `${finalName} is saved to your library. ${s ? `Schedule: ${scheduleText(s)}.` : 'No schedule yet: it runs when you start it.'}`});
   };
   useEffect(() => {
     if (trial !== 'done') setChecked([]);

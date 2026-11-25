@@ -14,7 +14,8 @@ export type WorkflowOverviewProps = {
   /** One sentence on what the workflow does. */
   summary: string;
   schedule: string;
-  nextRun: string;
+  /** Leave it out for a workflow without a schedule: the page says Not scheduled. */
+  nextRun?: string;
   approvers: string[];
   sendTo: string[];
   runs: WorkflowRun[];
@@ -46,7 +47,7 @@ export function WorkflowOverview({
     <OverviewFrame crumbs={[{label: name}]} homeHref={homeHref} isInPanel={isInPanel}>
       <OverviewHeading
         status={isDraft ? 'draft' : 'on'}
-        note={isDraft ? 'Not turned on yet' : `Next run: ${nextRun}`}
+        note={isDraft ? 'Not turned on yet' : nextRun ? `Next run: ${nextRun}` : 'Not scheduled'}
         name={name}
         summary={summary}
         actions={
@@ -66,7 +67,7 @@ export function WorkflowOverview({
         ]}
       />
 
-      <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : `The first run is ${nextRun}.`} />
+      <OverviewRuns runs={runs} emptyTitle="No runs yet" emptyDescription={isDraft ? 'It runs once it’s turned on.' : nextRun ? `The first run is ${nextRun}.` : 'It runs when you press Run now, or on a schedule once it has one.'} />
 
       <AlertDialog
         isOpen={isDeleting}

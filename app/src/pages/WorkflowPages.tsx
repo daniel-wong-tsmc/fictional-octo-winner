@@ -75,7 +75,7 @@ export function BuiltWorkflowPage({workflow: w, onDelete, isInPanel}: {workflow:
       name={w.name}
       summary={`${plural(count('input'), 'input', 'inputs')}, ${plural(count('step'), 'LLM step', 'LLM steps')}, ${plural(count('output'), 'handoff', 'handoffs')}. Turned on ${w.createdOn}.`}
       schedule={w.schedule}
-      nextRun={w.nextRun}
+      nextRun={w.nextRunAt ? w.nextRun : undefined}
       {...handoffDetails(stages)}
       runs={[]}
       editHref={`#workflow-edit-${w.id}`}
